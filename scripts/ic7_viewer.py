@@ -28,7 +28,7 @@ import streamlit as st
 # CONFIGURAÇÃO
 # ─────────────────────────────────────────────────────────────────────────────
 
-TRADE_LOG_PATH = Path(__file__).resolve().parent.parent / "reports" / "ic7_backtest" / "trade_log.csv"
+REPORTS_DIR    = Path(__file__).resolve().parent.parent / "reports" / "ic7_backtest"
 NDX_MULTIPLIER = 100
 
 # Paleta de cores
@@ -689,11 +689,26 @@ with st.sidebar:
     )
     st.divider()
 
-    if not TRADE_LOG_PATH.exists():
-        st.error(f"trade_log.csv not found:\n{TRADE_LOG_PATH}")
+    # ── Descoberta automática de todos os CSVs na pasta de relatórios ────
+    csv_files = sorted(REPORTS_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not csv_files:
+        st.error(f"No backtest CSV found in:\n{REPORTS_DIR}")
         st.stop()
 
-    df = load_trade_log(TRADE_LOG_PATH)
+    # Seletor de backtest (aparece só se houver mais de um resultado)
+    if len(csv_files) > 1:
+        st.markdown(f"<p class='section-title'>Select Backtest</p>", unsafe_allow_html=True)
+        selected_csv = st.selectbox(
+            "Backtest:",
+            options=csv_files,
+            format_func=lambda p: p.stem,   # mostra nome sem .csv
+            index=0,
+        )
+        st.divider()
+    else:
+        selected_csv = csv_files[0]
+
+    df = load_trade_log(selected_csv)
 
     # ── Resumo do portfólio ───────────────────────────────────────────────
     total     = len(df)

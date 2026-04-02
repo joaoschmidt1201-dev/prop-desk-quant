@@ -44,6 +44,11 @@ DATA_DIR       = Path("G:/Meu Drive/Quant_Data_MD")
 DATA_PATTERN   = "NDX_chain_{date}.parquet"
 OUTPUT_DIR     = Path(__file__).resolve().parent.parent / "reports" / "ic7_backtest"
 
+# Strategy tag — change this when running a different backtest variant.
+# The output CSV will be named: {STRATEGY_TAG}_{start}_{end}.csv
+# Example variants: "IC7_14DTE_NDX", "IC7_7DTE_SPX", "IC7_7DTE_NDX"
+STRATEGY_TAG   = "IC7_7DTE_NDX"
+
 NDX_MULTIPLIER = 100      # USD per index point
 PUT_WIDTH      = 50       # Put spread width  (points)
 CALL_WIDTH     = 100      # Call spread width (points)
@@ -855,8 +860,11 @@ def plot_monthly_heatmap(tl: pd.DataFrame, outdir: Path):
 # ── Export: CSV + TXT Report ──────────────────────────────────────────────
 
 def export_results(tl: pd.DataFrame, rpt: dict, outdir: Path):
-    # ── CSV
-    csv_path = outdir / "trade_log.csv"
+    # ── CSV  (filename encodes strategy + actual date range of the backtest)
+    start    = str(tl["trade_date"].min())
+    end      = str(tl["exp_date"].max())
+    csv_name = f"{STRATEGY_TAG}_{start}_{end}.csv"
+    csv_path = outdir / csv_name
     tl.to_csv(csv_path, index=False, float_format="%.4f")
     log.info(f"  ✓ {csv_path}")
 
