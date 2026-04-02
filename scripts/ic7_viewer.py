@@ -113,11 +113,17 @@ st.markdown(f"""
         margin-bottom: 8px;
     }}
 
-    /* Tabs */
+    /* Tabs — barra de navegação na parte INFERIOR */
+    .stTabs {{
+        display: flex !important;
+        flex-direction: column-reverse !important;
+    }}
     .stTabs [data-baseweb="tab-list"] {{
         background-color: {C['panel']};
-        border-bottom: 1px solid {C['border']};
+        border-top: 1px solid {C['border']};
+        border-bottom: none;
         gap: 4px;
+        margin-top: 12px;
     }}
     .stTabs [data-baseweb="tab"] {{
         background-color: transparent;
@@ -125,15 +131,17 @@ st.markdown(f"""
         font-family: monospace;
         font-size: 13px;
         padding: 8px 20px;
-        border-radius: 6px 6px 0 0;
+        border-radius: 0 0 6px 6px;
     }}
     .stTabs [aria-selected="true"] {{
         background-color: {C['bg']} !important;
         color: {C['white']} !important;
-        border-bottom: 2px solid {C['blue']} !important;
+        border-top: 2px solid {C['blue']} !important;
+        border-bottom: none !important;
     }}
     .stTabs [data-baseweb="tab-panel"] {{
-        padding-top: 20px;
+        padding-top: 4px;
+        padding-bottom: 8px;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -557,7 +565,7 @@ def build_monthly_heatmap(df: pd.DataFrame) -> go.Figure:
         z=z, x=month_abbr, y=y,
         text=text,
         texttemplate="%{text}",
-        textfont=dict(size=11, family="monospace"),
+        textfont=dict(size=11, family="monospace", color="black"),
         colorscale=[
             [0.00, "rgba(255,77,77,0.90)"],
             [0.45, "rgba(255,77,77,0.12)"],
@@ -580,6 +588,11 @@ def build_monthly_heatmap(df: pd.DataFrame) -> go.Figure:
         plot_bgcolor=C["panel"],
         font=dict(color=C["white"], family="monospace", size=11),
         xaxis=dict(side="top"),
+        yaxis=dict(
+            tickmode="array",
+            tickvals=y,
+            ticktext=y,
+        ),
         margin=dict(l=70, r=20, t=70, b=20),
         height=max(160, 80 + 70 * len(y)),
     )
