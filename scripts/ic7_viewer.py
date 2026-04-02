@@ -114,7 +114,7 @@ st.markdown(f"""
     }}
 
     /* Tabs — barra de navegação na parte INFERIOR */
-    .stTabs {{
+    div[data-testid="stTabs"] > div:first-child {{
         display: flex !important;
         flex-direction: column-reverse !important;
     }}
@@ -418,13 +418,12 @@ def build_equity_curve(df: pd.DataFrame) -> go.Figure:
             tickprefix="$", tickformat=",",
         ),
         yaxis2=dict(
-            title="Win Rate %",
+            title=dict(text="Win Rate %", font=dict(color=C["purple"])),
             overlaying="y", side="right",
             range=[0, 105],
             showgrid=False,
             ticksuffix="%",
             tickfont=dict(color=C["purple"]),
-            titlefont=dict(color=C["purple"]),
         ),
         legend=dict(
             orientation="h", y=1.04, x=0.01,
