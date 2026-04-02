@@ -1,0 +1,34 @@
+# ── Credenciais e segredos ────────────────────────────────────────────────────
+.env
+*.key
+
+# ── Dados de mercado (Google Drive / local — nunca no repo) ──────────────────
+*.parquet
+data/
+
+# ── Relatórios gerados (imagens e logs) ──────────────────────────────────────
+# O trade_log.csv É commitado — é o que alimenta o viewer no Streamlit Cloud
+reports/ic7_backtest/*.log
+reports/ic7_backtest/*.png
+reports/ic7_backtest/performance_report.txt
+reports/ic7_backtest/backtest.log
+
+# ── Python cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# ── Ambiente virtual ──────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── IDE e OS ─────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Claude Code (interno) ────────────────────────────────────────────────────
+.claude/
