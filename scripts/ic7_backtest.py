@@ -655,7 +655,7 @@ def build_performance_report(tl: pd.DataFrame) -> dict:
 
     # Recovery factor
     total_pnl = pnl.sum()
-    max_dd = dd.min()
+    max_dd = pnl.min()
     recovery = abs(total_pnl / max_dd) if max_dd != 0 else float("inf")
 
     return dict(

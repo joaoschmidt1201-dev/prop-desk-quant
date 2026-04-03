@@ -358,7 +358,7 @@ def compute_perf_stats(df: pd.DataFrame) -> dict:
         avg_loss      = losses.mean() if len(losses) > 0 else 0.0,
         profit_factor = profit_factor,
         sharpe        = sharpe,
-        max_dd        = dd.min(),
+        max_dd        = weekly.min(),
         avg_credit    = df["total_credit"].mean(),
         total_premium = df["total_credit"].sum() * NDX_MULTIPLIER,
     )
