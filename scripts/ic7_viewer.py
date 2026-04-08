@@ -267,13 +267,13 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
         fill="tozeroy", fillcolor="rgba(255,77,77,0.15)",
         line=dict(width=0), hoverinfo="skip",
     ))
-    pct_from_entry = (S - spot_in) / spot_in * 100
+    pct_from_entry = np.round((S - spot_in) / spot_in * 100, 1)
     fig.add_trace(go.Scatter(
         x=S, y=pnl, mode="lines",
         line=dict(color=C["white"], width=2.5),
         name="Payoff",
         customdata=np.stack([pct_from_entry], axis=1),
-        hovertemplate="Spot: %{x:,.0f}  (%{customdata[0]:+.1f}% vs entry)<br>P&L: $%{y:,.0f}<extra></extra>",
+        hovertemplate="Spot: %{x:,.0f} (%{customdata[0]:.1f}%)<br>P&L: $%{y:,.0f}<extra></extra>",
     ))
 
     # Strikes
