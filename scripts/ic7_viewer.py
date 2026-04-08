@@ -1231,14 +1231,14 @@ with tab1:
         c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
         iv_val = row.get("iv_atm_pct", row.get("iv_atm_entry", float("nan")))
 
-        # VIX lookup
+        # VIX lookup — normalize timezone before comparison
         trade_ts = pd.Timestamp(str(row["trade_date"]))
         vix_val  = float("nan")
         if not vix_series.empty:
-            # find closest date on or before trade_date
-            vix_idx = vix_series.index[vix_series.index <= trade_ts]
-            if len(vix_idx):
-                vix_val = float(vix_series.loc[vix_idx[-1]])
+            idx = vix_series.index.normalize().tz_localize(None)
+            mask = idx <= trade_ts
+            if mask.any():
+                vix_val = float(vix_series.iloc[mask.to_numpy().nonzero()[0][-1]])
 
         is_open_trade = bool(row.get("is_open", False))
 
