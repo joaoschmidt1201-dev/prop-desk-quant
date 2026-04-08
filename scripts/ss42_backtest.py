@@ -488,10 +488,19 @@ def compute_daily_mtm(
             mask_dte = chain["dte"].between(dte_rem - 1, dte_rem + 1)
 
             def _get_mid(side: str, strike: int) -> float | None:
+                # Exact match first
                 rows = chain[mask_dte & (chain["side"] == side) & (chain["strike"] == strike)]
-                if rows.empty:
+                if not rows.empty:
+                    v = float(rows["mid"].iloc[0])
+                    return v if v >= 0 else None
+                # Nearest-strike fallback: some parquets use 200-pt spacing
+                # for far-dated expirations — exact strike may not exist.
+                nearby = chain[mask_dte & (chain["side"] == side) &
+                               chain["strike"].between(strike - 200, strike + 200)]
+                if nearby.empty:
                     return None
-                v = float(rows["mid"].iloc[0])
+                nearest = nearby.iloc[(nearby["strike"] - strike).abs().values.argsort()[:1]]
+                v = float(nearest["mid"].iloc[0])
                 return v if v >= 0 else None
 
             put_mid  = _get_mid("put",  sp_int)
