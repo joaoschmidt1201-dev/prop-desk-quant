@@ -1016,8 +1016,10 @@ with st.sidebar:
     st.divider()
 
     # ── Descoberta automática de todos os CSVs em reports/ ───────────────
+    _excluded = {"_daily_", "vix_history"}
     csv_files = sorted(
-        [p for p in REPORTS_BASE.glob("**/*.csv") if "_daily_" not in p.stem],
+        [p for p in REPORTS_BASE.glob("**/*.csv")
+         if not any(x in p.stem for x in _excluded)],
         key=lambda p: p.stat().st_mtime, reverse=True,
     )
     if not csv_files:
@@ -1217,7 +1219,10 @@ with tab1:
         iv_val = row.get("iv_atm_pct", row.get("iv_atm_entry", float("nan")))
 
         # VIX read directly from CSV column
-        vix_val = float(row.get("vix_entry", float("nan")) or float("nan"))
+        try:
+            vix_val = float(row["vix_entry"])
+        except (KeyError, TypeError, ValueError):
+            vix_val = float("nan")
 
         is_open_trade = bool(row.get("is_open", False))
 
