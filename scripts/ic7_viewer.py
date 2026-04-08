@@ -1214,34 +1214,25 @@ with tab1:
     )
 
     if strategy == "SS42":
-        # ── SS42: 7 métricas (+ VIX) ─────────────────────────────────────
-        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+        # ── SS42: 6 métricas ─────────────────────────────────────────────
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
         iv_val = row.get("iv_atm_pct", row.get("iv_atm_entry", float("nan")))
-
-        # VIX read directly from CSV column
-        try:
-            vix_val = float(row["vix_entry"])
-        except (KeyError, TypeError, ValueError):
-            vix_val = float("nan")
-
         is_open_trade = bool(row.get("is_open", False))
 
         c1.metric("Entry Spot", f"{row['spot_entry']:,.0f}")
         c2.metric("IV ATM", f"{iv_val:.1f}%" if iv_val == iv_val else "—",
                   help="IV ATM at entry — Black-Scholes inversion from mid price")
-        c3.metric("VIX", f"{vix_val:.1f}" if vix_val == vix_val else "—",
-                  help="VIX closing price on entry date")
-        c4.metric("DTE Entry", f"{row.get('dte_entry', '—')} days")
-        c5.metric("Credit Received", f"{row['total_credit']:.2f} pts",
+        c3.metric("DTE Entry", f"{row.get('dte_entry', '—')} days")
+        c4.metric("Credit Received", f"{row['total_credit']:.2f} pts",
                   delta=f"${row['total_credit'] * SS42_MULTIPLIER:,.0f} USD")
         if is_open_trade:
-            c6.metric("Exit Spot", "—", help="Trade still open")
-            c7.metric("P&L", "In Progress", help="Trade has not yet expired")
+            c5.metric("Exit Spot", "—", help="Trade still open")
+            c6.metric("P&L", "In Progress", help="Trade has not yet expired")
         else:
-            c6.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
+            c5.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
                       delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
                       delta_color=delta_color(row["spot_exit"] - row["spot_entry"]))
-            c7.metric("Effective P&L", f"${row['effective_pnl_usd']:+,.0f}",
+            c6.metric("Effective P&L", f"${row['effective_pnl_usd']:+,.0f}",
                       delta=f"{row['pnl_points']:+.2f} pts",
                       delta_color=delta_color(row["effective_pnl_usd"]),
                       help="P&L per selected close rule")
