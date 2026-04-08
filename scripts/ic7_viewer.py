@@ -419,10 +419,12 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
             line=dict(width=0), hoverinfo="skip",
         ))
 
-        # Main line
+        # Main line + individual day dots
         fig.add_trace(go.Scatter(
-            x=x_vals, y=y_vals, mode="lines",
-            line=dict(color=exit_color, width=2.5),
+            x=x_vals, y=y_vals, mode="lines+markers",
+            line=dict(color=exit_color, width=2),
+            marker=dict(size=5, color=exit_color, opacity=0.75,
+                        line=dict(width=0)),
             customdata=[[s, d] for s, d in zip(spots, dtes)],
             hovertemplate="Day <b>%{x}</b>  (DTE %{customdata[1]})  |  Spot: %{customdata[0]:,.0f}  |  P&L: <b>$%{y:+,.0f}</b><extra></extra>",
         ))
