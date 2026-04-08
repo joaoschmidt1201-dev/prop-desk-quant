@@ -449,20 +449,93 @@ def calc_pnl_expiration(
     )
 
 
+def compute_daily_mtm(
+    entry_date:   date,
+    exp_date:     date,
+    short_put:    float,
+    short_call:   float,
+    entry_credit: float,
+    available:    set[date],
+) -> list[dict]:
+    """
+    Computes mark-to-market P&L for every available trading day of a strangle.
+    Uses actual mid prices from parquets (±1 DTE tolerance).
+    On expiration day, uses European intrinsic value.
+    """
+    records: list[dict] = []
+    sp_int = int(short_put)
+    sc_int = int(short_call)
+
+    current = entry_date
+    while current <= exp_date:
+        if current not in available:
+            current += timedelta(days=1)
+            continue
+
+        chain = load_chain(current)
+        if chain is None:
+            current += timedelta(days=1)
+            continue
+
+        dte_rem = (exp_date - current).days
+        spot    = float(chain["underlying_price"].median())
+
+        if dte_rem == 0:
+            # Expiration: intrinsic value (European exercise)
+            put_mid  = max(0.0, short_put  - spot)
+            call_mid = max(0.0, spot       - short_call)
+        else:
+            mask_dte = chain["dte"].between(dte_rem - 1, dte_rem + 1)
+
+            def _get_mid(side: str, strike: int) -> float | None:
+                rows = chain[mask_dte & (chain["side"] == side) & (chain["strike"] == strike)]
+                if rows.empty:
+                    return None
+                v = float(rows["mid"].iloc[0])
+                return v if v >= 0 else None
+
+            put_mid  = _get_mid("put",  sp_int)
+            call_mid = _get_mid("call", sc_int)
+
+            if put_mid is None or call_mid is None:
+                current += timedelta(days=1)
+                continue
+
+        close_cost = put_mid + call_mid
+        pnl_usd    = round((entry_credit - close_cost) * MULTIPLIER, 2)
+
+        records.append(dict(
+            trade_date    = entry_date,
+            calendar_date = current,
+            dte_remaining = dte_rem,
+            spot          = round(spot,      2),
+            put_mid       = round(float(put_mid),  4),
+            call_mid      = round(float(call_mid), 4),
+            pnl_usd       = pnl_usd,
+        ))
+
+        del chain
+        gc.collect()
+        current += timedelta(days=1)
+
+    return records
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION E — LOOP PRINCIPAL DO BACKTEST
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_backtest() -> pd.DataFrame:
+def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
     available = get_available_dates()
     if not available:
         log.error(f"Nenhum parquet encontrado para {UNDERLYING} em {DATA_DIR}")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
     entry_dates = discover_entry_dates(available)
     log.info(f"Datas de entrada encontradas: {len(entry_dates)}")
 
-    records: list[dict] = []
+    records:       list[dict] = []
+    daily_records: list[dict] = []
     skipped = 0
 
     for entry_date in entry_dates:
@@ -565,6 +638,16 @@ def run_backtest() -> pd.DataFrame:
             )
             records.append(record)
 
+            # ── DAILY MTM ────────────────────────────────────────────────────
+            daily_records.extend(compute_daily_mtm(
+                entry_date,
+                exp_date,
+                strikes["short_put"],
+                strikes["short_call"],
+                strikes["total_credit"],
+                available,
+            ))
+
             log.info(
                 f"{entry_date} -> {exp_date} ({dte_entry}DTE) | "
                 f"Spot:{spot:>7.0f} | "
@@ -588,7 +671,8 @@ def run_backtest() -> pd.DataFrame:
 
     log.info(f"\n{'─'*60}")
     log.info(f"Trades executados: {len(records)} | Pulados: {skipped}")
-    return pd.DataFrame(records)
+    log.info(f"Daily MTM records: {len(daily_records)}")
+    return pd.DataFrame(records), pd.DataFrame(daily_records)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -628,6 +712,20 @@ def save_results(df: pd.DataFrame) -> Path:
     return path
 
 
+def save_daily_mtm(df_daily: pd.DataFrame) -> Path:
+    if df_daily.empty:
+        log.warning("Daily MTM vazio — nenhum CSV daily gerado.")
+        return OUTPUT_DIR
+
+    start = df_daily["trade_date"].min()
+    end   = df_daily["trade_date"].max()
+    fname = f"SS42_{UNDERLYING}_daily_{start}_{end}.csv"
+    path  = OUTPUT_DIR / fname
+    df_daily.to_csv(path, index=False)
+    log.info(f"Daily MTM CSV salvo: {path} ({len(df_daily)} rows)")
+    return path
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
@@ -647,8 +745,9 @@ def main() -> None:
     if not Path("G:/").exists():
         sys.exit("[ERRO FATAL] Google Drive nao montado em G:/")
 
-    df = run_backtest()
+    df, df_daily = run_backtest()
     save_results(df)
+    save_daily_mtm(df_daily)
 
 
 if __name__ == "__main__":

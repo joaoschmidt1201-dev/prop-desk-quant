@@ -160,6 +160,14 @@ def load_trade_log(path: Path) -> pd.DataFrame:
     return df
 
 
+@st.cache_data
+def load_daily_mtm(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    df["trade_date"]    = df["trade_date"].astype(str)
+    df["calendar_date"] = pd.to_datetime(df["calendar_date"])
+    return df
+
+
 def detect_strategy(df: pd.DataFrame) -> str:
     """Detecta tipo de backtest: 'IC7' ou 'SS42'."""
     if "long_put" in df.columns and "long_call" in df.columns:
@@ -265,12 +273,7 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
         line=dict(color=C["white"], width=2.5),
         name="Payoff",
         customdata=np.stack([pct_from_entry], axis=1),
-        hovertemplate=(
-            "Spot: <b>%{x:,.0f}</b>"
-            " <span style='color:#8b949e'>(%{customdata[0]:+.1f}% vs entry)</span>"
-            "<br>P&L: <b>$%{y:,.0f}</b>"
-            "<extra></extra>"
-        ),
+        hovertemplate="Spot: %{x:,.0f}  (%{customdata[0]:+.1f}% vs entry)<br>P&L: $%{y:,.0f}<extra></extra>",
     ))
 
     # Strikes
@@ -311,7 +314,7 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
     fig.update_layout(
         paper_bgcolor=C["bg"], plot_bgcolor=C["panel"],
         font=dict(color=C["white"], family="monospace", size=11),
-        xaxis=dict(title="Underlying Price", gridcolor=C["border"], tickformat=","),
+        xaxis=dict(title="Underlying Price", gridcolor=C["border"], tickformat=",", hoverformat=",.0f"),
         yaxis=dict(title="P&L (USD)", gridcolor=C["border"],
                    tickprefix="$", tickformat=","),
         showlegend=False,
@@ -332,69 +335,118 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
     return fig
 
 
-def build_pnl_timeline(row: pd.Series) -> go.Figure:
+def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figure:
     """
-    Line chart showing P&L trajectory across the trade's life:
-    Entry (max credit) → 21 DTE checkpoint → Expiration.
-    X-axis = DTE countdown (entry DTE → 0).
+    Daily mark-to-market P&L line chart for a single strangle trade.
+    X-axis = DTE countdown (entry → 0). Uses actual daily mid prices from
+    the companion CSV when available; falls back to 3-point chart otherwise.
     """
-    mult       = SS42_MULTIPLIER
-    credit_usd = row["total_credit"] * mult
-    pnl_21     = row.get("pnl_usd_21dte", float("nan"))
-    pnl_exp    = row["pnl_usd"]
-    dte_entry  = int(row.get("dte_entry", 42))
-
-    x_vals, y_vals, labels = [], [], []
-
-    # Entry point — P&L = full credit received
-    x_vals.append(dte_entry); y_vals.append(credit_usd); labels.append(f"Entry<br>+${credit_usd:,.0f}")
-
-    # 21 DTE checkpoint (skip if NaN)
-    if pnl_21 == pnl_21:
-        x_vals.append(21); y_vals.append(pnl_21); labels.append(f"21 DTE<br>${pnl_21:+,.0f}")
-
-    # Expiration
-    x_vals.append(0); y_vals.append(pnl_exp); labels.append(f"Exp<br>${pnl_exp:+,.0f}")
-
+    pnl_exp   = row["pnl_usd"]
     exit_color = C["green"] if pnl_exp >= 0 else C["red"]
-    line_color = exit_color
+    fill_color = "rgba(0,200,150,0.08)" if pnl_exp >= 0 else "rgba(255,77,77,0.08)"
 
-    fig = go.Figure()
+    # ── Try actual daily data ─────────────────────────────────────────────────
+    trade_date_val = row["trade_date"]
+    if daily_df is not None and not daily_df.empty:
+        subset = daily_df[daily_df["trade_date"] == str(trade_date_val)]
+        if subset.empty:
+            # Try matching as date object
+            subset = daily_df[daily_df["trade_date"].astype(str) == str(trade_date_val)]
+    else:
+        subset = pd.DataFrame()
 
-    # Shaded area under the line
-    fig.add_trace(go.Scatter(
-        x=x_vals, y=y_vals,
-        fill="tozeroy",
-        fillcolor=f"rgba(0,200,150,0.08)" if pnl_exp >= 0 else "rgba(255,77,77,0.08)",
-        line=dict(width=0), hoverinfo="skip",
-    ))
+    if not subset.empty:
+        subset = subset.sort_values("dte_remaining", ascending=False)
+        x_vals = subset["dte_remaining"].tolist()
+        y_vals = subset["pnl_usd"].tolist()
+        spots  = subset["spot"].tolist()
 
-    # Main line + markers
-    fig.add_trace(go.Scatter(
-        x=x_vals, y=y_vals,
-        mode="lines+markers+text",
-        line=dict(color=line_color, width=2.5),
-        marker=dict(size=9, color=[C["blue"], C["yellow"], exit_color][:len(x_vals)],
-                    line=dict(width=1.5, color=C["bg"])),
-        text=labels,
-        textposition=["top center"] * len(x_vals),
-        textfont=dict(size=10, family="monospace", color=C["dim"]),
-        hovertemplate="DTE: <b>%{x}</b><br>P&L: <b>$%{y:,.0f}</b><extra></extra>",
-    ))
+        fig = go.Figure()
 
-    fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
+        # Shaded fill
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals, fill="tozeroy", fillcolor=fill_color,
+            line=dict(width=0), hoverinfo="skip",
+        ))
+
+        # Main line
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals, mode="lines",
+            line=dict(color=exit_color, width=2.5),
+            customdata=[[s] for s in spots],
+            hovertemplate="DTE: <b>%{x}</b>  |  Spot: %{customdata[0]:,.0f}  |  P&L: <b>$%{y:+,.0f}</b><extra></extra>",
+        ))
+
+        # Zero line
+        fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
+
+        # Mark 21 DTE checkpoint
+        ckpt = subset[subset["dte_remaining"] == 21]
+        if ckpt.empty:
+            # closest to 21
+            idx = (subset["dte_remaining"] - 21).abs().idxmin()
+            ckpt = subset.loc[[idx]]
+        if not ckpt.empty:
+            cx = int(ckpt["dte_remaining"].iloc[0])
+            cy = float(ckpt["pnl_usd"].iloc[0])
+            fig.add_trace(go.Scatter(
+                x=[cx], y=[cy], mode="markers",
+                marker=dict(size=10, color=C["yellow"], symbol="circle",
+                            line=dict(width=2, color=C["bg"])),
+                hovertemplate=f"21 DTE checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
+            ))
+
+        # Mark entry and expiration
+        entry_x = x_vals[0];  entry_y = y_vals[0]
+        exp_x   = x_vals[-1]; exp_y   = y_vals[-1]
+        fig.add_trace(go.Scatter(
+            x=[entry_x, exp_x], y=[entry_y, exp_y], mode="markers",
+            marker=dict(size=10, color=[C["blue"], exit_color],
+                        line=dict(width=2, color=C["bg"])),
+            hoverinfo="skip",
+        ))
+
+    else:
+        # ── Fallback: 3-point chart ───────────────────────────────────────────
+        credit_usd = row["total_credit"] * SS42_MULTIPLIER
+        pnl_21     = row.get("pnl_usd_21dte", float("nan"))
+        dte_entry  = int(row.get("dte_entry", 42))
+
+        x_vals = [dte_entry]
+        y_vals = [credit_usd]
+        if pnl_21 == pnl_21:
+            x_vals.append(21); y_vals.append(pnl_21)
+        x_vals.append(0); y_vals.append(pnl_exp)
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals, fill="tozeroy", fillcolor=fill_color,
+            line=dict(width=0), hoverinfo="skip",
+        ))
+        fig.add_trace(go.Scatter(
+            x=x_vals, y=y_vals, mode="lines+markers",
+            line=dict(color=exit_color, width=2.5),
+            marker=dict(size=9, color=[C["blue"], C["yellow"], exit_color][:len(x_vals)],
+                        line=dict(width=1.5, color=C["bg"])),
+            hovertemplate="DTE: <b>%{x}</b><br>P&L: <b>$%{y:+,.0f}</b><extra></extra>",
+        ))
+        fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
 
     fig.update_layout(
-        title=dict(text="<b>P&L Journey</b>",
+        title=dict(text="<b>P&L Journey</b>  — mark-to-market if closed today",
                    font=dict(size=13, color=C["white"], family="monospace"), x=0.02),
         paper_bgcolor=C["bg"], plot_bgcolor=C["panel"],
         font=dict(color=C["white"], family="monospace", size=11),
-        xaxis=dict(title="DTE", gridcolor=C["border"], autorange="reversed",
-                   tickvals=x_vals, ticktext=[str(v) for v in x_vals]),
-        yaxis=dict(gridcolor=C["border"], tickprefix="$", tickformat=","),
+        xaxis=dict(title="DTE remaining", gridcolor=C["border"],
+                   autorange="reversed", hoverformat="d"),
+        yaxis=dict(title="P&L (USD)", gridcolor=C["border"],
+                   tickprefix="$", tickformat=","),
         showlegend=False,
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor=C["panel"], bordercolor=C["border"],
+                        font=dict(color=C["white"])),
         margin=dict(l=70, r=20, t=50, b=50),
-        height=300,
+        height=320,
     )
     return fig
 
@@ -945,6 +997,16 @@ with st.sidebar:
     df_raw = load_trade_log(selected_csv)
     strategy = detect_strategy(df_raw)
 
+    # Auto-detect companion daily MTM CSV (SS42 only)
+    daily_df_raw: pd.DataFrame | None = None
+    if strategy == "SS42":
+        daily_candidates = sorted(selected_csv.parent.glob("*_daily_*.csv"))
+        # Match by underlying prefix (SPX or RUT)
+        prefix = "SPX" if "SPX" in selected_csv.stem else "RUT"
+        daily_candidates = [p for p in daily_candidates if prefix in p.stem]
+        if daily_candidates:
+            daily_df_raw = load_daily_mtm(daily_candidates[-1])
+
     # ── Close Rule selector (SS42 only) ──────────────────────────────────
     close_rule = "Hold to Expiration"
     if strategy == "SS42":
@@ -1115,12 +1177,9 @@ with tab1:
 
         st.markdown("---")
 
-        # ── SS42: payoff + timeline ───────────────────────────────────────
-        col_payoff, col_timeline = st.columns([3, 2])
-        with col_payoff:
-            st.plotly_chart(build_strangle_payoff_chart(row), use_container_width=True)
-        with col_timeline:
-            st.plotly_chart(build_pnl_timeline(row), use_container_width=True)
+        # ── SS42: payoff (full width) then daily P&L Journey ─────────────
+        st.plotly_chart(build_strangle_payoff_chart(row), use_container_width=True)
+        st.plotly_chart(build_pnl_timeline(row, daily_df_raw), use_container_width=True)
 
         st.markdown("---")
 
