@@ -534,6 +534,40 @@ def compute_daily_mtm(
 # SECTION E — LOOP PRINCIPAL DO BACKTEST
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _load_vix_cache(entry_dates: list) -> dict:
+    """
+    Loads VIX closes from reports/vix_history.csv (committed to repo).
+    Falls back to direct Yahoo Finance API if CSV not found.
+    Returns {date: vix_close}.
+    """
+    vix_csv = OUTPUT_DIR.parent / "vix_history.csv"
+    try:
+        if vix_csv.exists():
+            df = pd.read_csv(vix_csv, parse_dates=["date"])
+            cache = {row.date.date(): float(row.vix_close) for row in df.itertuples()}
+            log.info(f"VIX carregado do CSV: {len(cache)} dias")
+            return cache
+    except Exception as exc:
+        log.warning(f"Erro ao ler vix_history.csv: {exc}")
+
+    # Fallback: direct Yahoo Finance API (no yfinance wrapper)
+    try:
+        import urllib.request, json
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=2y"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read())
+        ts      = data["chart"]["result"][0]["timestamp"]
+        closes  = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+        dates   = pd.to_datetime(ts, unit="s").normalize()
+        cache   = {d.date(): float(v) for d, v in zip(dates, closes) if v is not None}
+        log.info(f"VIX carregado via API: {len(cache)} dias")
+        return cache
+    except Exception as exc:
+        log.warning(f"VIX não disponível via API: {exc}")
+        return {}
+
+
 def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
     available = get_available_dates()
     if not available:
@@ -542,6 +576,8 @@ def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
 
     entry_dates = discover_entry_dates(available)
     log.info(f"Datas de entrada encontradas: {len(entry_dates)}")
+
+    vix_cache = _load_vix_cache(entry_dates)
 
     records:       list[dict] = []
     daily_records: list[dict] = []
@@ -632,6 +668,14 @@ def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
                 spot_exit,
             )
 
+            # VIX: look up entry date, fall back to nearest previous day
+            vix_entry = vix_cache.get(entry_date)
+            if vix_entry is None:
+                for offset in range(1, 6):
+                    vix_entry = vix_cache.get(entry_date - timedelta(days=offset))
+                    if vix_entry is not None:
+                        break
+
             record = dict(
                 trade_date   = entry_date,
                 exp_date     = exp_date,
@@ -640,6 +684,7 @@ def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
                 spot_entry   = round(spot, 2),
                 iv_atm_entry = round(iv_atm, 6) if iv_atm else float("nan"),
                 iv_atm_pct   = round(iv_atm * 100, 2) if iv_atm else float("nan"),
+                vix_entry    = round(vix_entry, 2) if vix_entry else float("nan"),
                 exit_method  = exit_method,
                 **strikes,
                 **ckpt_data,

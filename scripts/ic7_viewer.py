@@ -171,18 +171,6 @@ def load_daily_mtm(path: Path) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(ttl=3600)
-def load_vix(date_min, date_max) -> pd.Series:
-    """Fetches VIX daily closes from Yahoo Finance for the given date range."""
-    try:
-        import yfinance as yf
-        from datetime import timedelta
-        end = pd.Timestamp(date_max) + pd.Timedelta(days=5)
-        vix = yf.download("^VIX", start=str(date_min), end=str(end.date()),
-                          progress=False, auto_adjust=True)
-        return vix["Close"].squeeze().rename("vix")
-    except Exception:
-        return pd.Series(dtype=float, name="vix")
 
 
 def detect_strategy(df: pd.DataFrame) -> str:
@@ -1114,9 +1102,6 @@ with st.sidebar:
 
     df_closed = df[~df["is_open"]]
 
-    # ── VIX ──────────────────────────────────────────────────────────────
-    vix_series = load_vix(df["trade_date"].min(), df["trade_date"].max())
-
     # ── Resumo do portfólio (apenas trades fechados) ──────────────────────
     total     = len(df_closed)
     wins      = (df_closed["effective_result"] == "WIN").sum()
@@ -1231,14 +1216,8 @@ with tab1:
         c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
         iv_val = row.get("iv_atm_pct", row.get("iv_atm_entry", float("nan")))
 
-        # VIX lookup — normalize timezone before comparison
-        trade_ts = pd.Timestamp(str(row["trade_date"]))
-        vix_val  = float("nan")
-        if not vix_series.empty:
-            idx = vix_series.index.normalize().tz_localize(None)
-            mask = idx <= trade_ts
-            if mask.any():
-                vix_val = float(vix_series.iloc[mask.to_numpy().nonzero()[0][-1]])
+        # VIX read directly from CSV column
+        vix_val = float(row.get("vix_entry", float("nan")) or float("nan"))
 
         is_open_trade = bool(row.get("is_open", False))
 
