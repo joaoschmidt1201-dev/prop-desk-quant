@@ -171,6 +171,20 @@ def load_daily_mtm(path: Path) -> pd.DataFrame:
     return df
 
 
+@st.cache_data(ttl=3600)
+def load_vix(date_min, date_max) -> pd.Series:
+    """Fetches VIX daily closes from Yahoo Finance for the given date range."""
+    try:
+        import yfinance as yf
+        from datetime import timedelta
+        end = pd.Timestamp(date_max) + pd.Timedelta(days=5)
+        vix = yf.download("^VIX", start=str(date_min), end=str(end.date()),
+                          progress=False, auto_adjust=True)
+        return vix["Close"].squeeze().rename("vix")
+    except Exception:
+        return pd.Series(dtype=float, name="vix")
+
+
 def detect_strategy(df: pd.DataFrame) -> str:
     """Detecta tipo de backtest: 'IC7' ou 'SS42'."""
     if "long_put" in df.columns and "long_call" in df.columns:
@@ -1090,38 +1104,60 @@ with st.sidebar:
         df["effective_pnl_usd"]  = df["pnl_usd"]
         df["effective_result"]   = df["result"]
 
-    # ── Resumo do portfólio ───────────────────────────────────────────────
-    total     = len(df)
-    wins      = (df["effective_result"] == "WIN").sum()
-    wr        = wins / total * 100
-    total_pnl = df["effective_pnl_usd"].sum()
+    # ── Marcar trades abertos (sem preço de saída real) ───────────────────
+    if "exit_method" in df.columns:
+        df["is_open"] = df["exit_method"] == "fallback_entry"
+        df.loc[df["is_open"], "effective_result"]  = "OPEN"
+        df.loc[df["is_open"], "effective_pnl_usd"] = float("nan")
+    else:
+        df["is_open"] = False
+
+    df_closed = df[~df["is_open"]]
+
+    # ── VIX ──────────────────────────────────────────────────────────────
+    vix_series = load_vix(df["trade_date"].min(), df["trade_date"].max())
+
+    # ── Resumo do portfólio (apenas trades fechados) ──────────────────────
+    total     = len(df_closed)
+    wins      = (df_closed["effective_result"] == "WIN").sum()
+    wr        = wins / total * 100 if total else 0
+    total_pnl = df_closed["effective_pnl_usd"].sum()
 
     st.markdown(f"<p class='section-title'>Portfolio Summary</p>", unsafe_allow_html=True)
 
+    n_open = df["is_open"].sum()
     col1, col2 = st.columns(2)
-    col1.metric("Trades", total)
+    col1.metric("Closed Trades", total)
     col2.metric("Win Rate", f"{wr:.1f}%")
-    mult_sidebar   = SS42_MULTIPLIER if strategy == "SS42" else NDX_MULTIPLIER
-    total_max_pnl  = (df["total_credit"] * mult_sidebar).sum()
-    capture_pct    = total_pnl / total_max_pnl * 100 if total_max_pnl else 0
+    mult_sidebar  = SS42_MULTIPLIER if strategy == "SS42" else NDX_MULTIPLIER
+    total_max_pnl = (df_closed["total_credit"] * mult_sidebar).sum()
+    capture_pct   = total_pnl / total_max_pnl * 100 if total_max_pnl else 0
 
     col1, col2 = st.columns(2)
     col1.metric("P&L Total", f"${total_pnl:,.0f}",
                 delta=f"{capture_pct:.1f}% of max credit",
-                help="% of total premium sold that was kept as profit")
-    iv_col = "iv_atm_pct" if "iv_atm_pct" in df.columns else "iv_atm_entry"
-    col2.metric("Avg IV ATM", f"{df[iv_col].mean():.1f}%" if iv_col in df.columns else "—")
+                help="% of total premium sold that was kept as profit (closed trades only)")
+    iv_col = "iv_atm_pct" if "iv_atm_pct" in df_closed.columns else "iv_atm_entry"
+    col2.metric("Avg IV ATM", f"{df_closed[iv_col].mean():.1f}%" if iv_col in df_closed.columns else "—")
+
+    if n_open > 0:
+        st.markdown(
+            f"<div style='font-size:11px; color:{C['yellow']}; margin-top:4px'>"
+            f"🟡 {n_open} open trade{'s' if n_open>1 else ''} excluded from stats</div>",
+            unsafe_allow_html=True,
+        )
 
     st.divider()
 
     # ── Seletor de trade ──────────────────────────────────────────────────
     st.markdown(f"<p class='section-title'>Select Trade</p>", unsafe_allow_html=True)
 
-    _icons = {"WIN": "✅", "LOSS": "🔴", "MAX_LOSS": "💀"}
-    options = [
-        f"{_icons.get(row.effective_result,'?')}  {row.trade_date} → {row.exp_date}  |  ${row.effective_pnl_usd:+,.0f}"
-        for row in df.itertuples()
-    ]
+    _icons = {"WIN": "✅", "LOSS": "🔴", "MAX_LOSS": "💀", "OPEN": "🟡"}
+    def _trade_label(row) -> str:
+        icon = _icons.get(row.effective_result, "?")
+        pnl  = f"${row.effective_pnl_usd:+,.0f}" if row.effective_pnl_usd == row.effective_pnl_usd else "In Progress"
+        return f"{icon}  {row.trade_date} → {row.exp_date}  |  {pnl}"
+    options = [_trade_label(row) for row in df.itertuples()]
     selected_idx = st.selectbox(
         "Select trade:",
         options=range(len(options)),
@@ -1136,13 +1172,14 @@ with st.sidebar:
 
     mini = df[["trade_date", "effective_result", "effective_pnl_usd"]].copy()
     mini.columns = ["Date", "Result", "P&L ($)"]
-    mini["P&L ($)"] = mini["P&L ($)"].map(lambda x: f"${x:+,.0f}")
+    mini["P&L ($)"] = mini["P&L ($)"].map(
+        lambda x: f"${x:+,.0f}" if x == x else "—"
+    )
 
     def _color_result(val):
-        if val == "WIN":
-            return f"color: {C['green']}"
-        elif val == "MAX_LOSS":
-            return "color: #ff6b6b"
+        if val == "WIN":    return f"color: {C['green']}"
+        if val == "OPEN":   return f"color: {C['yellow']}"
+        if val == "MAX_LOSS": return "color: #ff6b6b"
         return f"color: {C['red']}"
 
     styled = mini.style.map(_color_result, subset=["Result"])
@@ -1190,23 +1227,40 @@ with tab1:
     )
 
     if strategy == "SS42":
-        # ── SS42: 6 métricas ─────────────────────────────────────────────
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        # ── SS42: 7 métricas (+ VIX) ─────────────────────────────────────
+        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
         iv_val = row.get("iv_atm_pct", row.get("iv_atm_entry", float("nan")))
+
+        # VIX lookup
+        trade_ts = pd.Timestamp(str(row["trade_date"]))
+        vix_val  = float("nan")
+        if not vix_series.empty:
+            # find closest date on or before trade_date
+            vix_idx = vix_series.index[vix_series.index <= trade_ts]
+            if len(vix_idx):
+                vix_val = float(vix_series.loc[vix_idx[-1]])
+
+        is_open_trade = bool(row.get("is_open", False))
+
         c1.metric("Entry Spot", f"{row['spot_entry']:,.0f}")
         c2.metric("IV ATM", f"{iv_val:.1f}%" if iv_val == iv_val else "—",
-                  help="IV ATM na entrada — Black-Scholes inversion")
-        c3.metric("DTE Entry", f"{row.get('dte_entry', '—')} dias",
-                  help="DTE efetivo na data de entrada")
-        c4.metric("Credit Received", f"{row['total_credit']:.2f} pts",
+                  help="IV ATM at entry — Black-Scholes inversion from mid price")
+        c3.metric("VIX", f"{vix_val:.1f}" if vix_val == vix_val else "—",
+                  help="VIX closing price on entry date")
+        c4.metric("DTE Entry", f"{row.get('dte_entry', '—')} days")
+        c5.metric("Credit Received", f"{row['total_credit']:.2f} pts",
                   delta=f"${row['total_credit'] * SS42_MULTIPLIER:,.0f} USD")
-        c5.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
-                  delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
-                  delta_color=delta_color(row["spot_exit"] - row["spot_entry"]))
-        c6.metric("Effective P&L", f"${row['effective_pnl_usd']:+,.0f}",
-                  delta=f"{row['pnl_points']:+.2f} pts",
-                  delta_color=delta_color(row["effective_pnl_usd"]),
-                  help="P&L conforme a regra de fechamento selecionada")
+        if is_open_trade:
+            c6.metric("Exit Spot", "—", help="Trade still open")
+            c7.metric("P&L", "In Progress", help="Trade has not yet expired")
+        else:
+            c6.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
+                      delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
+                      delta_color=delta_color(row["spot_exit"] - row["spot_entry"]))
+            c7.metric("Effective P&L", f"${row['effective_pnl_usd']:+,.0f}",
+                      delta=f"{row['pnl_points']:+.2f} pts",
+                      delta_color=delta_color(row["effective_pnl_usd"]),
+                      help="P&L per selected close rule")
 
         # ── SS42: estrutura strangle ──────────────────────────────────────
         dp = row.get("delta_put", float("nan"))
@@ -1559,13 +1613,20 @@ with tab1:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab2:
-    # Para SS42: repassar df com effective_pnl_usd no lugar de pnl_usd
+    # Performance uses CLOSED trades only — open trades have no final P&L
     if strategy == "SS42":
-        df_perf = df.copy()
+        df_perf = df_closed.copy()
         df_perf["pnl_usd"] = df_perf["effective_pnl_usd"]
         df_perf["result"]  = df_perf["effective_result"]
     else:
-        df_perf = df
+        df_perf = df[~df["is_open"]].copy()
+
+    if df_perf.empty:
+        st.info("No closed trades yet to compute performance.", icon="ℹ️")
+        st.stop()
+
+    if n_open > 0:
+        st.info(f"🟡 {n_open} open trade{'s' if n_open>1 else ''} excluded — no final P&L yet.", icon="ℹ️")
 
     stats = compute_perf_stats(df_perf)
     pf_str = f"{stats['profit_factor']:.2f}" if stats['profit_factor'] != float("inf") else "∞"
