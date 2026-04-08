@@ -171,31 +171,41 @@ def detect_strategy(df: pd.DataFrame) -> str:
 
 def apply_close_rule(df: pd.DataFrame, rule: str, multiplier: int) -> pd.DataFrame:
     """
-    Aplica a regra de fechamento ao DataFrame SS42 e retorna cópia com
-    colunas 'effective_pnl_usd' e 'effective_result'.
+    Applies the close rule to the SS42 DataFrame, returning a copy with
+    'effective_pnl_usd' and 'effective_result' columns.
+    All rules are evaluated at the 21 DTE checkpoint; if no checkpoint
+    data is available the trade falls back to expiration P&L.
     """
     df = df.copy()
     max_profit = df["total_credit"] * multiplier
+    has_ckpt   = df["pnl_usd_21dte"].notna()
 
     if rule == "Hold to Expiration":
         df["effective_pnl_usd"] = df["pnl_usd"]
 
     elif rule == "Close at 21 DTE":
-        df["effective_pnl_usd"] = df["pnl_usd_21dte"].where(
-            df["pnl_usd_21dte"].notna(), df["pnl_usd"]
-        )
+        df["effective_pnl_usd"] = df["pnl_usd_21dte"].where(has_ckpt, df["pnl_usd"])
 
-    elif rule == "50% Profit at 21 DTE → else Hold":
-        take_profit = df["pnl_usd_21dte"] >= 0.5 * max_profit
+    elif rule == "50% Profit Target":
+        trigger = has_ckpt & (df["pnl_usd_21dte"] >= 0.50 * max_profit)
         df["effective_pnl_usd"] = df["pnl_usd"].copy()
-        df.loc[take_profit & df["pnl_usd_21dte"].notna(), "effective_pnl_usd"] = \
-            df.loc[take_profit & df["pnl_usd_21dte"].notna(), "pnl_usd_21dte"]
+        df.loc[trigger, "effective_pnl_usd"] = df.loc[trigger, "pnl_usd_21dte"]
 
-    elif rule == "2× Stop at 21 DTE → else Hold":
-        stop = df["pnl_usd_21dte"] <= -2 * max_profit
+    elif rule == "25% Profit Target":
+        trigger = has_ckpt & (df["pnl_usd_21dte"] >= 0.25 * max_profit)
         df["effective_pnl_usd"] = df["pnl_usd"].copy()
-        df.loc[stop & df["pnl_usd_21dte"].notna(), "effective_pnl_usd"] = \
-            df.loc[stop & df["pnl_usd_21dte"].notna(), "pnl_usd_21dte"]
+        df.loc[trigger, "effective_pnl_usd"] = df.loc[trigger, "pnl_usd_21dte"]
+
+    elif rule == "Stop at 2× Credit":
+        trigger = has_ckpt & (df["pnl_usd_21dte"] <= -2 * max_profit)
+        df["effective_pnl_usd"] = df["pnl_usd"].copy()
+        df.loc[trigger, "effective_pnl_usd"] = df.loc[trigger, "pnl_usd_21dte"]
+
+    elif rule == "50% Profit or 2× Stop":
+        tp = has_ckpt & (df["pnl_usd_21dte"] >= 0.50 * max_profit)
+        sl = has_ckpt & (df["pnl_usd_21dte"] <= -2  * max_profit)
+        df["effective_pnl_usd"] = df["pnl_usd"].copy()
+        df.loc[tp | sl, "effective_pnl_usd"] = df.loc[tp | sl, "pnl_usd_21dte"]
 
     else:
         df["effective_pnl_usd"] = df["pnl_usd"]
@@ -249,11 +259,18 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
         fill="tozeroy", fillcolor="rgba(255,77,77,0.15)",
         line=dict(width=0), hoverinfo="skip",
     ))
+    pct_from_entry = (S - spot_in) / spot_in * 100
     fig.add_trace(go.Scatter(
         x=S, y=pnl, mode="lines",
         line=dict(color=C["white"], width=2.5),
         name="Payoff",
-        hovertemplate="Spot: <b>%{x:,.0f}</b><br>P&L: <b>$%{y:,.0f}</b><extra></extra>",
+        customdata=np.stack([pct_from_entry], axis=1),
+        hovertemplate=(
+            "Spot: <b>%{x:,.0f}</b>"
+            " <span style='color:#8b949e'>(%{customdata[0]:+.1f}% vs entry)</span>"
+            "<br>P&L: <b>$%{y:,.0f}</b>"
+            "<extra></extra>"
+        ),
     ))
 
     # Strikes
@@ -317,43 +334,67 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
 
 def build_pnl_timeline(row: pd.Series) -> go.Figure:
     """
-    Barras mostrando a evolução do PnL: Crédito → 21 DTE → Expiração.
+    Line chart showing P&L trajectory across the trade's life:
+    Entry (max credit) → 21 DTE checkpoint → Expiration.
+    X-axis = DTE countdown (entry DTE → 0).
     """
-    mult   = SS42_MULTIPLIER
+    mult       = SS42_MULTIPLIER
     credit_usd = row["total_credit"] * mult
     pnl_21     = row.get("pnl_usd_21dte", float("nan"))
     pnl_exp    = row["pnl_usd"]
+    dte_entry  = int(row.get("dte_entry", 42))
 
-    labels = ["Credit Received", "Mark @ 21 DTE", "Expiration"]
-    values = [credit_usd, pnl_21, pnl_exp]
-    colors = [C["green"],
-              C["green"] if (isinstance(pnl_21, float) and pnl_21 >= 0) else C["red"],
-              C["green"] if pnl_exp >= 0 else C["red"]]
+    x_vals, y_vals, labels = [], [], []
 
-    texts  = []
-    for v in values:
-        if isinstance(v, float) and v != v:  # NaN
-            texts.append("N/A")
-        else:
-            texts.append(f"${v:+,.0f}")
+    # Entry point — P&L = full credit received
+    x_vals.append(dte_entry); y_vals.append(credit_usd); labels.append(f"Entry<br>+${credit_usd:,.0f}")
 
-    fig = go.Figure(go.Bar(
-        x=labels, y=[v if not (isinstance(v, float) and v != v) else 0 for v in values],
-        marker_color=colors,
-        text=texts, textposition="outside",
-        textfont=dict(size=13, family="monospace"),
+    # 21 DTE checkpoint (skip if NaN)
+    if pnl_21 == pnl_21:
+        x_vals.append(21); y_vals.append(pnl_21); labels.append(f"21 DTE<br>${pnl_21:+,.0f}")
+
+    # Expiration
+    x_vals.append(0); y_vals.append(pnl_exp); labels.append(f"Exp<br>${pnl_exp:+,.0f}")
+
+    exit_color = C["green"] if pnl_exp >= 0 else C["red"]
+    line_color = exit_color
+
+    fig = go.Figure()
+
+    # Shaded area under the line
+    fig.add_trace(go.Scatter(
+        x=x_vals, y=y_vals,
+        fill="tozeroy",
+        fillcolor=f"rgba(0,200,150,0.08)" if pnl_exp >= 0 else "rgba(255,77,77,0.08)",
+        line=dict(width=0), hoverinfo="skip",
     ))
-    fig.add_hline(y=0, line=dict(color=C["border"], width=1))
+
+    # Main line + markers
+    fig.add_trace(go.Scatter(
+        x=x_vals, y=y_vals,
+        mode="lines+markers+text",
+        line=dict(color=line_color, width=2.5),
+        marker=dict(size=9, color=[C["blue"], C["yellow"], exit_color][:len(x_vals)],
+                    line=dict(width=1.5, color=C["bg"])),
+        text=labels,
+        textposition=["top center"] * len(x_vals),
+        textfont=dict(size=10, family="monospace", color=C["dim"]),
+        hovertemplate="DTE: <b>%{x}</b><br>P&L: <b>$%{y:,.0f}</b><extra></extra>",
+    ))
+
+    fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
+
     fig.update_layout(
-        title=dict(text="<b>P&L Evolution</b>",
+        title=dict(text="<b>P&L Journey</b>",
                    font=dict(size=13, color=C["white"], family="monospace"), x=0.02),
         paper_bgcolor=C["bg"], plot_bgcolor=C["panel"],
         font=dict(color=C["white"], family="monospace", size=11),
+        xaxis=dict(title="DTE", gridcolor=C["border"], autorange="reversed",
+                   tickvals=x_vals, ticktext=[str(v) for v in x_vals]),
         yaxis=dict(gridcolor=C["border"], tickprefix="$", tickformat=","),
-        xaxis=dict(gridcolor="rgba(0,0,0,0)"),
         showlegend=False,
-        margin=dict(l=70, r=20, t=50, b=40),
-        height=260,
+        margin=dict(l=70, r=20, t=50, b=50),
+        height=300,
     )
     return fig
 
@@ -878,13 +919,23 @@ with st.sidebar:
         st.error(f"Nenhum CSV encontrado em:\n{REPORTS_BASE}")
         st.stop()
 
+    def _backtest_label(p: Path) -> str:
+        stem = p.stem
+        if stem == "trade_log":
+            return "IC7 NDX"
+        if "SS42_SPX" in stem:
+            return "Short Strangle 42 · SPX"
+        if "SS42_RUT" in stem:
+            return "Short Strangle 42 · RUT"
+        return stem
+
     # Seletor de backtest (aparece só se houver mais de um resultado)
     if len(csv_files) > 1:
         st.markdown(f"<p class='section-title'>Select Backtest</p>", unsafe_allow_html=True)
         selected_csv = st.selectbox(
             "Backtest:",
             options=csv_files,
-            format_func=lambda p: p.stem,   # mostra nome sem .csv
+            format_func=_backtest_label,
             index=0,
         )
         st.divider()
@@ -894,20 +945,22 @@ with st.sidebar:
     df_raw = load_trade_log(selected_csv)
     strategy = detect_strategy(df_raw)
 
-    # ── Close Rule selector (só para SS42) ───────────────────────────────
+    # ── Close Rule selector (SS42 only) ──────────────────────────────────
     close_rule = "Hold to Expiration"
     if strategy == "SS42":
         st.markdown(f"<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
         close_rule = st.selectbox(
-            "Regra de fechamento:",
+            "Close Rule:",
             options=[
                 "Hold to Expiration",
                 "Close at 21 DTE",
-                "50% Profit at 21 DTE → else Hold",
-                "2× Stop at 21 DTE → else Hold",
+                "50% Profit Target",
+                "25% Profit Target",
+                "Stop at 2× Credit",
+                "50% Profit or 2× Stop",
             ],
             index=0,
-            help="Simula diferentes regras de gestão usando o mark-to-market de 21 DTE.",
+            help="Rules are evaluated at the 21 DTE checkpoint. If no checkpoint data exists, falls back to expiration P&L.",
         )
         st.divider()
         df = apply_close_rule(df_raw, close_rule, SS42_MULTIPLIER)
@@ -927,8 +980,14 @@ with st.sidebar:
     col1, col2 = st.columns(2)
     col1.metric("Trades", total)
     col2.metric("Win Rate", f"{wr:.1f}%")
+    mult_sidebar   = SS42_MULTIPLIER if strategy == "SS42" else NDX_MULTIPLIER
+    total_max_pnl  = (df["total_credit"] * mult_sidebar).sum()
+    capture_pct    = total_pnl / total_max_pnl * 100 if total_max_pnl else 0
+
     col1, col2 = st.columns(2)
-    col1.metric("P&L Total", f"${total_pnl:,.0f}", delta=f"${total_pnl:,.0f}")
+    col1.metric("P&L Total", f"${total_pnl:,.0f}",
+                delta=f"{capture_pct:.1f}% of max credit",
+                help="% of total premium sold that was kept as profit")
     iv_col = "iv_atm_pct" if "iv_atm_pct" in df.columns else "iv_atm_entry"
     col2.metric("Avg IV ATM", f"{df[iv_col].mean():.1f}%" if iv_col in df.columns else "—")
 
