@@ -114,34 +114,37 @@ st.markdown(f"""
         margin-bottom: 8px;
     }}
 
-    /* Tabs — barra de navegação na parte INFERIOR */
-    div[data-testid="stTabs"] > div:first-child {{
-        display: flex !important;
-        flex-direction: column-reverse !important;
-    }}
+    /* Tabs — barra de navegação no TOPO como cabeçalho */
     .stTabs [data-baseweb="tab-list"] {{
         background-color: {C['panel']};
-        border-top: 1px solid {C['border']};
-        border-bottom: none;
-        gap: 4px;
-        margin-top: 12px;
+        border-bottom: 2px solid {C['border']};
+        border-top: none;
+        gap: 0px;
+        margin-bottom: 16px;
+        margin-top: 0px;
+        padding: 0 8px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }}
     .stTabs [data-baseweb="tab"] {{
         background-color: transparent;
         color: {C['dim']};
         font-family: monospace;
         font-size: 13px;
-        padding: 8px 20px;
-        border-radius: 0 0 6px 6px;
+        padding: 12px 24px;
+        border-radius: 0;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
     }}
     .stTabs [aria-selected="true"] {{
-        background-color: {C['bg']} !important;
+        background-color: transparent !important;
         color: {C['white']} !important;
-        border-top: 2px solid {C['blue']} !important;
-        border-bottom: none !important;
+        border-bottom: 3px solid {C['blue']} !important;
+        border-top: none !important;
     }}
     .stTabs [data-baseweb="tab-panel"] {{
-        padding-top: 4px;
+        padding-top: 8px;
         padding-bottom: 8px;
     }}
 </style>
@@ -177,46 +180,90 @@ def detect_strategy(df: pd.DataFrame) -> str:
     return "IC7"  # fallback
 
 
-def apply_close_rule(df: pd.DataFrame, rule: str, multiplier: int) -> pd.DataFrame:
+def _first_daily_crossing(
+    trade_date_str: str,
+    daily_df: pd.DataFrame,
+    tp_threshold: float | None,
+    sl_threshold: float | None,
+    fallback_pnl: float,
+) -> float:
     """
-    Applies the close rule to the SS42 DataFrame, returning a copy with
-    'effective_pnl_usd' and 'effective_result' columns.
-    All rules are evaluated at the 21 DTE checkpoint; if no checkpoint
-    data is available the trade falls back to expiration P&L.
+    Scans the daily MTM rows for one trade and returns the P&L of the
+    first day that crosses the take-profit or stop-loss threshold.
+    Skips the entry day (dte_remaining == max dte, DIT == 0).
+    Falls back to fallback_pnl if no crossing is found.
+    """
+    rows = daily_df[daily_df["trade_date"] == trade_date_str].copy()
+    if rows.empty:
+        return fallback_pnl
+
+    rows = rows.sort_values("dte_remaining", ascending=False)
+    entry_dte = rows["dte_remaining"].iloc[0]
+    rows = rows[rows["dte_remaining"] < entry_dte]   # skip entry day
+
+    for pnl in rows["pnl_usd"]:
+        hit_tp = (tp_threshold is not None) and (pnl >= tp_threshold)
+        hit_sl = (sl_threshold is not None) and (pnl <= sl_threshold)
+        if hit_tp or hit_sl:
+            return float(pnl)
+
+    return fallback_pnl
+
+
+def apply_close_rule(
+    df: pd.DataFrame,
+    rule: str,
+    multiplier: int,
+    daily_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """
+    Applies the selected management rule to each trade.
+    - 'Hold to Expiration' and 'Close at 21 DTE' use snapshot data only.
+    - All profit/stop rules use actual daily MTM (day-by-day scan) when
+      daily_df is available; fall back to expiration P&L otherwise.
     """
     df = df.copy()
-    max_profit = df["total_credit"] * multiplier
-    has_ckpt   = df["pnl_usd_21dte"].notna()
+    df["effective_pnl_usd"] = df["pnl_usd"].copy()  # default: hold to exp
 
     if rule == "Hold to Expiration":
-        df["effective_pnl_usd"] = df["pnl_usd"]
+        pass  # already set above
 
     elif rule == "Close at 21 DTE":
+        has_ckpt = df["pnl_usd_21dte"].notna()
         df["effective_pnl_usd"] = df["pnl_usd_21dte"].where(has_ckpt, df["pnl_usd"])
 
-    elif rule == "50% Profit Target":
-        trigger = has_ckpt & (df["pnl_usd_21dte"] >= 0.50 * max_profit)
-        df["effective_pnl_usd"] = df["pnl_usd"].copy()
-        df.loc[trigger, "effective_pnl_usd"] = df.loc[trigger, "pnl_usd_21dte"]
-
-    elif rule == "25% Profit Target":
-        trigger = has_ckpt & (df["pnl_usd_21dte"] >= 0.25 * max_profit)
-        df["effective_pnl_usd"] = df["pnl_usd"].copy()
-        df.loc[trigger, "effective_pnl_usd"] = df.loc[trigger, "pnl_usd_21dte"]
-
-    elif rule == "Stop at 2× Credit":
-        trigger = has_ckpt & (df["pnl_usd_21dte"] <= -2 * max_profit)
-        df["effective_pnl_usd"] = df["pnl_usd"].copy()
-        df.loc[trigger, "effective_pnl_usd"] = df.loc[trigger, "pnl_usd_21dte"]
-
-    elif rule == "50% Profit or 2× Stop":
-        tp = has_ckpt & (df["pnl_usd_21dte"] >= 0.50 * max_profit)
-        sl = has_ckpt & (df["pnl_usd_21dte"] <= -2  * max_profit)
-        df["effective_pnl_usd"] = df["pnl_usd"].copy()
-        df.loc[tp | sl, "effective_pnl_usd"] = df.loc[tp | sl, "pnl_usd_21dte"]
-
     else:
-        df["effective_pnl_usd"] = df["pnl_usd"]
+        # Profit/stop rules: scan daily data for first crossing
+        thresholds = {
+            "50% Profit Target":   (0.50, None),
+            "25% Profit Target":   (0.25, None),
+            "Stop at 2× Credit":   (None, -2.0),
+            "50% Profit or 2× Stop": (0.50, -2.0),
+        }
+        tp_pct, sl_pct = thresholds.get(rule, (None, None))
+
+        for idx, trade in df.iterrows():
+            max_p  = float(trade["total_credit"]) * multiplier
+            tp_thr = tp_pct * max_p if tp_pct is not None else None
+            sl_thr = sl_pct * max_p if sl_pct is not None else None
+
+            if daily_df is not None and not daily_df.empty:
+                eff = _first_daily_crossing(
+                    str(trade["trade_date"]),
+                    daily_df, tp_thr, sl_thr,
+                    fallback_pnl=float(trade["pnl_usd"]),
+                )
+            else:
+                # Fallback: check 21 DTE checkpoint
+                p21 = trade.get("pnl_usd_21dte", float("nan"))
+                if p21 == p21:  # not NaN
+                    hit_tp = (tp_thr is not None) and (p21 >= tp_thr)
+                    hit_sl = (sl_thr is not None) and (p21 <= sl_thr)
+                    eff = p21 if (hit_tp or hit_sl) else float(trade["pnl_usd"])
+                else:
+                    eff = float(trade["pnl_usd"])
+
+            df.at[idx, "effective_pnl_usd"] = eff
 
     df["effective_result"] = df["effective_pnl_usd"].apply(
         lambda x: "WIN" if x > 0 else "LOSS"
@@ -999,11 +1046,19 @@ with st.sidebar:
     df_raw = load_trade_log(selected_csv)
     strategy = detect_strategy(df_raw)
 
+    # ── Period display below selector ────────────────────────────────────
+    _date_min = df_raw["trade_date"].min()
+    _date_max = df_raw["exp_date"].max() if "exp_date" in df_raw.columns else df_raw["trade_date"].max()
+    st.markdown(
+        f"<div style='font-size:11px; color:{C['dim']}; margin-top:-8px; margin-bottom:8px'>"
+        f"Period: {_date_min} → {_date_max}</div>",
+        unsafe_allow_html=True,
+    )
+
     # Auto-detect companion daily MTM CSV (SS42 only)
     daily_df_raw: pd.DataFrame | None = None
     if strategy == "SS42":
         daily_candidates = sorted(selected_csv.parent.glob("*_daily_*.csv"))
-        # Match by underlying prefix (SPX or RUT)
         prefix = "SPX" if "SPX" in selected_csv.stem else "RUT"
         daily_candidates = [p for p in daily_candidates if prefix in p.stem]
         if daily_candidates:
@@ -1024,10 +1079,10 @@ with st.sidebar:
                 "50% Profit or 2× Stop",
             ],
             index=0,
-            help="Rules are evaluated at the 21 DTE checkpoint. If no checkpoint data exists, falls back to expiration P&L.",
+            help="Profit/stop rules scan daily MTM data and close on the first day the target is reached.",
         )
         st.divider()
-        df = apply_close_rule(df_raw, close_rule, SS42_MULTIPLIER)
+        df = apply_close_rule(df_raw, close_rule, SS42_MULTIPLIER, daily_df_raw)
     else:
         df = df_raw
         df["effective_pnl_usd"]  = df["pnl_usd"]
@@ -1527,7 +1582,9 @@ with tab2:
               delta=f"${stats['avg_credit'] * mult_used:,.0f} USD")
 
     if strategy == "SS42" and close_rule != "Hold to Expiration":
-        st.info(f"Performance calculada com regra: **{close_rule}**", icon="ℹ️")
+        using_daily = daily_df_raw is not None and close_rule not in ("Close at 21 DTE",)
+        src = "daily MTM scan" if using_daily else "21 DTE checkpoint fallback"
+        st.info(f"Rule: **{close_rule}** — evaluated via {src}", icon="ℹ️")
 
     st.markdown("---")
 
