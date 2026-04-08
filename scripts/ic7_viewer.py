@@ -28,8 +28,9 @@ import streamlit as st
 # CONFIGURAÇÃO
 # ─────────────────────────────────────────────────────────────────────────────
 
-REPORTS_DIR    = Path(__file__).resolve().parent.parent / "reports" / "ic7_backtest"
-NDX_MULTIPLIER = 100
+REPORTS_BASE   = Path(__file__).resolve().parent.parent / "reports"
+NDX_MULTIPLIER = 100   # IC7 NDX
+SS42_MULTIPLIER = 100  # Short Strangle SPX/RUT
 
 # Paleta de cores
 C = dict(
@@ -159,6 +160,52 @@ def load_trade_log(path: Path) -> pd.DataFrame:
     return df
 
 
+def detect_strategy(df: pd.DataFrame) -> str:
+    """Detecta tipo de backtest: 'IC7' ou 'SS42'."""
+    if "long_put" in df.columns and "long_call" in df.columns:
+        return "IC7"
+    if "short_put" in df.columns and "short_call" in df.columns:
+        return "SS42"
+    return "IC7"  # fallback
+
+
+def apply_close_rule(df: pd.DataFrame, rule: str, multiplier: int) -> pd.DataFrame:
+    """
+    Aplica a regra de fechamento ao DataFrame SS42 e retorna cópia com
+    colunas 'effective_pnl_usd' e 'effective_result'.
+    """
+    df = df.copy()
+    max_profit = df["total_credit"] * multiplier
+
+    if rule == "Hold to Expiration":
+        df["effective_pnl_usd"] = df["pnl_usd"]
+
+    elif rule == "Close at 21 DTE":
+        df["effective_pnl_usd"] = df["pnl_usd_21dte"].where(
+            df["pnl_usd_21dte"].notna(), df["pnl_usd"]
+        )
+
+    elif rule == "50% Profit at 21 DTE → else Hold":
+        take_profit = df["pnl_usd_21dte"] >= 0.5 * max_profit
+        df["effective_pnl_usd"] = df["pnl_usd"].copy()
+        df.loc[take_profit & df["pnl_usd_21dte"].notna(), "effective_pnl_usd"] = \
+            df.loc[take_profit & df["pnl_usd_21dte"].notna(), "pnl_usd_21dte"]
+
+    elif rule == "2× Stop at 21 DTE → else Hold":
+        stop = df["pnl_usd_21dte"] <= -2 * max_profit
+        df["effective_pnl_usd"] = df["pnl_usd"].copy()
+        df.loc[stop & df["pnl_usd_21dte"].notna(), "effective_pnl_usd"] = \
+            df.loc[stop & df["pnl_usd_21dte"].notna(), "pnl_usd_21dte"]
+
+    else:
+        df["effective_pnl_usd"] = df["pnl_usd"]
+
+    df["effective_result"] = df["effective_pnl_usd"].apply(
+        lambda x: "WIN" if x > 0 else "LOSS"
+    )
+    return df
+
+
 def ic_payoff_usd(
     S: np.ndarray,
     short_put:   float,
@@ -172,6 +219,143 @@ def ic_payoff_usd(
     put_cost  = np.maximum(0, short_put  - S) - np.maximum(0, long_put  - S)
     call_cost = np.maximum(0, S - short_call) - np.maximum(0, S - long_call)
     return (credit - put_cost - call_cost) * multiplier
+
+
+def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
+    """Payoff chart do Short Strangle na expiração."""
+    sp     = row["short_put"]
+    sc     = row["short_call"]
+    credit = row["total_credit"]
+    spot_in  = row["spot_entry"]
+    spot_out = row["spot_exit"]
+    mult   = SS42_MULTIPLIER
+
+    pad   = max((sc - sp) * 0.20, spot_in * 0.05)
+    x_min = sp - pad
+    x_max = sc + pad
+    S     = np.linspace(x_min, x_max, 1200)
+
+    # Payoff: credit - max(0, sp-S) - max(0, S-sc)
+    pnl = (credit - np.maximum(0, sp - S) - np.maximum(0, S - sc)) * mult
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=S, y=np.where(pnl >= 0, pnl, 0),
+        fill="tozeroy", fillcolor="rgba(0,200,150,0.15)",
+        line=dict(width=0), hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=S, y=np.where(pnl <= 0, pnl, 0),
+        fill="tozeroy", fillcolor="rgba(255,77,77,0.15)",
+        line=dict(width=0), hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=S, y=pnl, mode="lines",
+        line=dict(color=C["white"], width=2.5),
+        name="Payoff",
+        hovertemplate="Spot: <b>%{x:,.0f}</b><br>P&L: <b>$%{y:,.0f}</b><extra></extra>",
+    ))
+
+    # Strikes
+    for k, label, color in [(sp, f"Short Put {sp:,.0f}", C["red"]),
+                             (sc, f"Short Call {sc:,.0f}", C["red"])]:
+        fig.add_vline(x=k, line=dict(color=color, width=1.5, dash="dash"))
+        fig.add_annotation(x=k, y=credit * mult * 0.8, text=label,
+                           showarrow=False, font=dict(color=color, size=10),
+                           bgcolor=C["bg"])
+
+    # Spot entrada
+    fig.add_vline(x=spot_in, line=dict(color=C["blue"], width=1.5, dash="dot"))
+    fig.add_annotation(x=spot_in, y=credit * mult * 0.4,
+                       text=f"Entry {spot_in:,.0f}", showarrow=False,
+                       font=dict(color=C["blue"], size=10), bgcolor=C["bg"])
+
+    # Spot saída
+    pnl_exit = float((credit - max(0, sp - spot_out) - max(0, spot_out - sc)) * mult)
+    exit_color = C["green"] if pnl_exit >= 0 else C["red"]
+    fig.add_vline(x=spot_out, line=dict(color=exit_color, width=2))
+    fig.add_annotation(x=spot_out, y=pnl_exit,
+                       text=f"Exit {spot_out:,.0f}<br>${pnl_exit:+,.0f}",
+                       showarrow=True, arrowhead=2,
+                       font=dict(color=exit_color, size=10), bgcolor=C["bg"],
+                       arrowcolor=exit_color)
+
+    # Checkpoint 21 DTE
+    spot_21 = row.get("spot_21dte", float("nan"))
+    if not (isinstance(spot_21, float) and (spot_21 != spot_21)):  # not NaN
+        if x_min <= spot_21 <= x_max:
+            pnl_21 = float((credit - max(0, sp - spot_21) - max(0, spot_21 - sc)) * mult)
+            fig.add_vline(x=spot_21, line=dict(color=C["yellow"], width=1, dash="dot"))
+            fig.add_annotation(x=spot_21, y=pnl_21,
+                               text=f"21DTE {spot_21:,.0f}",
+                               showarrow=False, yshift=12,
+                               font=dict(color=C["yellow"], size=9), bgcolor=C["bg"])
+
+    fig.update_layout(
+        paper_bgcolor=C["bg"], plot_bgcolor=C["panel"],
+        font=dict(color=C["white"], family="monospace", size=11),
+        xaxis=dict(title="Underlying Price", gridcolor=C["border"], tickformat=","),
+        yaxis=dict(title="P&L (USD)", gridcolor=C["border"],
+                   tickprefix="$", tickformat=","),
+        showlegend=False,
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor=C["panel"], bordercolor=C["border"],
+                        font=dict(color=C["white"])),
+        margin=dict(l=70, r=30, t=40, b=60),
+        height=380,
+        title=dict(
+            text=f"<b>Short Strangle Payoff</b>"
+                 f"<span style='font-size:11px; color:{C['dim']}'>"
+                 f"  {row.get('underlying','')}"
+                 f"  |  Credit: {credit:.2f} pts (${credit*SS42_MULTIPLIER:,.0f})"
+                 f"</span>",
+            font=dict(size=14, color=C["white"], family="monospace"), x=0.02,
+        ),
+    )
+    return fig
+
+
+def build_pnl_timeline(row: pd.Series) -> go.Figure:
+    """
+    Barras mostrando a evolução do PnL: Crédito → 21 DTE → Expiração.
+    """
+    mult   = SS42_MULTIPLIER
+    credit_usd = row["total_credit"] * mult
+    pnl_21     = row.get("pnl_usd_21dte", float("nan"))
+    pnl_exp    = row["pnl_usd"]
+
+    labels = ["Credit Received", "Mark @ 21 DTE", "Expiration"]
+    values = [credit_usd, pnl_21, pnl_exp]
+    colors = [C["green"],
+              C["green"] if (isinstance(pnl_21, float) and pnl_21 >= 0) else C["red"],
+              C["green"] if pnl_exp >= 0 else C["red"]]
+
+    texts  = []
+    for v in values:
+        if isinstance(v, float) and v != v:  # NaN
+            texts.append("N/A")
+        else:
+            texts.append(f"${v:+,.0f}")
+
+    fig = go.Figure(go.Bar(
+        x=labels, y=[v if not (isinstance(v, float) and v != v) else 0 for v in values],
+        marker_color=colors,
+        text=texts, textposition="outside",
+        textfont=dict(size=13, family="monospace"),
+    ))
+    fig.add_hline(y=0, line=dict(color=C["border"], width=1))
+    fig.update_layout(
+        title=dict(text="<b>P&L Evolution</b>",
+                   font=dict(size=13, color=C["white"], family="monospace"), x=0.02),
+        paper_bgcolor=C["bg"], plot_bgcolor=C["panel"],
+        font=dict(color=C["white"], family="monospace", size=11),
+        yaxis=dict(gridcolor=C["border"], tickprefix="$", tickformat=","),
+        xaxis=dict(gridcolor="rgba(0,0,0,0)"),
+        showlegend=False,
+        margin=dict(l=70, r=20, t=50, b=40),
+        height=260,
+    )
+    return fig
 
 
 def build_payoff_chart(row: pd.Series) -> go.Figure:
@@ -681,17 +865,17 @@ with st.sidebar:
     st.markdown(
         f"<div style='text-align:center; padding:12px 0'>"
         f"<span style='font-size:28px'>📊</span><br>"
-        f"<span style='font-size:16px; font-weight:bold; color:{C['white']}'>IC7 Trade Auditor</span><br>"
-        f"<span style='font-size:11px; color:{C['dim']}'>NDX Iron Condor 7DTE</span>"
+        f"<span style='font-size:16px; font-weight:bold; color:{C['white']}'>Trade Auditor</span><br>"
+        f"<span style='font-size:11px; color:{C['dim']}'>Prop Desk Quant</span>"
         f"</div>",
         unsafe_allow_html=True,
     )
     st.divider()
 
-    # ── Descoberta automática de todos os CSVs na pasta de relatórios ────
-    csv_files = sorted(REPORTS_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    # ── Descoberta automática de todos os CSVs em reports/ ───────────────
+    csv_files = sorted(REPORTS_BASE.glob("**/*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not csv_files:
-        st.error(f"No backtest CSV found in:\n{REPORTS_DIR}")
+        st.error(f"Nenhum CSV encontrado em:\n{REPORTS_BASE}")
         st.stop()
 
     # Seletor de backtest (aparece só se houver mais de um resultado)
@@ -707,13 +891,36 @@ with st.sidebar:
     else:
         selected_csv = csv_files[0]
 
-    df = load_trade_log(selected_csv)
+    df_raw = load_trade_log(selected_csv)
+    strategy = detect_strategy(df_raw)
+
+    # ── Close Rule selector (só para SS42) ───────────────────────────────
+    close_rule = "Hold to Expiration"
+    if strategy == "SS42":
+        st.markdown(f"<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
+        close_rule = st.selectbox(
+            "Regra de fechamento:",
+            options=[
+                "Hold to Expiration",
+                "Close at 21 DTE",
+                "50% Profit at 21 DTE → else Hold",
+                "2× Stop at 21 DTE → else Hold",
+            ],
+            index=0,
+            help="Simula diferentes regras de gestão usando o mark-to-market de 21 DTE.",
+        )
+        st.divider()
+        df = apply_close_rule(df_raw, close_rule, SS42_MULTIPLIER)
+    else:
+        df = df_raw
+        df["effective_pnl_usd"]  = df["pnl_usd"]
+        df["effective_result"]   = df["result"]
 
     # ── Resumo do portfólio ───────────────────────────────────────────────
     total     = len(df)
-    wins      = (df["result"] == "WIN").sum()
+    wins      = (df["effective_result"] == "WIN").sum()
     wr        = wins / total * 100
-    total_pnl = df["pnl_usd"].sum()
+    total_pnl = df["effective_pnl_usd"].sum()
 
     st.markdown(f"<p class='section-title'>Portfolio Summary</p>", unsafe_allow_html=True)
 
@@ -722,7 +929,8 @@ with st.sidebar:
     col2.metric("Win Rate", f"{wr:.1f}%")
     col1, col2 = st.columns(2)
     col1.metric("P&L Total", f"${total_pnl:,.0f}", delta=f"${total_pnl:,.0f}")
-    col2.metric("Avg IV ATM", f"{df['iv_atm_pct'].mean():.1f}%")
+    iv_col = "iv_atm_pct" if "iv_atm_pct" in df.columns else "iv_atm_entry"
+    col2.metric("Avg IV ATM", f"{df[iv_col].mean():.1f}%" if iv_col in df.columns else "—")
 
     st.divider()
 
@@ -731,7 +939,7 @@ with st.sidebar:
 
     _icons = {"WIN": "✅", "LOSS": "🔴", "MAX_LOSS": "💀"}
     options = [
-        f"{_icons.get(row.result,'?')}  {row.trade_date} → {row.exp_date}  |  ${row.pnl_usd:+,.0f}"
+        f"{_icons.get(row.effective_result,'?')}  {row.trade_date} → {row.exp_date}  |  ${row.effective_pnl_usd:+,.0f}"
         for row in df.itertuples()
     ]
     selected_idx = st.selectbox(
@@ -746,7 +954,7 @@ with st.sidebar:
     # ── Mini-tabela de todos os trades ────────────────────────────────────
     st.markdown(f"<p class='section-title'>All Trades</p>", unsafe_allow_html=True)
 
-    mini = df[["trade_date", "result", "pnl_usd"]].copy()
+    mini = df[["trade_date", "effective_result", "effective_pnl_usd"]].copy()
     mini.columns = ["Date", "Result", "P&L ($)"]
     mini["P&L ($)"] = mini["P&L ($)"].map(lambda x: f"${x:+,.0f}")
 
@@ -776,17 +984,18 @@ with tab1:
     row = df.iloc[selected_idx]
 
     # ── Header do trade selecionado ───────────────────────────────────────
-    result_html   = result_badge(row["result"])
+    result_html   = result_badge(row["effective_result"])
     in_range_icon = "✅ INSIDE the strikes" if row["in_range"] else "❌ OUTSIDE the strikes"
     in_range_color= C["green"] if row["in_range"] else C["red"]
 
+    _strat_label = f"SS42 {row.get('underlying','')} Short Strangle" if strategy == "SS42" else "IC7 NDX Iron Condor"
     st.markdown(
         f"""
         <div style='background:{C['panel']}; border:1px solid {C['border']};
                     border-radius:10px; padding:16px 24px; margin-bottom:16px;
                     display:flex; align-items:center; gap:20px;'>
             <div>
-                <span style='font-size:13px; color:{C['dim']}'>Selected Trade</span><br>
+                <span style='font-size:11px; color:{C['dim']}'>{_strat_label}</span><br>
                 <span style='font-size:20px; font-weight:bold; font-family:monospace; color:{C['white']}'>
                     {row['trade_date']} &nbsp;→&nbsp; {row['exp_date']}
                 </span>
@@ -800,71 +1009,215 @@ with tab1:
         unsafe_allow_html=True,
     )
 
-    # ── Métricas principais (6 cards) ─────────────────────────────────────
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    if strategy == "SS42":
+        # ── SS42: 6 métricas ─────────────────────────────────────────────
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        iv_val = row.get("iv_atm_pct", row.get("iv_atm_entry", float("nan")))
+        c1.metric("Entry Spot", f"{row['spot_entry']:,.0f}")
+        c2.metric("IV ATM", f"{iv_val:.1f}%" if iv_val == iv_val else "—",
+                  help="IV ATM na entrada — Black-Scholes inversion")
+        c3.metric("DTE Entry", f"{row.get('dte_entry', '—')} dias",
+                  help="DTE efetivo na data de entrada")
+        c4.metric("Credit Received", f"{row['total_credit']:.2f} pts",
+                  delta=f"${row['total_credit'] * SS42_MULTIPLIER:,.0f} USD")
+        c5.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
+                  delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
+                  delta_color=delta_color(row["spot_exit"] - row["spot_entry"]))
+        c6.metric("Effective P&L", f"${row['effective_pnl_usd']:+,.0f}",
+                  delta=f"{row['pnl_points']:+.2f} pts",
+                  delta_color=delta_color(row["effective_pnl_usd"]),
+                  help="P&L conforme a regra de fechamento selecionada")
 
-    c1.metric("Entry Spot", f"{row['spot_entry']:,.0f}",
-              help="NDX price at trade entry")
-    c2.metric("IV ATM", f"{row['iv_atm_pct']:.1f}%",
-              help="ATM Implied Volatility — Black-Scholes inversion (mid-price)")
-    c3.metric("Expected Move", f"±{row['expected_move']:,.0f} pts",
-              delta=f"±{row['em_pct']:.2f}%",
-              help="EM = Spot × IV_ATM × √(7/365) — identical to OptionsStrat")
-    c4.metric("Credit Received", f"{row['total_credit']:.2f} pts",
-              delta=f"${row['total_credit'] * NDX_MULTIPLIER:,.0f} USD",
-              help="Net premium received at trade open")
-    c5.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
-              delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
-              delta_color=delta_color(row["spot_exit"] - row["spot_entry"]),
-              help="NDX price at expiration (exit)")
-    c6.metric("Final P&L", f"${row['pnl_usd']:+,.0f}",
-              delta=f"{row['pnl_points']:+.2f} pts",
-              delta_color=delta_color(row["pnl_usd"]),
-              help="Realized P&L (credit − exercise cost) × $100")
-
-    # ── Card de estrutura: os 4 contratos ────────────────────────────────
-    _cs = (row["constraint_satisfied"] if "constraint_satisfied" in row.index else True)
-    _cs_badge = (
-        f"<span style='color:{C['green']};font-size:10px'>✓ BEPs outside ±1SD</span>"
-        if _cs else
-        f"<span style='color:{C['yellow']};font-size:10px'>⚠ BEP Best Effort</span>"
-    )
-    st.markdown(
-        f"""
-        <div style='background:{C['panel']}; border:1px solid {C['border']};
-                    border-radius:8px; padding:10px 20px; margin-top:6px;
-                    font-family:monospace; font-size:13px; text-align:center;'>
-            <span style='color:{C['dim']}; font-size:10px; letter-spacing:1px;
-                         text-transform:uppercase; margin-right:16px'>Structure</span>
-            <span style='color:{C['blue']}'>BUY&nbsp;PUT&nbsp;<b>{row['long_put']:,.0f}</b></span>
-            <span style='color:{C['border']}'>&nbsp;|&nbsp;</span>
-            <span style='color:{C['orange']}'>SELL&nbsp;PUT&nbsp;<b>{row['short_put']:,.0f}</b></span>
-            &nbsp;&nbsp;
-            <span style='color:{C['dim']}; font-size:11px'>◄&nbsp;SPOT&nbsp;{row['spot_entry']:,.0f}&nbsp;►</span>
-            &nbsp;&nbsp;
-            <span style='color:{C['orange']}'>SELL&nbsp;CALL&nbsp;<b>{row['short_call']:,.0f}</b></span>
-            <span style='color:{C['border']}'>&nbsp;|&nbsp;</span>
-            <span style='color:{C['blue']}'>BUY&nbsp;CALL&nbsp;<b>{row['long_call']:,.0f}</b></span>
-            <span style='margin-left:20px'>{_cs_badge}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("---")
-
-    # ── Gráfico de Payoff ─────────────────────────────────────────────────
-    st.plotly_chart(build_payoff_chart(row), use_container_width=True)
-
-    st.markdown("---")
-
-    # ── Strike Structure | BEPs | P&L Breakdown ───────────────────────────
-    col_strikes, col_beps, col_decomp = st.columns([2, 2, 3])
-
-    with col_strikes:
-        st.markdown(f"<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
+        # ── SS42: estrutura strangle ──────────────────────────────────────
+        dp = row.get("delta_put", float("nan"))
+        dc = row.get("delta_call", float("nan"))
+        dp_str = f"Δ={dp:+.2f}" if dp == dp else ""
+        dc_str = f"Δ={dc:+.2f}" if dc == dc else ""
         st.markdown(
             f"""
+            <div style='background:{C['panel']}; border:1px solid {C['border']};
+                        border-radius:8px; padding:10px 20px; margin-top:6px;
+                        font-family:monospace; font-size:13px; text-align:center;'>
+                <span style='color:{C['dim']}; font-size:10px; letter-spacing:1px;
+                             text-transform:uppercase; margin-right:16px'>Structure</span>
+                <span style='color:{C['orange']}'>SELL&nbsp;PUT&nbsp;<b>{row['short_put']:,.0f}</b>
+                    <span style='font-size:10px; color:{C['dim']}'>&nbsp;{dp_str}</span></span>
+                &nbsp;&nbsp;
+                <span style='color:{C['dim']}; font-size:11px'>◄&nbsp;SPOT&nbsp;{row['spot_entry']:,.0f}&nbsp;►</span>
+                &nbsp;&nbsp;
+                <span style='color:{C['orange']}'>SELL&nbsp;CALL&nbsp;<b>{row['short_call']:,.0f}</b>
+                    <span style='font-size:10px; color:{C['dim']}'>&nbsp;{dc_str}</span></span>
+                &nbsp;&nbsp;
+                <span style='font-size:10px; color:{C['dim']}'>width:&nbsp;{row['short_call']-row['short_put']:,.0f}&nbsp;pts</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("---")
+
+        # ── SS42: payoff + timeline ───────────────────────────────────────
+        col_payoff, col_timeline = st.columns([3, 2])
+        with col_payoff:
+            st.plotly_chart(build_strangle_payoff_chart(row), use_container_width=True)
+        with col_timeline:
+            st.plotly_chart(build_pnl_timeline(row), use_container_width=True)
+
+        st.markdown("---")
+
+        # ── SS42: P&L Breakdown ───────────────────────────────────────────
+        col_strikes, col_decomp = st.columns([2, 3])
+
+        with col_strikes:
+            st.markdown(f"<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
+            mp = row.get("mid_put_entry",  0)
+            mc = row.get("mid_call_entry", 0)
+            mp21 = row.get("mid_put_21dte",  float("nan"))
+            mc21 = row.get("mid_call_21dte", float("nan"))
+            pnl21 = row.get("pnl_usd_21dte", float("nan"))
+            pnl21_str = f"${pnl21:+,.0f}" if pnl21 == pnl21 else "N/A"
+            pnl21_color = C["green"] if (pnl21 == pnl21 and pnl21 >= 0) else C["red"]
+            st.markdown(
+                f"""
+                <div style='font-family:monospace; font-size:13px; line-height:2.2'>
+                    <span class='strike-badge strike-short'>SELL PUT &nbsp;{row['short_put']:,.0f}</span>
+                    <span style='font-size:11px; color:{C['dim']}'>&nbsp;mid entry: {mp:.2f} pts</span><br>
+                    <span class='strike-badge strike-short'>SELL CALL {row['short_call']:,.0f}</span>
+                    <span style='font-size:11px; color:{C['dim']}'>&nbsp;mid entry: {mc:.2f} pts</span><br><br>
+                    <span style='font-size:11px; color:{C['dim']}'>21 DTE mark:</span><br>
+                    <span style='font-size:11px; color:{C['dim']}'>
+                        &nbsp;Put: {f"{mp21:.2f}" if mp21==mp21 else "N/A"} pts
+                        &nbsp;|&nbsp;Call: {f"{mc21:.2f}" if mc21==mc21 else "N/A"} pts
+                    </span><br>
+                    <span style='font-size:14px; color:{pnl21_color}; font-weight:bold'>
+                        P&L @ 21DTE: {pnl21_str}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col_decomp:
+            st.markdown(f"<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
+            put_cost  = row.get("put_cost_exp",  0)
+            call_cost = row.get("call_cost_exp", 0)
+            st.markdown(
+                f"""
+                <table style='font-family:monospace; font-size:12px; width:100%;
+                              border-collapse:collapse; color:{C['white']}'>
+                    <tr style='color:{C['dim']}; font-size:11px; border-bottom:1px solid {C['border']}'>
+                        <td>Item</td><td style='text-align:right'>Points</td><td style='text-align:right'>USD</td>
+                    </tr>
+                    <tr>
+                        <td>Credit received</td>
+                        <td style='text-align:right; color:{C['green']}'>{row['total_credit']:+.2f}</td>
+                        <td style='text-align:right; color:{C['green']}'>+${row['total_credit']*SS42_MULTIPLIER:,.0f}</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;Short Put ({row['short_put']:.0f})</td>
+                        <td style='text-align:right; color:{C['green']}'>{row.get('mid_put_entry',0):+.2f}</td>
+                        <td style='text-align:right; color:{C['green']}'>+${row.get('mid_put_entry',0)*SS42_MULTIPLIER:,.0f}</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;Short Call ({row['short_call']:.0f})</td>
+                        <td style='text-align:right; color:{C['green']}'>{row.get('mid_call_entry',0):+.2f}</td>
+                        <td style='text-align:right; color:{C['green']}'>+${row.get('mid_call_entry',0)*SS42_MULTIPLIER:,.0f}</td>
+                    </tr>
+                    <tr style='border-top:1px solid {C['border']}'>
+                        <td>Expiration cost</td>
+                        <td style='text-align:right; color:{C['red']}'>{-(put_cost+call_cost):+.2f}</td>
+                        <td style='text-align:right; color:{C['red']}'>-${(put_cost+call_cost)*SS42_MULTIPLIER:,.0f}</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;Put intrinsic ({row['short_put']:.0f})</td>
+                        <td style='text-align:right; color:{C['dim']}'>{-put_cost:+.2f}</td>
+                        <td style='text-align:right; color:{C['dim']}'>-${put_cost*SS42_MULTIPLIER:,.0f}</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;&nbsp;Call intrinsic ({row['short_call']:.0f})</td>
+                        <td style='text-align:right; color:{C['dim']}'>{-call_cost:+.2f}</td>
+                        <td style='text-align:right; color:{C['dim']}'>-${call_cost*SS42_MULTIPLIER:,.0f}</td>
+                    </tr>
+                    <tr style='border-top:2px solid {C['border']}; font-weight:bold'>
+                        <td>P&L FINAL (expiração)</td>
+                        <td style='text-align:right; color:{"#00c896" if row["pnl_usd"]>=0 else "#ff4d4d"}'>
+                            {row['pnl_points']:+.2f}
+                        </td>
+                        <td style='text-align:right; color:{"#00c896" if row["pnl_usd"]>=0 else "#ff4d4d"}'>
+                            ${row['pnl_usd']:+,.0f}
+                        </td>
+                    </tr>
+                </table>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    else:
+        # ── IC7: métricas originais ───────────────────────────────────────
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+
+        c1.metric("Entry Spot", f"{row['spot_entry']:,.0f}",
+                  help="NDX price at trade entry")
+        c2.metric("IV ATM", f"{row['iv_atm_pct']:.1f}%",
+                  help="ATM Implied Volatility — Black-Scholes inversion (mid-price)")
+        c3.metric("Expected Move", f"±{row['expected_move']:,.0f} pts",
+                  delta=f"±{row['em_pct']:.2f}%",
+                  help="EM = Spot × IV_ATM × √(7/365) — identical to OptionsStrat")
+        c4.metric("Credit Received", f"{row['total_credit']:.2f} pts",
+                  delta=f"${row['total_credit'] * NDX_MULTIPLIER:,.0f} USD",
+                  help="Net premium received at trade open")
+        c5.metric("Exit Spot", f"{row['spot_exit']:,.0f}",
+                  delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
+                  delta_color=delta_color(row["spot_exit"] - row["spot_entry"]),
+                  help="NDX price at expiration (exit)")
+        c6.metric("Final P&L", f"${row['pnl_usd']:+,.0f}",
+                  delta=f"{row['pnl_points']:+.2f} pts",
+                  delta_color=delta_color(row["pnl_usd"]),
+                  help="Realized P&L (credit − exercise cost) × $100")
+
+        # ── IC7: Card de estrutura ────────────────────────────────────────
+        _cs = (row["constraint_satisfied"] if "constraint_satisfied" in row.index else True)
+        _cs_badge = (
+            f"<span style='color:{C['green']};font-size:10px'>✓ BEPs outside ±1SD</span>"
+            if _cs else
+            f"<span style='color:{C['yellow']};font-size:10px'>⚠ BEP Best Effort</span>"
+        )
+        st.markdown(
+            f"""
+            <div style='background:{C['panel']}; border:1px solid {C['border']};
+                        border-radius:8px; padding:10px 20px; margin-top:6px;
+                        font-family:monospace; font-size:13px; text-align:center;'>
+                <span style='color:{C['dim']}; font-size:10px; letter-spacing:1px;
+                             text-transform:uppercase; margin-right:16px'>Structure</span>
+                <span style='color:{C['blue']}'>BUY&nbsp;PUT&nbsp;<b>{row['long_put']:,.0f}</b></span>
+                <span style='color:{C['border']}'>&nbsp;|&nbsp;</span>
+                <span style='color:{C['orange']}'>SELL&nbsp;PUT&nbsp;<b>{row['short_put']:,.0f}</b></span>
+                &nbsp;&nbsp;
+                <span style='color:{C['dim']}; font-size:11px'>◄&nbsp;SPOT&nbsp;{row['spot_entry']:,.0f}&nbsp;►</span>
+                &nbsp;&nbsp;
+                <span style='color:{C['orange']}'>SELL&nbsp;CALL&nbsp;<b>{row['short_call']:,.0f}</b></span>
+                <span style='color:{C['border']}'>&nbsp;|&nbsp;</span>
+                <span style='color:{C['blue']}'>BUY&nbsp;CALL&nbsp;<b>{row['long_call']:,.0f}</b></span>
+                <span style='margin-left:20px'>{_cs_badge}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("---")
+
+        # ── IC7: Gráfico de Payoff ────────────────────────────────────────
+        st.plotly_chart(build_payoff_chart(row), use_container_width=True)
+
+        st.markdown("---")
+
+        # ── IC7: Strike Structure | BEPs | P&L Breakdown ──────────────────
+        col_strikes, col_beps, col_decomp = st.columns([2, 2, 3])
+
+        with col_strikes:
+            st.markdown(f"<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
+            st.markdown(
+                f"""
             <div style='font-family:monospace; font-size:13px; line-height:2.2'>
                 <span class='strike-badge strike-long'>BUY PUT &nbsp;{row['long_put']:,.0f}</span><br>
                 <span class='strike-badge strike-short'>SELL PUT {row['short_put']:,.0f}</span><br>
@@ -878,17 +1231,17 @@ with tab1:
                 </span>
             </div>
             """,
-            unsafe_allow_html=True,
-        )
+                unsafe_allow_html=True,
+            )
 
-    with col_beps:
-        st.markdown(f"<p class='section-title'>Breakevens vs 1SD Target</p>", unsafe_allow_html=True)
-        bep_delta_lo = row["bep_lower"] - row["lower_target"]
-        bep_delta_hi = row["bep_upper"] - row["upper_target"]
-        bep_color_lo = C["green"] if abs(bep_delta_lo) < 50 else C["yellow"]
-        bep_color_hi = C["green"] if abs(bep_delta_hi) < 50 else C["yellow"]
-        st.markdown(
-            f"""
+        with col_beps:
+            st.markdown(f"<p class='section-title'>Breakevens vs 1SD Target</p>", unsafe_allow_html=True)
+            bep_delta_lo = row["bep_lower"] - row["lower_target"]
+            bep_delta_hi = row["bep_upper"] - row["upper_target"]
+            bep_color_lo = C["green"] if abs(bep_delta_lo) < 50 else C["yellow"]
+            bep_color_hi = C["green"] if abs(bep_delta_hi) < 50 else C["yellow"]
+            st.markdown(
+                f"""
             <div style='font-family:monospace; font-size:13px; line-height:2.2'>
                 <div style='color:{C['dim']}'>-1SD Target (lower)</div>
                 <div style='color:{C['purple']}; font-size:15px; font-weight:bold'>{row['lower_target']:,.0f}</div>
@@ -907,19 +1260,19 @@ with tab1:
                 </div>
             </div>
             """,
-            unsafe_allow_html=True,
-        )
+                unsafe_allow_html=True,
+            )
 
-    with col_decomp:
-        st.markdown(f"<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
-        max_profit    = row["total_credit"] * NDX_MULTIPLIER
-        max_loss      = row["max_risk_usd"]
-        put_cost_usd  = row["put_cost"]  * NDX_MULTIPLIER
-        call_cost_usd = row["call_cost"] * NDX_MULTIPLIER
-        exit_usd      = row["exit_cost"] * NDX_MULTIPLIER
-        rr = abs(max_profit / max_loss) if max_loss != 0 else float("inf")
-        st.markdown(
-            f"""
+        with col_decomp:
+            st.markdown(f"<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
+            max_profit    = row["total_credit"] * NDX_MULTIPLIER
+            max_loss      = row["max_risk_usd"]
+            put_cost_usd  = row["put_cost"]  * NDX_MULTIPLIER
+            call_cost_usd = row["call_cost"] * NDX_MULTIPLIER
+            exit_usd      = row["exit_cost"] * NDX_MULTIPLIER
+            rr = abs(max_profit / max_loss) if max_loss != 0 else float("inf")
+            st.markdown(
+                f"""
             <table style='font-family:monospace; font-size:12px; width:100%;
                           border-collapse:collapse; color:{C['white']}'>
                 <tr style='color:{C['dim']}; font-size:11px; border-bottom:1px solid {C['border']}'>
@@ -991,8 +1344,8 @@ with tab1:
                 </tr>
             </table>
             """,
-            unsafe_allow_html=True,
-        )
+                unsafe_allow_html=True,
+            )
 
     # ── Navegação rápida ──────────────────────────────────────────────────
     st.markdown("---")
@@ -1029,7 +1382,15 @@ with tab1:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 with tab2:
-    stats = compute_perf_stats(df)
+    # Para SS42: repassar df com effective_pnl_usd no lugar de pnl_usd
+    if strategy == "SS42":
+        df_perf = df.copy()
+        df_perf["pnl_usd"] = df_perf["effective_pnl_usd"]
+        df_perf["result"]  = df_perf["effective_result"]
+    else:
+        df_perf = df
+
+    stats = compute_perf_stats(df_perf)
     pf_str = f"{stats['profit_factor']:.2f}" if stats['profit_factor'] != float("inf") else "∞"
 
     # ── Row 1: KPIs principais ────────────────────────────────────────────
@@ -1041,44 +1402,49 @@ with tab2:
     k4.metric("Sharpe (ann.)",  f"{stats['sharpe']:.2f}",
               help="Weekly P&L Sharpe × √52 — benchmark: > 0.5 é respeitável em vol-selling")
     k5.metric("Max Drawdown",   f"${stats['max_dd']:,.0f}")
+    mult_used = SS42_MULTIPLIER if strategy == "SS42" else NDX_MULTIPLIER
     k6.metric("Avg Credit",     f"{stats['avg_credit']:.2f} pts",
-              delta=f"${stats['avg_credit'] * NDX_MULTIPLIER:,.0f} USD")
+              delta=f"${stats['avg_credit'] * mult_used:,.0f} USD")
+
+    if strategy == "SS42" and close_rule != "Hold to Expiration":
+        st.info(f"Performance calculada com regra: **{close_rule}**", icon="ℹ️")
 
     st.markdown("---")
 
     # ── Row 2: Equity Curve (full width) ─────────────────────────────────
-    st.plotly_chart(build_equity_curve(df), use_container_width=True)
+    st.plotly_chart(build_equity_curve(df_perf), use_container_width=True)
 
     # ── Row 3: Drawdown + P&L Distribution (50/50) ───────────────────────
     col_dd, col_dist = st.columns(2)
     with col_dd:
-        st.plotly_chart(build_drawdown_chart(df), use_container_width=True)
+        st.plotly_chart(build_drawdown_chart(df_perf), use_container_width=True)
     with col_dist:
-        st.plotly_chart(build_pnl_distribution(df), use_container_width=True)
+        st.plotly_chart(build_pnl_distribution(df_perf), use_container_width=True)
 
     # ── Row 4: Monthly Heatmap (full width) ───────────────────────────────
-    st.plotly_chart(build_monthly_heatmap(df), use_container_width=True)
+    st.plotly_chart(build_monthly_heatmap(df_perf), use_container_width=True)
 
-    # ── Row 5: IV vs Realized (full width) — estratégico para o CZ ───────
-    st.plotly_chart(build_iv_vs_move(df), use_container_width=True)
+    # ── Row 5: IV vs Realized (full width) ───────────────────────────────
+    if "expected_move" in df_perf.columns:
+        st.plotly_chart(build_iv_vs_move(df_perf), use_container_width=True)
 
-    # ── Row 6: Stats adicionais + Tier breakdown ──────────────────────────
+    # ── Row 6: Stats adicionais ───────────────────────────────────────────
     st.markdown("---")
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Avg Win",           f"${stats['avg_win']:+,.0f}")
     s2.metric("Avg Loss",          f"${stats['avg_loss']:+,.0f}")
     s3.metric("Total Premium Sold",f"${stats['total_premium']:,.0f}",
-              help="Soma de todos os créditos recebidos × $100")
-    s4.metric("Trades Analyzed",   len(df))
+              help="Soma de todos os créditos recebidos × multiplicador")
+    s4.metric("Trades Analyzed",   len(df_perf))
 
-    # Tier breakdown (só aparece se a coluna existir — backward compatible)
-    if "min_bid_used" in df.columns:
+    # Tier breakdown (só IC7)
+    if "min_bid_used" in df_perf.columns:
         st.markdown("---")
         st.markdown(
             f"<p class='section-title'>Liquidity Tier Breakdown</p>",
             unsafe_allow_html=True,
         )
-        tier_counts = df["min_bid_used"].value_counts().sort_index()
+        tier_counts = df_perf["min_bid_used"].value_counts().sort_index()
         tier_total  = tier_counts.sum()
         cols = st.columns(len(tier_counts))
         tier_labels = {0.05: "Primary (bid ≥ 0.05)", 0.03: "Tier 2 (bid ≥ 0.03)", 0.01: "Tier 3 (bid ≥ 0.01)"}
@@ -1095,10 +1461,9 @@ st.markdown(
     f"""
     <div style='text-align:center; color:{C['dim']}; font-size:10px;
                 margin-top:40px; border-top:1px solid {C['border']}; padding-top:12px'>
-        IC7 Trade Auditor v2  |  Prop Desk Quant  |  Senior Quant Developer<br>
+        Trade Auditor v3  |  Prop Desk Quant  |  IC7 NDX · SS42 SPX · SS42 RUT<br>
         For internal use only — Cristiano (CZ)  |
-        Data: <code>trade_log.csv</code>  |
-        Engine: Black-Scholes IV + European Exercise
+        Engine: Black-Scholes IV + European Exercise · 16Δ Strike Selection
     </div>
     """,
     unsafe_allow_html=True,
