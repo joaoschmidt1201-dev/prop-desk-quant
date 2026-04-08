@@ -356,10 +356,13 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
         subset = pd.DataFrame()
 
     if not subset.empty:
-        subset = subset.sort_values("dte_remaining", ascending=False)
-        x_vals = subset["dte_remaining"].tolist()
+        subset  = subset.sort_values("dte_remaining", ascending=False)
+        dte_max = int(subset["dte_remaining"].iloc[0])   # entry DTE (e.g. 42)
+        # Convert DTE → DIT (Days In Trade): DIT = dte_max - dte_remaining
+        x_vals = [dte_max - d for d in subset["dte_remaining"].tolist()]
         y_vals = subset["pnl_usd"].tolist()
         spots  = subset["spot"].tolist()
+        dtes   = subset["dte_remaining"].tolist()
 
         fig = go.Figure()
 
@@ -373,34 +376,31 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
         fig.add_trace(go.Scatter(
             x=x_vals, y=y_vals, mode="lines",
             line=dict(color=exit_color, width=2.5),
-            customdata=[[s] for s in spots],
-            hovertemplate="DTE: <b>%{x}</b>  |  Spot: %{customdata[0]:,.0f}  |  P&L: <b>$%{y:+,.0f}</b><extra></extra>",
+            customdata=[[s, d] for s, d in zip(spots, dtes)],
+            hovertemplate="Day <b>%{x}</b>  (DTE %{customdata[1]})  |  Spot: %{customdata[0]:,.0f}  |  P&L: <b>$%{y:+,.0f}</b><extra></extra>",
         ))
 
         # Zero line
         fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
 
-        # Mark 21 DTE checkpoint
+        # Mark 21 DTE checkpoint (= DIT ≈ dte_max - 21)
         ckpt = subset[subset["dte_remaining"] == 21]
         if ckpt.empty:
-            # closest to 21
-            idx = (subset["dte_remaining"] - 21).abs().idxmin()
+            idx  = (subset["dte_remaining"] - 21).abs().idxmin()
             ckpt = subset.loc[[idx]]
         if not ckpt.empty:
-            cx = int(ckpt["dte_remaining"].iloc[0])
+            cx = dte_max - int(ckpt["dte_remaining"].iloc[0])
             cy = float(ckpt["pnl_usd"].iloc[0])
             fig.add_trace(go.Scatter(
                 x=[cx], y=[cy], mode="markers",
                 marker=dict(size=10, color=C["yellow"], symbol="circle",
                             line=dict(width=2, color=C["bg"])),
-                hovertemplate=f"21 DTE checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
+                hovertemplate=f"~21 DTE checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
             ))
 
-        # Mark entry and expiration
-        entry_x = x_vals[0];  entry_y = y_vals[0]
-        exp_x   = x_vals[-1]; exp_y   = y_vals[-1]
+        # Mark entry (day 0) and expiration (day dte_max)
         fig.add_trace(go.Scatter(
-            x=[entry_x, exp_x], y=[entry_y, exp_y], mode="markers",
+            x=[0, x_vals[-1]], y=[y_vals[0], y_vals[-1]], mode="markers",
             marker=dict(size=10, color=[C["blue"], exit_color],
                         line=dict(width=2, color=C["bg"])),
             hoverinfo="skip",
@@ -412,11 +412,11 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
         pnl_21     = row.get("pnl_usd_21dte", float("nan"))
         dte_entry  = int(row.get("dte_entry", 42))
 
-        x_vals = [dte_entry]
+        x_vals = [0]
         y_vals = [credit_usd]
         if pnl_21 == pnl_21:
-            x_vals.append(21); y_vals.append(pnl_21)
-        x_vals.append(0); y_vals.append(pnl_exp)
+            x_vals.append(dte_entry - 21); y_vals.append(pnl_21)
+        x_vals.append(dte_entry); y_vals.append(pnl_exp)
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
@@ -428,7 +428,7 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
             line=dict(color=exit_color, width=2.5),
             marker=dict(size=9, color=[C["blue"], C["yellow"], exit_color][:len(x_vals)],
                         line=dict(width=1.5, color=C["bg"])),
-            hovertemplate="DTE: <b>%{x}</b><br>P&L: <b>$%{y:+,.0f}</b><extra></extra>",
+            hovertemplate="Day <b>%{x}</b><br>P&L: <b>$%{y:+,.0f}</b><extra></extra>",
         ))
         fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
 
@@ -437,8 +437,7 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
                    font=dict(size=13, color=C["white"], family="monospace"), x=0.02),
         paper_bgcolor=C["bg"], plot_bgcolor=C["panel"],
         font=dict(color=C["white"], family="monospace", size=11),
-        xaxis=dict(title="DTE remaining", gridcolor=C["border"],
-                   autorange="reversed", hoverformat="d"),
+        xaxis=dict(title="Days in Trade (DIT)", gridcolor=C["border"], hoverformat="d"),
         yaxis=dict(title="P&L (USD)", gridcolor=C["border"],
                    tickprefix="$", tickformat=","),
         showlegend=False,
@@ -966,7 +965,10 @@ with st.sidebar:
     st.divider()
 
     # ── Descoberta automática de todos os CSVs em reports/ ───────────────
-    csv_files = sorted(REPORTS_BASE.glob("**/*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    csv_files = sorted(
+        [p for p in REPORTS_BASE.glob("**/*.csv") if "_daily_" not in p.stem],
+        key=lambda p: p.stat().st_mtime, reverse=True,
+    )
     if not csv_files:
         st.error(f"Nenhum CSV encontrado em:\n{REPORTS_BASE}")
         st.stop()
