@@ -20,7 +20,7 @@ import sys
 import json
 import requests
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 
 try:
@@ -101,36 +101,72 @@ def fetch_spx_technicals() -> dict:
 
 # ─── GEX LEVELS ──────────────────────────────────────────────────────────────
 
-def get_gex_context(today: date) -> str:
-    """Reads most recent GEX week from gex_history.json and formats for prompt."""
+def get_gex_context(today: date) -> dict:
+    """Reads gex_history.json. Returns dict with 'text' (str) and 'is_current' (bool)."""
     if not HISTORY_FILE.exists():
-        return "GEX levels not available (gex_history.json not found in repo)."
+        return {"text": "GEX levels not available (gex_history.json not found in repo).", "is_current": False}
     try:
         history = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
     except Exception:
-        return "GEX levels not available (could not parse history file)."
+        return {"text": "GEX levels not available (could not parse history file).", "is_current": False}
     if not history:
-        return "No GEX levels recorded yet."
+        return {"text": "No GEX levels recorded yet.", "is_current": False}
 
     latest    = history[-1]
-    week_date = latest.get("week", "unknown")
+    week_date = latest.get("week", "")
     factor    = latest.get("factor", 1.0)
+
+    # Detect if data is from the current calendar week
+    monday_of_week = today - timedelta(days=today.weekday())
+    is_current = False
+    try:
+        week_dt    = datetime.strptime(week_date, "%Y-%m-%d").date()
+        is_current = week_dt >= monday_of_week
+    except (ValueError, TypeError):
+        pass
+
+    if not is_current:
+        return {
+            "text": (
+                f"GEX DATA NOT YET UPDATED for this week (most recent: week of {week_date}). "
+                "TradingLIT has not yet released this week's levels."
+            ),
+            "is_current": False,
+        }
+
     is_monday = today.weekday() == 0
+
+    # Level type legend — only included on Mondays to educate the LLM
+    LEGEND = (
+        "LEVEL TYPE LEGEND (source: TradingLIT):\n"
+        "  g-flip        : Gamma Flip — where dealer hedging shifts direction. "
+                          "Price ABOVE = bullish dealer flow; price BELOW = bearish dealer flow. Critical inflection.\n"
+        "  p/p1/p2/p3    : Positive GEX levels ranked by magnitude. Act as RESISTANCE (Call Walls).\n"
+        "  n/n1/n2       : Negative GEX levels ranked by magnitude. Act as SUPPORT (Put Walls).\n"
+        "  ag            : Aggregate gamma from multiple strikes — strong CONFLUENCE level.\n"
+        "  coi/poi/hoi   : Coinciding option interest at that strike — reinforces the level.\n"
+        "  r             : Resistance level.\n"
+        "  dip           : Short-term support level.\n"
+        "  low gex       : Broad low-GEX zone — price can move more freely here.\n"
+        "  Combined labels (e.g. p1 + coi + ag2): Multiple signals at the same strike = very strong level."
+    )
 
     lines = []
     intro = (
-        f"**NEW GEX LEVELS — week of {week_date} (Source: TradingLitt, 7DTE SPY→SPX factor: {factor:.2f})**"
+        f"NEW GEX LEVELS — week of {week_date} (Source: TradingLIT, 7DTE SPY→SPX factor: {factor:.2f})"
         if is_monday else
-        f"**GEX levels — week of {week_date} (Source: TradingLitt, factor: {factor:.2f})**"
+        f"GEX levels — week of {week_date} (Source: TradingLIT, factor: {factor:.2f})"
     )
     lines.append(intro)
+    if is_monday:
+        lines.append(LEGEND)
 
     field_labels = [
-        ("gflip",    "Gamma Flip (zero GEX — critical level)"),
-        ("pos",      "Call Walls / Positive GEX"),
-        ("neg",      "Put Support / Negative GEX"),
-        ("agg",      "Aggregate / Confluence"),
-        ("neg_zone", "Neg GEX Zone Start"),
+        ("gflip",    "Gamma Flip (g-flip)"),
+        ("pos",      "Positive GEX / Call Walls (p/p1/p2/p3)"),
+        ("neg",      "Negative GEX / Put Walls (n/n1/n2)"),
+        ("agg",      "Aggregate GEX (ag)"),
+        ("neg_zone", "Low GEX Zone Start"),
     ]
     for key, label in field_labels:
         raw = latest.get(key, "")
@@ -149,7 +185,7 @@ def get_gex_context(today: date) -> str:
         if spx_vals:
             lines.append(f"  • {label}: {', '.join(spx_vals)}")
 
-    return "\n".join(lines)
+    return {"text": "\n".join(lines), "is_current": True}
 
 # ─── PERPLEXITY — RESEARCH + BRIEFING ────────────────────────────────────────
 
@@ -157,13 +193,13 @@ def generate_briefing(
     market_data: dict,
     technicals: dict,
     gex_context: str,
+    gex_is_current: bool,
     today: date,
     api_key: str,
 ) -> str:
     """Calls Perplexity sonar-pro to research news and generate the morning briefing."""
 
     today_str  = today.strftime("%A, %B %d, %Y")
-    is_monday  = today.weekday() == 0
 
     # Build market summary string
     mkt_lines = []
@@ -179,13 +215,29 @@ def generate_briefing(
                 f"  {ma}: {data['value']:,.2f}  ({data['dist_pct']:+.1f}% — SPX is {data['side']})"
             )
 
-    gex_instruction = (
-        "Today is MONDAY. Introduce the new GEX levels for this week: explain what each key level means "
-        "for price action (call wall = resistance, put wall = support, gamma flip = trend inflection)."
-        if is_monday else
-        "Comment on how SPX price is currently positioned relative to the GEX levels. "
-        "Is price above or below the Gamma Flip? Near any key wall? What does that suggest?"
-    )
+    is_monday = today.weekday() == 0
+    if not gex_is_current:
+        gex_instruction = (
+            "GEX data for this week has NOT yet been released by TradingLIT. "
+            "Write exactly: '⚠️ GEX levels not yet available — TradingLIT has not released this week\\'s data. "
+            "Levels will be included in tomorrow\\'s briefing once published.' Do not speculate on GEX levels."
+        )
+    elif is_monday:
+        gex_instruction = (
+            "Today is MONDAY with NEW GEX levels just released by TradingLIT. "
+            "Using the LEVEL TYPE LEGEND provided, introduce each level present in the data and explain "
+            "what it means for SPX price action this week: where is the g-flip (bullish/bearish inflection)? "
+            "Which p/p1/p2/p3 levels are the key call walls (resistance)? "
+            "Which n/n1/n2 levels are the key put walls (support)? "
+            "Are there ag (aggregate) or combined labels (e.g. p1 + coi + ag2) indicating especially strong levels? "
+            "Reference the actual SPX dollar prices."
+        )
+    else:
+        gex_instruction = (
+            "Comment on how SPX is currently positioned relative to this week's GEX levels. "
+            "Is price above or below the Gamma Flip? Approaching any call wall (resistance) or put wall (support)? "
+            "What does the current positioning suggest for today's session?"
+        )
 
     prompt = f"""You are the senior quantitative analyst for a professional proprietary trading desk.
 The desk trades SPX options with a minimum 7DTE horizon. No individual stocks — only macro index ETFs.
@@ -332,10 +384,14 @@ def main():
     technicals = fetch_spx_technicals()
 
     print("  Reading GEX levels...")
-    gex_context = get_gex_context(today)
+    gex_result = get_gex_context(today)
 
     print("  Generating briefing (Perplexity sonar-pro)...")
-    briefing = generate_briefing(market_data, technicals, gex_context, today, perplexity_key)
+    briefing = generate_briefing(
+        market_data, technicals,
+        gex_result["text"], gex_result["is_current"],
+        today, perplexity_key,
+    )
 
     print("  Posting to Discord...")
     post_to_discord(discord_webhook, briefing, today, market_data)
