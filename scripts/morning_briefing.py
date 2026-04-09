@@ -217,42 +217,57 @@ def generate_briefing(
 The desk trades SPX options with a minimum 7DTE horizon. No individual stocks — only macro index ETFs.
 Today is {today_str}.
 
---- PRE-MARKET DATA ---
+--- PRE-MARKET DATA (from yfinance) ---
 {chr(10).join(mkt_lines) if mkt_lines else "  (data unavailable)"}
 
---- SPX MOVING AVERAGES ---
+--- SPX MOVING AVERAGES (from yfinance) ---
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
 
 --- YOUR TASK ---
-Write a concise Morning Briefing. Structure:
+Write a Morning Briefing for a professional trading Discord channel.
+Use the exact section structure and formatting below. Output clean Discord markdown only.
 
-**1. PRE-MARKET PULSE**
-Two or three sentences on the overall tone heading into the open. Reference futures and VIX.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**📊 1 — PRE-MARKET PULSE**
 
-**2. KEY NEWS & MACRO**
-Search for and summarize the 3-4 most important news items or macro events relevant to SPX/ES/NQ today ({today_str}). Include scheduled data releases (CPI, jobs, Fed speakers, FOMC) and earnings from major index components. Be specific and cite sources.
+2-3 sentences on the overall pre-market tone. Reference VIX level and direction, then each futures contract (ES, NQ, RTY) with price and % change. Keep it punchy.
 
-**3. SPX TECHNICAL PICTURE**
-Comment on SPX relative to its key moving averages (W EMA20, D SMA50, D SMA200). Which MAs are acting as support or resistance today? Keep it to 3-4 sentences.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**📰 2 — KEY NEWS & MACRO**
 
-**4. GAMMA LEVELS — 7DTE**
-Search the web RIGHT NOW for any publicly available 7DTE gamma exposure (GEX) levels published TODAY or this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
-STRICT RULES:
-- Include ONLY data from those four providers. Do not use any other source.
-- Focus ONLY on weekly/7DTE levels. Ignore 0DTE and intraday gamma data entirely.
-- Always cite the provider name next to each level you mention.
-- If you find data from some providers but not others, include what you found and note which ones had no public data available.
-- If you find NO publicly available 7DTE gamma data from ANY of these four providers today, write exactly: "⚠️ No public 7DTE gamma data found today from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier. This section will be updated if data becomes available."
-- Do NOT speculate, estimate, or use data from any other source.
+Search for and list the 3-4 most relevant macro events or news for SPX/ES/NQ on {today_str}. Include: scheduled data releases (CPI, jobs, PPI, Fed speakers, FOMC), earnings from top S&P 500 index components (Apple, Nvidia, Microsoft, Amazon, Meta, etc.), and any geopolitical or policy event moving the tape. Format as bullet points. Be specific — include times (ET) when known.
 
-**5. SESSION BIAS**
-One direct sentence: the desk's tactical bias for today's session and why.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**📈 3 — SPX TECHNICAL PICTURE**
 
---- CONSTRAINTS ---
-- Total length: 400-550 words
-- Professional, direct tone — no fluff
-- No excessive emojis
-- Use markdown bold for section headers"""
+Using the moving averages provided above, write 3-4 sentences. State where SPX is trading relative to W EMA20, D SMA50, and D SMA200. Identify which MA is acting as nearest support and which as nearest resistance. Conclude with what the MA structure implies for near-term bias.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**⚡ 4 — GAMMA LEVELS — 7DTE**
+
+Search the web RIGHT NOW for publicly available 7DTE gamma exposure (GEX) levels published this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
+
+STRICT RULES — read carefully:
+• Each level you mention MUST start with the provider name in bold, e.g.: **SpotGamma** — Call Wall $5,600 | Gamma Flip $5,450 | Put Wall $5,300
+• Include ONLY 7DTE or weekly-horizon levels. Ignore 0DTE, intraday, and same-day gamma entirely.
+• If you find data from some providers but not others, list what you found and note which ones had no public data.
+• If you find NO public 7DTE gamma data from ANY of those four providers, write: "⚠️ No public 7DTE gamma data found this week from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier."
+• Do NOT use data from TradingLIT, TradingView scripts, or any other source not on the four-provider list above.
+• Do NOT invent, estimate, or carry over numbers from previous weeks.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**🎯 5 — SESSION BIAS**
+
+One direct sentence: the desk's tactical bias for today and the single most important reason.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+--- FORMATTING RULES ---
+- Do NOT include any inline citation markers such as [1], [2], [provided data], or any bracketed references anywhere in the output.
+- Keep the ━━━ divider lines exactly as shown between sections.
+- Use bullet points (•) for lists.
+- Total output: 420-560 words.
+- Tone: professional, direct, data-driven. No filler phrases."""
 
     try:
         response = requests.post(
