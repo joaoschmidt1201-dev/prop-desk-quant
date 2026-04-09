@@ -1,0 +1,33 @@
+name: Morning Briefing
+
+on:
+  schedule:
+    # 9:00 AM EDT (UTC-4) = 13:00 UTC — runs Mon-Fri
+    # Note: during EST (Nov-Mar, UTC-5) this fires at 8:00 AM ET — still pre-market
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:
+    # Allows manual trigger from GitHub Actions tab (useful for testing)
+
+jobs:
+  morning-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet yfinance requests pandas pytz
+
+      - name: Run Morning Briefing
+        env:
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python scripts/morning_briefing.py
