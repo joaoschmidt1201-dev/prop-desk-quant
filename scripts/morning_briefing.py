@@ -192,14 +192,12 @@ def get_gex_context(today: date) -> dict:
 def generate_briefing(
     market_data: dict,
     technicals: dict,
-    gex_context: str,
-    gex_is_current: bool,
     today: date,
     api_key: str,
 ) -> str:
     """Calls Perplexity sonar-pro to research news and generate the morning briefing."""
 
-    today_str  = today.strftime("%A, %B %d, %Y")
+    today_str = today.strftime("%A, %B %d, %Y")
 
     # Build market summary string
     mkt_lines = []
@@ -215,30 +213,6 @@ def generate_briefing(
                 f"  {ma}: {data['value']:,.2f}  ({data['dist_pct']:+.1f}% — SPX is {data['side']})"
             )
 
-    is_monday = today.weekday() == 0
-    if not gex_is_current:
-        gex_instruction = (
-            "GEX data for this week has NOT yet been released by TradingLIT. "
-            "Write exactly: '⚠️ GEX levels not yet available — TradingLIT has not released this week\\'s data. "
-            "Levels will be included in tomorrow\\'s briefing once published.' Do not speculate on GEX levels."
-        )
-    elif is_monday:
-        gex_instruction = (
-            "Today is MONDAY with NEW GEX levels just released by TradingLIT. "
-            "Using the LEVEL TYPE LEGEND provided, introduce each level present in the data and explain "
-            "what it means for SPX price action this week: where is the g-flip (bullish/bearish inflection)? "
-            "Which p/p1/p2/p3 levels are the key call walls (resistance)? "
-            "Which n/n1/n2 levels are the key put walls (support)? "
-            "Are there ag (aggregate) or combined labels (e.g. p1 + coi + ag2) indicating especially strong levels? "
-            "Reference the actual SPX dollar prices."
-        )
-    else:
-        gex_instruction = (
-            "Comment on how SPX is currently positioned relative to this week's GEX levels. "
-            "Is price above or below the Gamma Flip? Approaching any call wall (resistance) or put wall (support)? "
-            "What does the current positioning suggest for today's session?"
-        )
-
     prompt = f"""You are the senior quantitative analyst for a professional proprietary trading desk.
 The desk trades SPX options with a minimum 7DTE horizon. No individual stocks — only macro index ETFs.
 Today is {today_str}.
@@ -249,9 +223,6 @@ Today is {today_str}.
 --- SPX MOVING AVERAGES ---
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
 
---- GEX LEVELS (Gamma Exposure, 7DTE — Source: TradingLitt) ---
-{gex_context}
-
 --- YOUR TASK ---
 Write a concise Morning Briefing. Structure:
 
@@ -259,16 +230,23 @@ Write a concise Morning Briefing. Structure:
 Two or three sentences on the overall tone heading into the open. Reference futures and VIX.
 
 **2. KEY NEWS & MACRO**
-Search for and summarize the 3-4 most important news items or macro events relevant to SPX/ES/NQ today ({today_str}). Include any scheduled data releases (CPI, jobs, Fed speakers, FOMC, earnings from major index components). Be specific and cite what you find.
+Search for and summarize the 3-4 most important news items or macro events relevant to SPX/ES/NQ today ({today_str}). Include scheduled data releases (CPI, jobs, Fed speakers, FOMC) and earnings from major index components. Be specific and cite sources.
 
 **3. SPX TECHNICAL PICTURE**
-Comment on SPX relative to its key moving averages. Which MAs are acting as support/resistance today? Keep it to 3-4 sentences.
+Comment on SPX relative to its key moving averages (W EMA20, D SMA50, D SMA200). Which MAs are acting as support or resistance today? Keep it to 3-4 sentences.
 
-**4. GEX ANALYSIS — 7DTE**
-{gex_instruction}
+**4. GAMMA LEVELS — 7DTE**
+Search the web RIGHT NOW for any publicly available 7DTE gamma exposure (GEX) levels published TODAY or this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
+STRICT RULES:
+- Include ONLY data from those four providers. Do not use any other source.
+- Focus ONLY on weekly/7DTE levels. Ignore 0DTE and intraday gamma data entirely.
+- Always cite the provider name next to each level you mention.
+- If you find data from some providers but not others, include what you found and note which ones had no public data available.
+- If you find NO publicly available 7DTE gamma data from ANY of these four providers today, write exactly: "⚠️ No public 7DTE gamma data found today from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier. This section will be updated if data becomes available."
+- Do NOT speculate, estimate, or use data from any other source.
 
 **5. SESSION BIAS**
-One direct sentence: what is the desk's tactical bias for today's session and why.
+One direct sentence: the desk's tactical bias for today's session and why.
 
 --- CONSTRAINTS ---
 - Total length: 400-550 words
@@ -383,15 +361,8 @@ def main():
     print("  Computing SPX moving averages...")
     technicals = fetch_spx_technicals()
 
-    print("  Reading GEX levels...")
-    gex_result = get_gex_context(today)
-
     print("  Generating briefing (Perplexity sonar-pro)...")
-    briefing = generate_briefing(
-        market_data, technicals,
-        gex_result["text"], gex_result["is_current"],
-        today, perplexity_key,
-    )
+    briefing = generate_briefing(market_data, technicals, today, perplexity_key)
 
     print("  Posting to Discord...")
     post_to_discord(discord_webhook, briefing, today, market_data)
