@@ -208,10 +208,10 @@ def generate_briefing(
     # Build technicals summary
     tech_lines = []
     if technicals:
-        tech_lines.append(f"  SPX: {technicals['price']:,.2f}")
+        tech_lines.append(f"  SPX: {round(technicals['price'])}")
         for ma, data in technicals.get("mas", {}).items():
             tech_lines.append(
-                f"  {ma}: {data['value']:,.2f}  ({data['dist_pct']:+.1f}% — SPX is {data['side']})"
+                f"  {ma}: {round(data['value'])}  ({data['dist_pct']:+.1f}% — SPX is {data['side']})"
             )
 
     prompt = f"""You are the senior quantitative analyst for a professional proprietary trading desk.
