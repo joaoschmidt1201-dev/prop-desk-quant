@@ -476,71 +476,79 @@ def simulate_with_reinvestments(
     underlying: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Continuous chain simulation (live, requires G:/ parquets).
+    Monthly-anchor simulation (live, requires G:/ parquets).
 
-    Every trade closure — whether triggered by the close rule OR by reaching
-    expiration — opens a new trade on the next Friday.  The chain starts at
-    the same entry date as the first original trade and continues until parquet
-    data is no longer available.
+    The 12 monthly trades are the base.  When a close rule fires on any trade:
+      - A re-entry opens the next Friday (~42 DTE).
+      - The NEXT scheduled monthly slot is skipped (one-for-one swap).
+      - Recursive: if the re-entry also fires, another re-entry opens and
+        another monthly slot is skipped, until a trade expires normally.
+      - After any expiration the monthly schedule resumes.
 
-    Returns (df_chain, daily_df_chain).
+    Trade count is always EXACTLY equal to Hold to Expiration.
     Falls back to originals if parquet access unavailable or rule is Hold.
     """
     if not _REINVEST_OK or rule == "Hold to Expiration":
         return df_orig, daily_df_orig
 
-    available   = _ss42_available(underlying)
-    first_entry = pd.to_datetime(
-        df_orig.sort_values("trade_date")["trade_date"].iloc[0]
-    ).date()
+    df_sorted = df_orig.copy()
+    df_sorted["_td"] = pd.to_datetime(df_sorted["trade_date"]).dt.date
+    df_sorted["_ed"] = pd.to_datetime(df_sorted["exp_date"]).dt.date
+    df_sorted = df_sorted.sort_values("_td").reset_index(drop=True)
+    n = len(df_sorted)
 
     result_trades: list[dict] = []
-    result_daily:  list[dict] = []
+    result_daily:  list[dict] = list(daily_df_orig.to_dict("records"))
 
-    chain_entry  = first_entry
-    MAX_TRADES   = 200  # safety cap
-
-    while len(result_trades) < MAX_TRADES:
-        trade_d, daily_r = _simulate_single_trade(chain_entry, underlying)
-        if trade_d is None:
-            break
+    i = 0
+    while i < n:
+        row       = df_sorted.iloc[i]
+        t_exp     = row["_ed"]
+        trade_str = str(row["trade_date"])
+        trade_d   = row.drop(["_td", "_ed"]).to_dict()
 
         result_trades.append(trade_d)
-        result_daily.extend(daily_r)
+        i += 1  # advance past this monthly slot
 
-        t_exp = pd.to_datetime(trade_d["exp_date"]).date()
+        close_d = _get_close_date_for_trade(
+            pd.Series(trade_d | {"trade_date": trade_str, "exp_date": t_exp}),
+            rule, daily_df_orig, multiplier,
+        )
 
-        # Determine when this trade closes (close rule OR expiration)
-        if daily_r:
-            t_series = pd.Series(trade_d)
-            t_series["trade_date"] = str(trade_d["trade_date"])
-            daily_r_df = pd.DataFrame(daily_r)
-            daily_r_df["trade_date"] = daily_r_df["trade_date"].astype(str)
-            close_d = _get_close_date_for_trade(t_series, rule, daily_r_df, multiplier)
-        else:
-            close_d = t_exp
+        if close_d >= t_exp:
+            continue  # rule never fired → advance to next monthly normally
 
-        # Next entry: next Friday after the close date
-        next_entry = _next_friday_after(close_d)
+        # Close rule fired: start re-entry chain.
+        # Monthly slot is only skipped AFTER the re-entry successfully opens.
+        re_entry = _next_friday_after(close_d)
 
-        # Find nearest available parquet date (±7 days)
-        actual_entry: "_date | None" = None
-        if next_entry in available:
-            actual_entry = next_entry
-        else:
-            for offset in range(1, 8):
-                for delta in [offset, -offset]:
-                    candidate = next_entry + timedelta(days=delta)
-                    if candidate in available:
-                        actual_entry = candidate
-                        break
-                if actual_entry is not None:
-                    break
+        # Re-entry chain
+        while True:
+            t_re, daily_re = _simulate_single_trade(re_entry, underlying)
+            if t_re is None:
+                break  # can't open re-entry → don't skip monthly
 
-        if actual_entry is None:
-            break  # no more data
+            # Re-entry opened → NOW skip the next monthly slot
+            if i < n:
+                i += 1
 
-        chain_entry = actual_entry
+            result_trades.append(t_re)
+            result_daily.extend(daily_re)
+
+            t_exp_re = pd.to_datetime(t_re["exp_date"]).date()
+
+            if daily_re:
+                s = pd.Series(t_re | {"trade_date": str(t_re["trade_date"])})
+                dre = pd.DataFrame(daily_re)
+                dre["trade_date"] = dre["trade_date"].astype(str)
+                close_re = _get_close_date_for_trade(s, rule, dre, multiplier)
+
+                if close_re < t_exp_re:
+                    # Re-entry also fired: set next (skip happens on next iteration)
+                    re_entry = _next_friday_after(close_re)
+                    continue
+
+            break  # re-entry expired → return to monthly schedule
 
     # ── Build output DataFrames ───────────────────────────────────────────
     if not result_trades:
