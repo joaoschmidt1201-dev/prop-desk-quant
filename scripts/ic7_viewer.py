@@ -1324,7 +1324,7 @@ with st.sidebar:
     st.divider()
 
     # ── Descoberta automática de todos os CSVs em reports/ ───────────────
-    _excluded = {"_daily_", "vix_history"}
+    _excluded = {"_daily_", "vix_history", "_reinvest_"}
     csv_files = sorted(
         [p for p in REPORTS_BASE.glob("**/*.csv")
          if not any(x in p.stem for x in _excluded)],
@@ -1403,7 +1403,17 @@ with st.sidebar:
 
         _underlying = "SPX" if "SPX" in selected_csv.stem else "RUT"
 
+        # Map close rule name → CSV key used by ss42_reinvest_sim.py
+        _RULE_KEY_MAP = {
+            "25% Profit Target":    "25pct",
+            "50% Profit Target":    "50pct",
+            "75% Profit Target":    "75pct",
+            "50% Profit or 24 DIT": "50pct_24dit",
+            "24 DIT":               "24dit",
+        }
+
         if close_rule != "Hold to Expiration" and _REINVEST_OK and daily_df_raw is not None:
+            # ── Live simulation (G:/ mounted locally) ────────────────────────
             with st.spinner("Simulating re-entries…"):
                 df_sim, daily_df_eff = simulate_with_reinvestments(
                     df_raw, daily_df_raw, close_rule, SS42_MULTIPLIER, _underlying
@@ -1415,6 +1425,28 @@ with st.sidebar:
                     f"+ {n_reentries} re-entr{'y' if n_reentries==1 else 'ies'} simulated</div>",
                     unsafe_allow_html=True,
                 )
+
+        elif close_rule != "Hold to Expiration":
+            # ── Pre-computed reinvest CSVs (Streamlit Cloud) ─────────────────
+            _rule_key  = _RULE_KEY_MAP.get(close_rule)
+            _reinv_dir = selected_csv.parent
+            _t_path = _reinv_dir / f"SS42_{_underlying}_reinvest_{_rule_key}_trades.csv" if _rule_key else None
+            _d_path = _reinv_dir / f"SS42_{_underlying}_reinvest_{_rule_key}_daily.csv"  if _rule_key else None
+
+            if _t_path and _t_path.exists() and _d_path and _d_path.exists():
+                df_sim       = load_trade_log(_t_path)
+                daily_df_eff = load_daily_mtm(_d_path)
+                n_reentries  = len(df_sim) - len(df_raw)
+                if n_reentries > 0:
+                    st.markdown(
+                        f"<div style='font-size:11px; color:{C['blue']}; margin-top:-4px'>"
+                        f"+ {n_reentries} re-entr{'y' if n_reentries==1 else 'ies'} (pre-computed)</div>",
+                        unsafe_allow_html=True,
+                    )
+            else:
+                df_sim       = df_raw
+                daily_df_eff = daily_df_raw
+
         else:
             df_sim       = df_raw
             daily_df_eff = daily_df_raw
