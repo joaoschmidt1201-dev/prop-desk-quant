@@ -16,6 +16,7 @@ Data sources:
 """
 
 import os
+import re
 import sys
 import json
 import requests
@@ -224,50 +225,33 @@ Today is {today_str}.
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
 
 --- YOUR TASK ---
-Write a Morning Briefing for a professional trading Discord channel.
-Use the exact section structure and formatting below. Output clean Discord markdown only.
+Write a Morning Briefing using exactly these five numbered sections with bold headers.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📊 1 — PRE-MARKET PULSE**
+**1. PRE-MARKET PULSE**
+2-3 sentences. Reference VIX level and direction, then ES, NQ, RTY with price and % change. Punchy tone.
 
-2-3 sentences on the overall pre-market tone. Reference VIX level and direction, then each futures contract (ES, NQ, RTY) with price and % change. Keep it punchy.
+**2. KEY NEWS & MACRO**
+Search the web for the 3-4 most relevant macro events or news for SPX/ES/NQ on {today_str}. Include scheduled data releases (CPI, PPI, jobs, Fed speakers, FOMC) and earnings from top S&P 500 components. Write each item as a bullet point starting with a dash (-). Include times (ET) when known.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📰 2 — KEY NEWS & MACRO**
+**3. SPX TECHNICAL PICTURE**
+3-4 sentences using the moving averages provided above. State SPX price relative to W EMA20, D SMA50, D SMA200. Identify nearest support MA and nearest resistance MA. Conclude with near-term bias implied by the MA structure.
 
-Search for and list the 3-4 most relevant macro events or news for SPX/ES/NQ on {today_str}. Include: scheduled data releases (CPI, jobs, PPI, Fed speakers, FOMC), earnings from top S&P 500 index components (Apple, Nvidia, Microsoft, Amazon, Meta, etc.), and any geopolitical or policy event moving the tape. Format as bullet points. Be specific — include times (ET) when known.
+**4. GAMMA LEVELS — 7DTE**
+Search the web for publicly available 7DTE gamma exposure (GEX) levels published this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
+Rules:
+- Each level found MUST be prefixed with the provider name, e.g.: "SpotGamma: Call Wall $5,600 | Gamma Flip $5,450 | Put Wall $5,300"
+- Only include 7DTE or weekly-horizon levels. Ignore 0DTE and intraday gamma.
+- If you cannot confirm that a specific number came from one of those four providers, do NOT include it.
+- If you find data from some providers but not others, list what you found and note which had no public data.
+- If you find NO confirmed public 7DTE gamma data from any of the four providers, write: "No public 7DTE gamma data confirmed this week from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier."
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**📈 3 — SPX TECHNICAL PICTURE**
+**5. SESSION BIAS**
+One sentence: the desk's tactical bias for today and the single most important reason.
 
-Using the moving averages provided above, write 3-4 sentences. State where SPX is trading relative to W EMA20, D SMA50, and D SMA200. Identify which MA is acting as nearest support and which as nearest resistance. Conclude with what the MA structure implies for near-term bias.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**⚡ 4 — GAMMA LEVELS — 7DTE**
-
-Search the web RIGHT NOW for publicly available 7DTE gamma exposure (GEX) levels published this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
-
-STRICT RULES — read carefully:
-• Each level you mention MUST start with the provider name in bold, e.g.: **SpotGamma** — Call Wall $5,600 | Gamma Flip $5,450 | Put Wall $5,300
-• Include ONLY 7DTE or weekly-horizon levels. Ignore 0DTE, intraday, and same-day gamma entirely.
-• If you find data from some providers but not others, list what you found and note which ones had no public data.
-• If you find NO public 7DTE gamma data from ANY of those four providers, write: "⚠️ No public 7DTE gamma data found this week from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier."
-• Do NOT use data from TradingLIT, TradingView scripts, or any other source not on the four-provider list above.
-• Do NOT invent, estimate, or carry over numbers from previous weeks.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**🎯 5 — SESSION BIAS**
-
-One direct sentence: the desk's tactical bias for today and the single most important reason.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
---- FORMATTING RULES ---
-- Do NOT include any inline citation markers such as [1], [2], [provided data], or any bracketed references anywhere in the output.
-- Keep the ━━━ divider lines exactly as shown between sections.
-- Use bullet points (•) for lists.
-- Total output: 420-560 words.
-- Tone: professional, direct, data-driven. No filler phrases."""
+--- CONSTRAINTS ---
+- Total: 420-560 words.
+- Professional, direct, data-driven tone.
+- Do NOT include citation markers like [1], [2], [provided data], or any bracketed references in the output."""
 
     try:
         response = requests.post(
@@ -300,6 +284,39 @@ One direct sentence: the desk's tactical bias for today and the single most impo
         return "⚠️ Morning Briefing could not be generated (Perplexity API timeout)."
     except requests.exceptions.RequestException as e:
         return f"⚠️ Morning Briefing could not be generated: {e}"
+
+# ─── POST-PROCESSING ─────────────────────────────────────────────────────────
+
+_DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+_SECTION_EMOJIS = {"1": "📊", "2": "📰", "3": "📈", "4": "⚡", "5": "🎯"}
+
+def post_process(text: str) -> str:
+    """Strip Perplexity citation markers and inject Discord formatting."""
+    # Remove numeric citations: [1], [2], [12]
+    text = re.sub(r'\[\d+\]', '', text)
+    # Remove labeled citations: [provided data], [provided GEX], [source], etc.
+    text = re.sub(r'\[[^\]]{1,40}\]', '', text)
+    # Clean up extra spaces left by citation removal
+    text = re.sub(r'  +', ' ', text)
+    text = re.sub(r' ([.,])', r'\1', text)
+
+    # Inject divider + emoji before each numbered bold section header
+    def replace_header(m):
+        num   = m.group(1)
+        title = m.group(2).strip().rstrip('*').strip()
+        emoji = _SECTION_EMOJIS.get(num, '')
+        return f"\n{_DIVIDER}\n**{emoji}  {num}. {title}**\n"
+
+    text = re.sub(
+        r'\*\*\s*(\d)\s*[.\u2014\-]+\s*([^\n*]+?)\s*\*\*',
+        replace_header,
+        text,
+    )
+
+    # Convert "- item" bullet lines to "• item" for Discord aesthetics
+    text = re.sub(r'(?m)^-\s+', '• ', text)
+
+    return text.strip()
 
 # ─── DISCORD ─────────────────────────────────────────────────────────────────
 
@@ -377,7 +394,7 @@ def main():
     technicals = fetch_spx_technicals()
 
     print("  Generating briefing (Perplexity sonar-pro)...")
-    briefing = generate_briefing(market_data, technicals, today, perplexity_key)
+    briefing = post_process(generate_briefing(market_data, technicals, today, perplexity_key))
 
     print("  Posting to Discord...")
     post_to_discord(discord_webhook, briefing, today, market_data)
