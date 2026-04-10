@@ -283,7 +283,13 @@ One direct sentence: the desk's tactical bias for today and the single most impo
             timeout=90,
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        content = response.json()["choices"][0]["message"]["content"]
+        # Strip Perplexity's auto-injected citation markers at the source
+        content = re.sub(r'\[\d+\]', '', content)
+        content = re.sub(r'\[[^\]]{1,60}\]', '', content)
+        content = re.sub(r'  +', ' ', content).strip()
+        print(f"  [DEBUG] Raw response (first 300 chars): {repr(content[:300])}")
+        return content
 
     except requests.exceptions.Timeout:
         return "⚠️ Morning Briefing could not be generated (Perplexity API timeout)."
