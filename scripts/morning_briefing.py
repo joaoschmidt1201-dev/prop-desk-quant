@@ -225,33 +225,38 @@ Today is {today_str}.
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
 
 --- YOUR TASK ---
-Write a Morning Briefing using exactly these five numbered sections with bold headers.
+Write a Morning Briefing with exactly five sections.
+CRITICAL: Begin each section with its delimiter token on its own line — NOTHING before it.
+The five delimiter tokens are: §1§  §2§  §3§  §4§  §5§
+Do NOT write any text before §1§. Do NOT number or title the sections yourself.
 
-**1. PRE-MARKET PULSE**
-2-3 sentences. Reference VIX level and direction, then ES, NQ, RTY with price and % change. Punchy tone.
+§1§
+2-3 sentences on pre-market tone. State VIX (level and % change direction), then ES, NQ and RTY (price and % change). Punchy, direct.
 
-**2. KEY NEWS & MACRO**
-Search the web for the 3-4 most relevant macro events or news for SPX/ES/NQ on {today_str}. Include scheduled data releases (CPI, PPI, jobs, Fed speakers, FOMC) and earnings from top S&P 500 components. Write each item as a bullet point starting with a dash (-). Include times (ET) when known.
+§2§
+Search the web for the 3-4 most relevant macro events or news for SPX/ES/NQ on {today_str}. Include: scheduled data releases (CPI, PPI, jobs, Fed speakers, FOMC), earnings from top S&P 500 components (Apple, Nvidia, Microsoft, Amazon, Meta, etc.), any major geopolitical or policy event moving markets. Write each item on its own line starting with a dash (-). Include ET times when known.
 
-**3. SPX TECHNICAL PICTURE**
-3-4 sentences using the moving averages provided above. State SPX price relative to W EMA20, D SMA50, D SMA200. Identify nearest support MA and nearest resistance MA. Conclude with near-term bias implied by the MA structure.
+§3§
+3-4 sentences using the moving averages in the data above. State where SPX is relative to W EMA20, D SMA50, and D SMA200. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
 
-**4. GAMMA LEVELS — 7DTE**
-Search the web for publicly available 7DTE gamma exposure (GEX) levels published this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
-Rules:
-- Each level found MUST be prefixed with the provider name, e.g.: "SpotGamma: Call Wall $5,600 | Gamma Flip $5,450 | Put Wall $5,300"
-- Only include 7DTE or weekly-horizon levels. Ignore 0DTE and intraday gamma.
-- If you cannot confirm that a specific number came from one of those four providers, do NOT include it.
-- If you find data from some providers but not others, list what you found and note which had no public data.
-- If you find NO confirmed public 7DTE gamma data from any of the four providers, write: "No public 7DTE gamma data confirmed this week from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier."
+§4§
+Search the web RIGHT NOW for publicly available 7DTE gamma exposure (GEX) levels published this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
+Rules (mandatory):
+- Prefix EVERY level with the provider name: e.g. "SpotGamma: Gamma Flip $5,450 | Call Wall $5,600 | Put Wall $5,300"
+- Include ONLY weekly/7DTE levels. Ignore 0DTE and intraday entirely.
+- If you cannot confirm a number came from one of those four providers, do NOT include it.
+- If some providers had no public data, list which ones.
+- If NO confirmed data exists from any of the four providers, write exactly: "No public 7DTE gamma data found this week from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier."
 
-**5. SESSION BIAS**
-One sentence: the desk's tactical bias for today and the single most important reason.
+§5§
+One direct sentence: the desk's tactical bias for today and the single most important reason.
 
---- CONSTRAINTS ---
-- Total: 420-560 words.
-- Professional, direct, data-driven tone.
-- Do NOT include citation markers like [1], [2], [provided data], or any bracketed references in the output."""
+--- OUTPUT RULES ---
+- The ONLY special characters allowed are the five delimiters §1§ through §5§ and dashes (-) for bullet lines.
+- Do NOT write section titles or headers.
+- Do NOT include any citation markers like [1], [2], [provided data], or anything in square brackets.
+- Total content: 380-520 words (excluding delimiters).
+- Professional, data-driven tone."""
 
     try:
         response = requests.post(
@@ -288,35 +293,44 @@ One sentence: the desk's tactical bias for today and the single most important r
 # ─── POST-PROCESSING ─────────────────────────────────────────────────────────
 
 _DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-_SECTION_EMOJIS = {"1": "📊", "2": "📰", "3": "📈", "4": "⚡", "5": "🎯"}
+_SECTIONS = {
+    "1": ("📊", "PRE-MARKET PULSE"),
+    "2": ("📰", "KEY NEWS & MACRO"),
+    "3": ("📈", "SPX TECHNICAL PICTURE"),
+    "4": ("⚡", "GAMMA LEVELS — 7DTE"),
+    "5": ("🎯", "SESSION BIAS"),
+}
 
-def post_process(text: str) -> str:
-    """Strip Perplexity citation markers and inject Discord formatting."""
-    # Remove numeric citations: [1], [2], [12]
-    text = re.sub(r'\[\d+\]', '', text)
-    # Remove labeled citations: [provided data], [provided GEX], [source], etc.
-    text = re.sub(r'\[[^\]]{1,40}\]', '', text)
-    # Clean up extra spaces left by citation removal
+def post_process(raw: str) -> str:
+    """Parse §N§ delimiters, strip citations, build Discord-formatted output."""
+    # Strip ALL bracket citation patterns aggressively
+    text = re.sub(r'\[\d+\]', '', raw)
+    text = re.sub(r'\[[^\]]{1,60}\]', '', text)
     text = re.sub(r'  +', ' ', text)
-    text = re.sub(r' ([.,])', r'\1', text)
 
-    # Inject divider + emoji before each numbered bold section header
-    def replace_header(m):
-        num   = m.group(1)
-        title = m.group(2).strip().rstrip('*').strip()
-        emoji = _SECTION_EMOJIS.get(num, '')
-        return f"\n{_DIVIDER}\n**{emoji}  {num}. {title}**\n"
+    # Split on §1§ ... §5§ delimiters
+    parts = re.split(r'§(\d)§', text)
+    # parts = [anything_before_first, "1", content1, "2", content2, ...]
 
-    text = re.sub(
-        r'\*\*\s*(\d)\s*[.\u2014\-]+\s*([^\n*]+?)\s*\*\*',
-        replace_header,
-        text,
-    )
+    output = []
+    i = 1
+    while i + 1 < len(parts):
+        num     = parts[i].strip()
+        content = parts[i + 1].strip()
+        # Convert dash bullets to •
+        content = re.sub(r'(?m)^-\s+', '• ', content)
+        # Strip any stray bold headers Perplexity may have added inside content
+        content = re.sub(r'^\*\*[^*\n]+\*\*\s*\n?', '', content, flags=re.MULTILINE).strip()
+        if num in _SECTIONS:
+            emoji, title = _SECTIONS[num]
+            output.append(f"{_DIVIDER}\n**{emoji}  {title}**\n\n{content}")
+        i += 2
 
-    # Convert "- item" bullet lines to "• item" for Discord aesthetics
-    text = re.sub(r'(?m)^-\s+', '• ', text)
+    if not output:
+        # Delimiter parsing failed — return raw text with citations stripped at minimum
+        return text.strip()
 
-    return text.strip()
+    return "\n\n".join(output)
 
 # ─── DISCORD ─────────────────────────────────────────────────────────────────
 
