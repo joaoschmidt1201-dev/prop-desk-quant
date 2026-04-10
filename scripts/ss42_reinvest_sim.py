@@ -221,87 +221,80 @@ def run_reinvest_sim(
     rule: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Constrói sequência augmentada de trades com re-entradas recursivas.
-    Quando uma close rule dispara cedo:
-      - Abre novo trade na próxima sexta (~42 DTE)
-      - Substitui o calendário mensal enquanto a re-entrada está ativa
-      - Recursivo: re-entradas que fecham cedo também geram novas re-entradas
+    Continuous chain simulation.
+
+    Every trade closure — whether triggered by the close rule OR by reaching
+    expiration — opens a new trade on the next Friday.  The chain starts at
+    the same entry date as the first original trade and continues until parquet
+    data is no longer available.
+
+    Trade count is always >= original count, because early closures open new
+    trades sooner, adding trades within the same calendar window.
     """
-    df_sorted = df_orig.copy()
-    df_sorted["_td"] = pd.to_datetime(df_sorted["trade_date"]).dt.date
-    df_sorted["_ed"] = pd.to_datetime(df_sorted["exp_date"]).dt.date
-    df_sorted = df_sorted.sort_values("_td").reset_index(drop=True)
+    available = get_available_dates(UNDERLYING)
+
+    # Chain starts at the same date as the original first trade
+    first_entry: date = pd.to_datetime(
+        df_orig.sort_values("trade_date")["trade_date"].iloc[0]
+    ).date()
 
     result_trades: list[dict] = []
-    result_daily:  list[dict] = list(daily_df.to_dict("records"))
+    result_daily:  list[dict] = []
 
-    active_until:  date | None = None
-    pending_entry: date | None = None
-    orig_idx = 0
-    n_orig   = len(df_sorted)
+    chain_entry = first_entry
+    MAX_TRADES   = 200  # safety cap
 
-    while orig_idx < n_orig or pending_entry is not None:
-
-        # ── Processar re-entrada pendente ─────────────────────────────────
-        if pending_entry is not None:
-            next_orig_date = df_sorted.at[orig_idx, "_td"] if orig_idx < n_orig else None
-
-            # Só processa a re-entrada se vier antes do próximo trade mensal
-            if next_orig_date is None or pending_entry < next_orig_date:
-                trade_d, daily_r = simulate_single_trade(pending_entry)
-                pending_entry = None
-
-                if trade_d is None:
-                    # Sem parquet → abandona a cadeia de re-entradas
-                    continue
-
-                result_trades.append(trade_d)
-                result_daily.extend(daily_r)
-
-                t_exp = pd.to_datetime(trade_d["exp_date"]).date()
-                active_until = t_exp
-
-                # Verificar se esta re-entrada também fecha cedo
-                if daily_r:
-                    t_series = pd.Series(trade_d | {"trade_date": str(trade_d["trade_date"])})
-                    daily_r_df = pd.DataFrame(daily_r)
-                    daily_r_df["trade_date"] = daily_r_df["trade_date"].astype(str)
-                    close_d = get_close_date(t_series, rule, daily_r_df)
-                    if close_d < t_exp:
-                        pending_entry = next_friday_after(close_d)
-
-                continue
-
-        # ── Processar próximo trade mensal original ────────────────────────
-        if orig_idx >= n_orig:
+    while len(result_trades) < MAX_TRADES:
+        t_re, daily_re = simulate_single_trade(chain_entry)
+        if t_re is None:
+            log.info(f"  [chain] Sem dados para {chain_entry} — fim da cadeia")
             break
 
-        row = df_sorted.iloc[orig_idx]
-        orig_idx += 1
-        t_date = row["_td"]
+        result_trades.append(t_re)
+        result_daily.extend(daily_re)
 
-        # Pular se coberto por trade de re-entrada ainda ativo
-        if active_until is not None and t_date <= active_until:
-            log.debug(f"  [skip mensal] {t_date} coberto por active_until={active_until}")
-            continue
+        t_exp = pd.to_datetime(t_re["exp_date"]).date()
 
-        trade_d   = row.drop(["_td", "_ed"]).to_dict()
-        t_exp     = row["_ed"]
-        trade_str = str(row["trade_date"])
+        # Determine when this trade closes (close rule OR expiration)
+        if daily_re:
+            s   = pd.Series(t_re | {"trade_date": str(t_re["trade_date"])})
+            dre = pd.DataFrame(daily_re)
+            dre["trade_date"] = dre["trade_date"].astype(str)
+            close_d = get_close_date(s, rule, dre)
+        else:
+            close_d = t_exp
 
-        result_trades.append(trade_d)
-        active_until = t_exp
-
-        # Verificar se este trade fecha cedo
-        close_d = get_close_date(
-            pd.Series(trade_d | {"trade_date": trade_str, "exp_date": t_exp}),
-            rule, daily_df,
+        closed_by = "rule" if close_d < t_exp else "expiration"
+        log.info(
+            f"  [chain] {chain_entry} → exp {t_exp} | "
+            f"close {close_d} ({closed_by}) | "
+            f"P&L: {t_re.get('pnl_usd', 0):+,.0f}$"
         )
-        if close_d < t_exp:
-            pending_entry = next_friday_after(close_d)
-            log.debug(f"  Trade {trade_str} → fecha em {close_d} → re-entrada {pending_entry}")
 
-    # ── Montar DataFrames de saída ─────────────────────────────────────────
+        # Next entry: next Friday after the close date
+        next_entry = next_friday_after(close_d)
+
+        # Find the nearest available parquet date (±7 days)
+        actual_entry: date | None = None
+        if next_entry in available:
+            actual_entry = next_entry
+        else:
+            for offset in range(1, 8):
+                for delta in [offset, -offset]:
+                    candidate = next_entry + timedelta(days=delta)
+                    if candidate in available:
+                        actual_entry = candidate
+                        break
+                if actual_entry is not None:
+                    break
+
+        if actual_entry is None:
+            log.info(f"  [chain] Sem parquet perto de {next_entry} — fim da cadeia")
+            break
+
+        chain_entry = actual_entry
+
+    # ── Build output DataFrames ───────────────────────────────────────────
     if not result_trades:
         return df_orig, daily_df
 
@@ -312,7 +305,12 @@ def run_reinvest_sim(
 
     daily_new = pd.DataFrame(result_daily)
     if not daily_new.empty:
-        daily_new["trade_date"] = daily_new["trade_date"].astype(str)
+        daily_new["trade_date"]    = daily_new["trade_date"].astype(str)
+        # Normalise to plain YYYY-MM-DD — avoids mixed Timestamp/date format
+        # issue with newer pandas on Streamlit Cloud
+        daily_new["calendar_date"] = pd.to_datetime(
+            daily_new["calendar_date"]
+        ).dt.strftime("%Y-%m-%d")
 
     return df_new, daily_new
 
