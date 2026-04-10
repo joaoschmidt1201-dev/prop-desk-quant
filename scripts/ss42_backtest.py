@@ -46,7 +46,8 @@ warnings.filterwarnings("ignore")
 # PARÂMETROS
 # ─────────────────────────────────────────────────────────────────────────────
 
-UNDERLYING    = sys.argv[1].upper() if len(sys.argv) > 1 else "SPX"
+_arg_u        = sys.argv[1].upper() if len(sys.argv) > 1 else "SPX"
+UNDERLYING    = _arg_u if _arg_u in ("SPX", "RUT", "NDX") else "SPX"
 MULTIPLIER    = 100          # $100/ponto (SPX e RUT)
 TARGET_DTE    = 42           # DTE alvo na entrada
 CHECKPOINT_DTE = 21          # DTE do checkpoint (padrão TastyTrade)
@@ -86,11 +87,12 @@ def _attach_file_handler():
 # SECTION A — DATA LAYER
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_available_dates() -> set[date]:
+def get_available_dates(underlying: str | None = None) -> set[date]:
     """Retorna conjunto de datas com parquet disponível para o underlying."""
+    u = (underlying or UNDERLYING).upper()
     dates: set[date] = set()
-    for f in DATA_DIR.glob(f"{UNDERLYING}_chain_*.parquet"):
-        ds = f.stem.replace(f"{UNDERLYING}_chain_", "")
+    for f in DATA_DIR.glob(f"{u}_chain_*.parquet"):
+        ds = f.stem.replace(f"{u}_chain_", "")
         try:
             dates.add(date.fromisoformat(ds))
         except ValueError:
@@ -98,9 +100,10 @@ def get_available_dates() -> set[date]:
     return dates
 
 
-def load_chain(trade_date: date) -> pd.DataFrame | None:
+def load_chain(trade_date: date, underlying: str | None = None) -> pd.DataFrame | None:
     """Carrega o parquet de um dia específico. Retorna None se ausente."""
-    path = DATA_DIR / f"{UNDERLYING}_chain_{trade_date.isoformat()}.parquet"
+    u = (underlying or UNDERLYING).upper()
+    path = DATA_DIR / f"{u}_chain_{trade_date.isoformat()}.parquet"
     if not path.exists():
         return None
     try:
@@ -456,6 +459,7 @@ def compute_daily_mtm(
     short_call:   float,
     entry_credit: float,
     available:    set[date],
+    underlying:   str | None = None,
 ) -> list[dict]:
     """
     Computes mark-to-market P&L for every available trading day of a strangle.
@@ -472,7 +476,7 @@ def compute_daily_mtm(
             current += timedelta(days=1)
             continue
 
-        chain = load_chain(current)
+        chain = load_chain(current, underlying)
         if chain is None:
             current += timedelta(days=1)
             continue

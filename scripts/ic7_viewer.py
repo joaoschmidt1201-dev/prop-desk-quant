@@ -17,12 +17,31 @@
 from __future__ import annotations
 
 import math
+from datetime import date as _date, timedelta
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+
+# ── Optional: re-entry simulation (requires local parquet access via G:/) ──
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from ss42_backtest import (  # noqa: F401
+        load_chain             as _ss42_load_chain,
+        find_target_expiration as _ss42_find_exp,
+        select_16delta_strikes as _ss42_select_strikes,
+        calc_iv_atm            as _ss42_iv_atm,
+        get_available_dates    as _ss42_available,
+        compute_daily_mtm      as _ss42_daily_mtm,
+        calc_pnl_expiration    as _ss42_pnl_exp,
+        DATA_DIR               as _SS42_DATA_DIR,
+    )
+    _REINVEST_OK = _SS42_DATA_DIR.exists()
+except Exception:
+    _REINVEST_OK = False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO
@@ -212,6 +231,36 @@ def _first_daily_crossing(
     return fallback_pnl
 
 
+def _close_at_dit(
+    trade_date_str: str,
+    daily_df: pd.DataFrame,
+    dit_target: int,
+    tp_threshold: float | None,
+    fallback_pnl: float,
+) -> float:
+    """
+    Returns the P&L on the first day where tp_threshold is hit OR DIT >= dit_target
+    (whichever comes first). Falls back to fallback_pnl if no daily rows found.
+    """
+    rows = daily_df[daily_df["trade_date"] == trade_date_str].copy()
+    if rows.empty:
+        return fallback_pnl
+
+    rows = rows.sort_values("dte_remaining", ascending=False)
+    dte_max = int(rows["dte_remaining"].iloc[0])
+    rows = rows[rows["dte_remaining"] < dte_max]  # skip entry day
+
+    for _, row in rows.iterrows():
+        dit = dte_max - int(row["dte_remaining"])
+        pnl = float(row["pnl_usd"])
+        if tp_threshold is not None and pnl >= tp_threshold:
+            return pnl
+        if dit >= dit_target:
+            return pnl
+
+    return fallback_pnl
+
+
 def apply_close_rule(
     df: pd.DataFrame,
     rule: str,
@@ -220,27 +269,38 @@ def apply_close_rule(
 ) -> pd.DataFrame:
     """
     Applies the selected management rule to each trade.
-    - 'Hold to Expiration' and 'Close at 21 DTE' use snapshot data only.
-    - All profit/stop rules use actual daily MTM (day-by-day scan) when
-      daily_df is available; fall back to expiration P&L otherwise.
+    - 'Hold to Expiration': uses expiration P&L unchanged.
+    - '24 DIT' / '50% Profit or 24 DIT': scan daily MTM for DIT=24 or profit target.
+    - Profit targets: scan daily MTM for first day >= threshold (not exactly =).
     """
     df = df.copy()
-    df["effective_pnl_usd"] = df["pnl_usd"].copy()  # default: hold to exp
+    df["effective_pnl_usd"] = df["pnl_usd"].copy()
 
     if rule == "Hold to Expiration":
-        pass  # already set above
+        pass
 
-    elif rule == "Close at 21 DTE":
-        has_ckpt = df["pnl_usd_21dte"].notna()
-        df["effective_pnl_usd"] = df["pnl_usd_21dte"].where(has_ckpt, df["pnl_usd"])
+    elif rule in ("24 DIT", "50% Profit or 24 DIT"):
+        tp_pct = 0.50 if "50%" in rule else None
+        for idx, trade in df.iterrows():
+            max_p = float(trade["total_credit"]) * multiplier
+            tp_thr = tp_pct * max_p if tp_pct is not None else None
+            if daily_df is not None and not daily_df.empty:
+                eff = _close_at_dit(
+                    str(trade["trade_date"]), daily_df,
+                    dit_target=24, tp_threshold=tp_thr,
+                    fallback_pnl=float(trade["pnl_usd"]),
+                )
+            else:
+                p21 = trade.get("pnl_usd_21dte", float("nan"))
+                eff = float(p21) if p21 == p21 else float(trade["pnl_usd"])
+            df.at[idx, "effective_pnl_usd"] = eff
 
     else:
-        # Profit/stop rules: scan daily data for first crossing
+        # Profit target rules: scan daily MTM for first day >= threshold
         thresholds = {
-            "50% Profit Target":   (0.50, None),
-            "25% Profit Target":   (0.25, None),
-            "Stop at 2× Credit":   (None, -2.0),
-            "50% Profit or 2× Stop": (0.50, -2.0),
+            "25% Profit Target": (0.25, None),
+            "50% Profit Target": (0.50, None),
+            "75% Profit Target": (0.75, None),
         }
         tp_pct, sl_pct = thresholds.get(rule, (None, None))
 
@@ -256,12 +316,10 @@ def apply_close_rule(
                     fallback_pnl=float(trade["pnl_usd"]),
                 )
             else:
-                # Fallback: check 21 DTE checkpoint
                 p21 = trade.get("pnl_usd_21dte", float("nan"))
-                if p21 == p21:  # not NaN
+                if p21 == p21:
                     hit_tp = (tp_thr is not None) and (p21 >= tp_thr)
-                    hit_sl = (sl_thr is not None) and (p21 <= sl_thr)
-                    eff = p21 if (hit_tp or hit_sl) else float(trade["pnl_usd"])
+                    eff = p21 if hit_tp else float(trade["pnl_usd"])
                 else:
                     eff = float(trade["pnl_usd"])
 
@@ -271,6 +329,255 @@ def apply_close_rule(
         lambda x: "WIN" if x > 0 else "LOSS"
     )
     return df
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RE-ENTRY SIMULATION (requires local parquet access via _REINVEST_OK)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_close_date_for_trade(
+    trade: pd.Series,
+    rule: str,
+    daily_df: pd.DataFrame,
+    multiplier: int,
+) -> "_date":
+    """Returns the calendar_date when the close rule fires for a trade.
+    Returns exp_date if no early-close trigger is found."""
+    trade_date_str = str(trade["trade_date"])
+    exp_date = pd.to_datetime(trade["exp_date"]).date()
+
+    if rule == "Hold to Expiration":
+        return exp_date
+
+    rows = daily_df[daily_df["trade_date"] == trade_date_str].copy()
+    if rows.empty:
+        return exp_date
+
+    rows = rows.sort_values("dte_remaining", ascending=False)
+    dte_max = int(rows["dte_remaining"].iloc[0])
+    rows_scan = rows[rows["dte_remaining"] < dte_max]
+    max_p = float(trade["total_credit"]) * multiplier
+
+    if rule in ("24 DIT", "50% Profit or 24 DIT"):
+        tp_thr = 0.50 * max_p if "50%" in rule else None
+        for _, row in rows_scan.iterrows():
+            dit = dte_max - int(row["dte_remaining"])
+            pnl = float(row["pnl_usd"])
+            if tp_thr is not None and pnl >= tp_thr:
+                return pd.to_datetime(row["calendar_date"]).date()
+            if dit >= 24:
+                return pd.to_datetime(row["calendar_date"]).date()
+    else:
+        pct_map = {"25% Profit Target": 0.25, "50% Profit Target": 0.50, "75% Profit Target": 0.75}
+        tp_pct = pct_map.get(rule)
+        if tp_pct is not None:
+            tp_thr = tp_pct * max_p
+            for _, row in rows_scan.iterrows():
+                if float(row["pnl_usd"]) >= tp_thr:
+                    return pd.to_datetime(row["calendar_date"]).date()
+
+    return exp_date
+
+
+def _next_friday_after(d: "_date") -> "_date":
+    """Returns the next Friday strictly after date d (exclusive)."""
+    days_ahead = 4 - d.weekday()   # 4 = Friday
+    if days_ahead <= 0:
+        days_ahead += 7
+    return d + timedelta(days=days_ahead)
+
+
+@st.cache_data(show_spinner=False)
+def _simulate_single_trade(
+    entry_date: "_date",
+    underlying: str,
+) -> tuple[dict | None, list[dict]]:
+    """
+    Simulates one SS42 strangle from entry_date using parquet data.
+    Returns (trade_dict, daily_records) or (None, []) if data unavailable.
+    Cached by Streamlit so repeated calls for the same date are instant.
+    """
+    if not _REINVEST_OK:
+        return None, []
+
+    chain_entry = _ss42_load_chain(entry_date, underlying)
+    if chain_entry is None:
+        return None, []
+
+    spot = float(chain_entry["underlying_price"].median())
+    if spot <= 0:
+        return None, []
+
+    exp_date, dte_entry = _ss42_find_exp(chain_entry, entry_date)
+    if exp_date is None:
+        return None, []
+
+    strikes = _ss42_select_strikes(chain_entry, spot, dte_entry)
+    if strikes is None:
+        return None, []
+
+    iv_atm   = _ss42_iv_atm(chain_entry, spot, dte_entry)
+    available = _ss42_available(underlying)
+
+    # Exit pricing (at expiration ±1 day for holidays)
+    spot_exit   = float("nan")
+    exit_method = "missing"
+    for offset in [0, -1, 1]:
+        chain_exp = _ss42_load_chain(exp_date + timedelta(days=offset), underlying)
+        if chain_exp is not None:
+            spot_exit   = float(chain_exp["underlying_price"].median())
+            exit_method = "market" if offset == 0 else f"fallback+{offset:+d}d"
+            break
+
+    if math.isnan(spot_exit) or spot_exit <= 0:
+        spot_exit   = spot
+        exit_method = "reinvestment_fallback"
+
+    pnl_rec = _ss42_pnl_exp(
+        strikes["short_put"], strikes["short_call"],
+        strikes["total_credit"], spot_exit,
+    )
+
+    trade_dict: dict = dict(
+        trade_date      = entry_date,
+        exp_date        = exp_date,
+        underlying      = underlying,
+        dte_entry       = dte_entry,
+        spot_entry      = round(spot, 2),
+        iv_atm_entry    = round(iv_atm, 6) if iv_atm else float("nan"),
+        iv_atm_pct      = round(iv_atm * 100, 2) if iv_atm else float("nan"),
+        vix_entry       = float("nan"),
+        exit_method     = "reinvestment",
+        **strikes,
+        checkpoint_date  = None,
+        spot_21dte       = float("nan"),
+        mid_put_21dte    = float("nan"),
+        mid_call_21dte   = float("nan"),
+        pnl_pts_21dte    = float("nan"),
+        pnl_usd_21dte    = float("nan"),
+        **pnl_rec,
+    )
+
+    daily_records = _ss42_daily_mtm(
+        entry_date, exp_date,
+        strikes["short_put"], strikes["short_call"],
+        strikes["total_credit"], available, underlying,
+    )
+
+    return trade_dict, daily_records
+
+
+@st.cache_data(show_spinner=False)  # spinner handled by caller
+def simulate_with_reinvestments(
+    df_orig: pd.DataFrame,
+    daily_df_orig: pd.DataFrame,
+    rule: str,
+    multiplier: int,
+    underlying: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Builds an augmented trade sequence where any early close triggers a
+    re-entry on the next Friday (42 DTE). Re-entries are recursive —
+    a re-entry that closes early also triggers another re-entry.
+    Regular monthly entries are skipped while a re-entry chain is active.
+
+    Returns (df_augmented, daily_df_augmented).
+    Falls back to originals if parquet access unavailable or rule is Hold.
+    """
+    if not _REINVEST_OK or rule == "Hold to Expiration":
+        return df_orig, daily_df_orig
+
+    df_sorted = df_orig.copy()
+    df_sorted["_td"] = pd.to_datetime(df_sorted["trade_date"]).dt.date
+    df_sorted["_ed"] = pd.to_datetime(df_sorted["exp_date"]).dt.date
+    df_sorted = df_sorted.sort_values("_td").reset_index(drop=True)
+
+    result_trades: list[dict] = []
+    result_daily:  list[dict] = list(daily_df_orig.to_dict("records"))
+
+    # Pointer: exp_date of the last active trade (original or re-entry)
+    active_until: "_date | None" = None
+
+    # Pending re-entry entry date (set when a trade closes early)
+    pending_entry: "_date | None" = None
+
+    orig_idx = 0
+    n_orig   = len(df_sorted)
+
+    while orig_idx < n_orig or pending_entry is not None:
+
+        # ── Try to process a pending re-entry first ───────────────────────
+        if pending_entry is not None:
+            next_orig_date = df_sorted.at[orig_idx, "_td"] if orig_idx < n_orig else None
+
+            # Process the pending re-entry if it comes before the next monthly entry
+            if next_orig_date is None or pending_entry < next_orig_date:
+                trade_d, daily_r = _simulate_single_trade(pending_entry, underlying)
+                pending_entry = None
+
+                if trade_d is None:
+                    # No parquet for this date; bail on re-entry chain
+                    continue
+
+                result_trades.append(trade_d)
+                result_daily.extend(daily_r)
+
+                t_exp = pd.to_datetime(trade_d["exp_date"]).date()
+                active_until = t_exp
+
+                # Check if this re-entry also closes early
+                if daily_r:
+                    t_series = pd.Series(trade_d)
+                    t_series["trade_date"] = str(trade_d["trade_date"])
+                    daily_r_df = pd.DataFrame(daily_r)
+                    daily_r_df["trade_date"] = daily_r_df["trade_date"].astype(str)
+                    close_d = _get_close_date_for_trade(t_series, rule, daily_r_df, multiplier)
+                    if close_d < t_exp:
+                        pending_entry = _next_friday_after(close_d)
+
+                continue  # loop back to check pending again
+
+        # ── Process next original monthly trade ───────────────────────────
+        if orig_idx >= n_orig:
+            break
+
+        row = df_sorted.iloc[orig_idx]
+        orig_idx += 1
+        t_date = row["_td"]
+
+        # Skip if a re-entry chain is still active on this monthly entry date
+        if active_until is not None and t_date <= active_until:
+            continue
+
+        trade_d   = row.drop(["_td", "_ed"]).to_dict()
+        t_exp     = row["_ed"]
+        trade_str = str(row["trade_date"])
+
+        result_trades.append(trade_d)
+        active_until = t_exp
+
+        # Determine close date for this original trade
+        close_d = _get_close_date_for_trade(
+            pd.Series(trade_d | {"trade_date": trade_str}),
+            rule, daily_df_orig, multiplier,
+        )
+        if close_d < t_exp:
+            pending_entry = _next_friday_after(close_d)
+
+    # ── Build output DataFrames ───────────────────────────────────────────
+    if not result_trades:
+        return df_orig, daily_df_orig
+
+    df_new = pd.DataFrame(result_trades)
+    df_new["trade_date"] = pd.to_datetime(df_new["trade_date"]).dt.date
+    df_new["exp_date"]   = pd.to_datetime(df_new["exp_date"]).dt.date
+    df_new = df_new.sort_values("trade_date").reset_index(drop=True)
+
+    daily_new = pd.DataFrame(result_daily)
+    if not daily_new.empty:
+        daily_new["trade_date"] = daily_new["trade_date"].astype(str)
+
+    return df_new, daily_new
 
 
 def ic_payoff_usd(
@@ -434,10 +741,11 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
         # Zero line
         fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
 
-        # Mark 21 DTE checkpoint (= DIT ≈ dte_max - 21)
-        ckpt = subset[subset["dte_remaining"] == 21]
+        # Mark 24 DIT checkpoint (dte_remaining ≈ dte_max - 24)
+        _ckpt_dte = dte_max - 24
+        ckpt = subset[subset["dte_remaining"] == _ckpt_dte]
         if ckpt.empty:
-            idx  = (subset["dte_remaining"] - 21).abs().idxmin()
+            idx  = (subset["dte_remaining"] - _ckpt_dte).abs().idxmin()
             ckpt = subset.loc[[idx]]
         if not ckpt.empty:
             cx = dte_max - int(ckpt["dte_remaining"].iloc[0])
@@ -446,7 +754,7 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
                 x=[cx], y=[cy], mode="markers",
                 marker=dict(size=10, color=C["yellow"], symbol="circle",
                             line=dict(width=2, color=C["bg"])),
-                hovertemplate=f"~21 DTE checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
+                hovertemplate=f"24 DIT checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
             ))
 
         # Mark entry (day 0) and expiration (day dte_max)
@@ -1071,6 +1379,7 @@ with st.sidebar:
             daily_df_raw = load_daily_mtm(daily_candidates[-1])
 
     # ── Close Rule selector (SS42 only) ──────────────────────────────────
+    daily_df_eff: pd.DataFrame | None = daily_df_raw  # default; may be augmented
     close_rule = "Hold to Expiration"
     if strategy == "SS42":
         st.markdown(f"<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
@@ -1078,17 +1387,39 @@ with st.sidebar:
             "Close Rule:",
             options=[
                 "Hold to Expiration",
-                "Close at 21 DTE",
-                "50% Profit Target",
                 "25% Profit Target",
-                "Stop at 2× Credit",
-                "50% Profit or 2× Stop",
+                "50% Profit Target",
+                "75% Profit Target",
+                "50% Profit or 24 DIT",
+                "24 DIT",
             ],
             index=0,
-            help="Profit/stop rules scan daily MTM data and close on the first day the target is reached.",
+            help=(
+                "Profit rules close on the first day the target is reached or exceeded — "
+                "not at an exact price. DIT = Days In Trade."
+            ),
         )
         st.divider()
-        df = apply_close_rule(df_raw, close_rule, SS42_MULTIPLIER, daily_df_raw)
+
+        _underlying = "SPX" if "SPX" in selected_csv.stem else "RUT"
+
+        if close_rule != "Hold to Expiration" and _REINVEST_OK and daily_df_raw is not None:
+            with st.spinner("Simulating re-entries…"):
+                df_sim, daily_df_eff = simulate_with_reinvestments(
+                    df_raw, daily_df_raw, close_rule, SS42_MULTIPLIER, _underlying
+                )
+            n_reentries = len(df_sim) - len(df_raw)
+            if n_reentries > 0:
+                st.markdown(
+                    f"<div style='font-size:11px; color:{C['blue']}; margin-top:-4px'>"
+                    f"+ {n_reentries} re-entr{'y' if n_reentries==1 else 'ies'} simulated</div>",
+                    unsafe_allow_html=True,
+                )
+        else:
+            df_sim       = df_raw
+            daily_df_eff = daily_df_raw
+
+        df = apply_close_rule(df_sim, close_rule, SS42_MULTIPLIER, daily_df_eff)
     else:
         df = df_raw
         df["effective_pnl_usd"]  = df["pnl_usd"]
@@ -1267,7 +1598,7 @@ with tab1:
 
         # ── SS42: payoff (full width) then daily P&L Journey ─────────────
         st.plotly_chart(build_strangle_payoff_chart(row), use_container_width=True)
-        st.plotly_chart(build_pnl_timeline(row, daily_df_raw), use_container_width=True)
+        st.plotly_chart(build_pnl_timeline(row, daily_df_eff), use_container_width=True)
 
         st.markdown("---")
 
