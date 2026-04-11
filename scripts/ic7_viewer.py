@@ -655,11 +655,18 @@ def build_strangle_payoff_chart(row: pd.Series) -> go.Figure:
     return fig
 
 
-def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figure:
+def build_pnl_timeline(
+    row: pd.Series,
+    daily_df: pd.DataFrame | None,
+    close_rule: str = "Hold to Expiration",
+    multiplier: int = 100,
+) -> go.Figure:
     """
     Daily mark-to-market P&L line chart for a single strangle trade.
-    X-axis = DTE countdown (entry → 0). Uses actual daily mid prices from
+    X-axis = DIT (Days In Trade, 0 → exp). Uses actual daily mid prices from
     the companion CSV when available; falls back to 3-point chart otherwise.
+    When close_rule != 'Hold to Expiration', adds an orange marker on the
+    exact DIT when the close rule fires.
     """
     pnl_exp   = row["pnl_usd"]
     exit_color = C["green"] if pnl_exp >= 0 else C["red"]
@@ -720,6 +727,53 @@ def build_pnl_timeline(row: pd.Series, daily_df: pd.DataFrame | None) -> go.Figu
                             line=dict(width=2, color=C["bg"])),
                 hovertemplate=f"24 DIT checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
             ))
+
+        # ── Close rule marker (orange star) ─────────────────────────────
+        if close_rule not in ("Hold to Expiration", ""):
+            max_p = float(row.get("total_credit", 0)) * multiplier
+            _rule_dit = None
+            _rule_pnl = None
+            rows_scan = subset[subset["dte_remaining"] < dte_max].sort_values(
+                "dte_remaining", ascending=False
+            )
+            if close_rule in ("24 DIT", "50% Profit or 24 DIT"):
+                tp_thr = 0.50 * max_p if "50%" in close_rule else None
+                for _, r in rows_scan.iterrows():
+                    dit = dte_max - int(r["dte_remaining"])
+                    pnl = float(r["pnl_usd"])
+                    if tp_thr is not None and pnl >= tp_thr:
+                        _rule_dit, _rule_pnl = dit, pnl
+                        break
+                    if dit >= 24:
+                        _rule_dit, _rule_pnl = dit, pnl
+                        break
+            else:
+                pct_map = {
+                    "25% Profit Target": 0.25,
+                    "50% Profit Target": 0.50,
+                    "75% Profit Target": 0.75,
+                }
+                tp_pct = pct_map.get(close_rule)
+                if tp_pct is not None:
+                    tp_thr = tp_pct * max_p
+                    for _, r in rows_scan.iterrows():
+                        if float(r["pnl_usd"]) >= tp_thr:
+                            _rule_dit = dte_max - int(r["dte_remaining"])
+                            _rule_pnl = float(r["pnl_usd"])
+                            break
+
+            if _rule_dit is not None:
+                fig.add_trace(go.Scatter(
+                    x=[_rule_dit], y=[_rule_pnl], mode="markers",
+                    marker=dict(size=14, color=C["orange"], symbol="star",
+                                line=dict(width=1.5, color=C["bg"])),
+                    hovertemplate=(
+                        f"<b>Close Rule fired</b><br>"
+                        f"{close_rule}<br>"
+                        f"DIT: {_rule_dit}  |  P&L: ${_rule_pnl:+,.0f}"
+                        f"<extra></extra>"
+                    ),
+                ))
 
         # Mark entry (day 0) and expiration (day dte_max)
         fig.add_trace(go.Scatter(
@@ -1594,7 +1648,10 @@ with tab1:
 
         # ── SS42: payoff (full width) then daily P&L Journey ─────────────
         st.plotly_chart(build_strangle_payoff_chart(row), use_container_width=True)
-        st.plotly_chart(build_pnl_timeline(row, daily_df_eff), use_container_width=True)
+        st.plotly_chart(
+            build_pnl_timeline(row, daily_df_eff, close_rule, SS42_MULTIPLIER),
+            use_container_width=True,
+        )
 
         st.markdown("---")
 
