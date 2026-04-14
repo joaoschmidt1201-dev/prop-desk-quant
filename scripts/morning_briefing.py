@@ -38,7 +38,9 @@ except ImportError:
     sys.exit(1)
 
 ROOT         = Path(__file__).parent.parent
-HISTORY_FILE = ROOT / "gex_history.json"
+HISTORY_FILE = ROOT / "gex_history.json"       # legacy (kept for backward compat)
+HISTORY_SPX  = ROOT / "gex_history_spx.json"   # new pipeline
+HISTORY_NDX  = ROOT / "gex_history_ndx.json"   # new pipeline
 
 # ─── MARKET DATA ─────────────────────────────────────────────────────────────
 
@@ -50,6 +52,7 @@ def fetch_market_data() -> dict:
         "NQ":   "NQ=F",
         "RTY":  "RTY=F",
         "SPX":  "^GSPC",
+        "NDX":  "^NDX",
     }
     result = {}
     for name, ticker in symbols.items():
@@ -188,6 +191,140 @@ def get_gex_context(today: date) -> dict:
 
     return {"text": "\n".join(lines), "is_current": True}
 
+
+# ─── GEX SECTION (local JSON pipeline) ───────────────────────────────────────
+
+def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_monday: bool) -> str:
+    """Format the GEX block for one ticker (SPX or NDX)."""
+    expiry = entry.get("expiry", "?")
+    try:
+        exp_fmt = datetime.strptime(expiry, "%Y-%m-%d").strftime("%b %d")
+    except (ValueError, TypeError):
+        exp_fmt = expiry
+
+    gflip    = entry.get("gflip")
+    pos      = entry.get("pos", [])    # [p1, p2, p3] ints
+    neg      = entry.get("neg", [])    # [n1, n2, n3] ints
+    coi      = entry.get("coi", [])
+    poi      = entry.get("poi", [])
+    agg      = entry.get("agg")
+    conf     = set(entry.get("conf") or [])
+
+    def star(v):
+        return " ★" if v in conf else ""
+
+    lines = [f"**{ticker_name}** (7DTE, expires {exp_fmt})"]
+
+    if is_monday:
+        if gflip is not None:
+            lines.append(f"• Gamma Flip:  ${gflip:,}{star(gflip)}")
+        if pos:
+            pos_str = " | ".join(f"p{i+1} ${v:,}{star(v)}" for i, v in enumerate(pos))
+            lines.append(f"• Pos GEX:     {pos_str}")
+        if neg:
+            neg_str = " | ".join(f"n{i+1} ${v:,}{star(v)}" for i, v in enumerate(neg))
+            lines.append(f"• Neg GEX:     {neg_str}")
+        if coi:
+            lines.append(f"• Call OI:     " + " / ".join(f"${v:,}{star(v)}" for v in coi))
+        if poi:
+            lines.append(f"• Put OI:      " + " / ".join(f"${v:,}{star(v)}" for v in poi))
+        if agg is not None:
+            lines.append(f"• Agg GEX:     ${agg:,}{star(agg)}")
+        if conf:
+            lines.append(f"• Confluences: " + " | ".join(f"${v:,}" for v in sorted(conf)))
+        if spot is not None and gflip is not None:
+            if spot >= gflip:
+                lines.append("-> Gamma Condition: POSITIVE — spot above flip, mean-reversion bias")
+            else:
+                lines.append("-> Gamma Condition: NEGATIVE — spot below flip, volatility-expansion bias")
+    else:
+        # Tue–Fri: spot vs levels
+        if spot is not None and gflip is not None:
+            diff = round(spot - gflip)
+            if diff >= 0:
+                cond = f"ABOVE Gamma Flip (${gflip:,}) by {diff} pts [POSITIVE GAMMA]"
+            else:
+                cond = f"BELOW Gamma Flip (${gflip:,}) by {abs(diff)} pts [NEGATIVE GAMMA]"
+            lines.append(f"• Spot ${spot:,.0f} -> {cond}")
+
+        if spot is not None:
+            # Nearest resistance above spot
+            candidates_above = [(v, f"p{i+1}") for i, v in enumerate(pos) if v > spot]
+            if agg is not None and agg > spot:
+                candidates_above.append((agg, "agg"))
+            if candidates_above:
+                res_val, res_lbl = min(candidates_above, key=lambda x: x[0])
+                ctag = " [confluence]" if res_val in conf else ""
+                lines.append(f"• Nearest resistance: {res_lbl} ${res_val:,} (+{round(res_val - spot)} pts){ctag}")
+
+            # Nearest support below spot
+            candidates_below = [(v, f"n{i+1}") for i, v in enumerate(neg) if v < spot]
+            if agg is not None and agg < spot:
+                candidates_below.append((agg, "agg"))
+            if candidates_below:
+                sup_val, sup_lbl = max(candidates_below, key=lambda x: x[0])
+                ctag = " [confluence]" if sup_val in conf else ""
+                lines.append(f"• Nearest support:    {sup_lbl} ${sup_val:,} (-{round(spot - sup_val)} pts){ctag}")
+
+        if spot is not None and gflip is not None:
+            if spot >= gflip:
+                lines.append("-> Positive gamma: dealers dampen moves, pin risk near flip")
+            else:
+                lines.append("-> Negative gamma: dealers amplify directional moves")
+
+    return "\n".join(lines)
+
+
+def build_gex_section(today: date, market_data: dict) -> str:
+    """
+    Build the §4§ GEX content from local JSON files.
+    Monday: full level listing. Tue–Fri: spot vs levels distances.
+    Returns a plain text string to be injected into the briefing.
+    """
+    monday    = today - timedelta(days=today.weekday())
+    is_monday = today.weekday() == 0
+
+    spot_spx = market_data.get("SPX", {}).get("price")
+    spot_ndx = market_data.get("NDX", {}).get("price")
+
+    blocks = []
+    for ticker_name, hist_file, spot in [
+        ("SPX", HISTORY_SPX, spot_spx),
+        ("NDX", HISTORY_NDX, spot_ndx),
+    ]:
+        if not hist_file.exists():
+            blocks.append(f"**{ticker_name} GEX:** file not found — run gex_csv_parser.py and push to repo")
+            continue
+        try:
+            history = json.loads(hist_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            blocks.append(f"**{ticker_name} GEX:** could not parse data file ({e})")
+            continue
+        if not history:
+            blocks.append(f"**{ticker_name} GEX:** history file is empty")
+            continue
+
+        latest    = history[-1]
+        week_str  = latest.get("week", "")
+        is_current = False
+        try:
+            week_dt    = datetime.strptime(week_str, "%Y-%m-%d").date()
+            is_current = week_dt >= monday
+        except (ValueError, TypeError):
+            pass
+
+        if not is_current:
+            blocks.append(
+                f"**{ticker_name} GEX:** data outdated (last update: {week_str}) — "
+                "run gex_csv_parser.py and push to repo"
+            )
+            continue
+
+        blocks.append(_gex_ticker_block(latest, ticker_name, spot, is_monday))
+
+    return "\n\n".join(blocks) if blocks else "GEX data unavailable."
+
+
 # ─── PERPLEXITY — RESEARCH + BRIEFING ────────────────────────────────────────
 
 def generate_briefing(
@@ -195,8 +332,10 @@ def generate_briefing(
     technicals: dict,
     today: date,
     api_key: str,
+    gex_section: str = "",
 ) -> str:
-    """Calls Perplexity sonar-pro to research news and generate the morning briefing."""
+    """Calls Perplexity sonar-pro to research news and generate the morning briefing.
+    §4§ (GEX levels) is built locally and injected — Perplexity handles §1§–§3§ and §5§ only."""
 
     today_str = today.strftime("%A, %B %d, %Y")
 
@@ -225,10 +364,11 @@ Today is {today_str}.
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
 
 --- YOUR TASK ---
-Write a Morning Briefing with exactly five sections.
+Write a Morning Briefing with exactly four sections.
 CRITICAL: Begin each section with its delimiter token on its own line — NOTHING before it.
-The five delimiter tokens are: §1§  §2§  §3§  §4§  §5§
+The four delimiter tokens are: §1§  §2§  §3§  §5§
 Do NOT write any text before §1§. Do NOT number or title the sections yourself.
+Do NOT write a §4§ section — it will be filled in separately.
 
 §1§
 2-3 sentences on pre-market tone. State VIX (level and % change direction), then ES, NQ and RTY (price and % change). Punchy, direct.
@@ -239,23 +379,14 @@ Search the web for the 3-4 most relevant macro events or news for SPX/ES/NQ on {
 §3§
 3-4 sentences using the moving averages in the data above. State where SPX is relative to W EMA20, D SMA50, and D SMA200. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
 
-§4§
-Search the web RIGHT NOW for publicly available 7DTE gamma exposure (GEX) levels published this week by these four providers ONLY: SpotGamma, Gamma Edge, Volt Signals, Alpha Tier.
-Rules (mandatory):
-- Prefix EVERY level with the provider name: e.g. "SpotGamma: Gamma Flip $5,450 | Call Wall $5,600 | Put Wall $5,300"
-- Include ONLY weekly/7DTE levels. Ignore 0DTE and intraday entirely.
-- If you cannot confirm a number came from one of those four providers, do NOT include it.
-- If some providers had no public data, list which ones.
-- If NO confirmed data exists from any of the four providers, write exactly: "No public 7DTE gamma data found this week from SpotGamma, Gamma Edge, Volt Signals, or Alpha Tier."
-
 §5§
 One direct sentence: the desk's tactical bias for today and the single most important reason.
 
 --- OUTPUT RULES ---
-- The ONLY special characters allowed are the five delimiters §1§ through §5§ and dashes (-) for bullet lines.
+- The ONLY special characters allowed are the four delimiters §1§ §2§ §3§ §5§ and dashes (-) for bullet lines.
 - Do NOT write section titles or headers.
 - Do NOT include any citation markers like [1], [2], [provided data], or anything in square brackets.
-- Total content: 380-520 words (excluding delimiters).
+- Total content: 280-400 words (excluding delimiters).
 - Professional, data-driven tone."""
 
     try:
@@ -288,6 +419,15 @@ One direct sentence: the desk's tactical bias for today and the single most impo
         content = re.sub(r'\[\d+\]', '', content)
         content = re.sub(r'\[[^\]]{1,60}\]', '', content)
         content = re.sub(r'  +', ' ', content).strip()
+
+        # Inject local GEX data as §4§ before §5§
+        if gex_section:
+            if '§5§' in content:
+                content = content.replace('§5§', f'\n§4§\n{gex_section}\n\n§5§', 1)
+            else:
+                # §5§ not found — append §4§ at the end
+                content = content.rstrip() + f'\n§4§\n{gex_section}'
+
         print(f"  [DEBUG] Raw response (first 300 chars): {repr(content[:300])}")
         return content
 
@@ -325,8 +465,9 @@ def post_process(raw: str) -> str:
         content = parts[i + 1].strip()
         # Convert dash bullets to •
         content = re.sub(r'(?m)^-\s+', '• ', content)
-        # Strip any stray bold headers Perplexity may have added inside content
-        content = re.sub(r'^\*\*[^*\n]+\*\*\s*\n?', '', content, flags=re.MULTILINE).strip()
+        # Strip stray bold headers Perplexity may add (e.g. "**Pre-Market Pulse**")
+        # Only strip lines where ** wraps the ENTIRE line (nothing after closing **)
+        content = re.sub(r'^\*\*[^*\n]+\*\*\s*$', '', content, flags=re.MULTILINE).strip()
         if num in _SECTIONS:
             emoji, title = _SECTIONS[num]
             output.append(f"{_DIVIDER}\n**{emoji}  {title}**\n\n{content}")
@@ -413,8 +554,11 @@ def main():
     print("  Computing SPX moving averages...")
     technicals = fetch_spx_technicals()
 
+    print("  Building GEX section from local data...")
+    gex_section = build_gex_section(today, market_data)
+
     print("  Generating briefing (Perplexity sonar-pro)...")
-    briefing = post_process(generate_briefing(market_data, technicals, today, perplexity_key))
+    briefing = post_process(generate_briefing(market_data, technicals, today, perplexity_key, gex_section))
 
     print("  Posting to Discord...")
     post_to_discord(discord_webhook, briefing, today, market_data)
