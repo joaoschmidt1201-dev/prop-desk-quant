@@ -15,12 +15,10 @@ _valid  = _is_spx or _is_ndx
 
 // --- INPUTS (Colors) ------------------------------------------------
 var string _GC = "Colors"
-C_GFLIP = input.color(color.white,                           "Gamma Flip",   group=_GC, display=display.none)
+C_GFLIP = input.color(color.rgb(128, 0, 200),                "Gamma Flip",   group=_GC, display=display.none)
 C_POS   = input.color(color.rgb(0, 200, 83),                 "Positive GEX", group=_GC, display=display.none)
 C_NEG   = input.color(color.rgb(255, 23, 68),                "Negative GEX", group=_GC, display=display.none)
 C_AGG   = input.color(color.rgb(170, 0, 255),                "Aggregate",    group=_GC, display=display.none)
-C_PZ    = input.color(color.new(color.rgb(0, 200, 83),  45), "Pos Zone",     group=_GC, display=display.none)
-C_NZ    = input.color(color.new(color.rgb(255, 23, 68), 45), "Neg Zone",     group=_GC, display=display.none)
 C_SEP_W = color.new(color.gray, 40)
 C_SEP_D = color.new(color.gray, 72)
 
@@ -34,8 +32,6 @@ STY_N1    = input.string("Solid",   "Neg GEX n1",   options=["Solid", "Dashed", 
 STY_N2    = input.string("Dashed",  "Neg GEX n2",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
 STY_N3    = input.string("Dotted",  "Neg GEX n3",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
 STY_AGG   = input.string("Dotted",  "Aggregate",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_PZ    = input.string("Dashed",  "Pos Zone",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_NZ    = input.string("Dashed",  "Neg Zone",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
 
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
@@ -78,7 +74,7 @@ if barstate.islast and _valid
         float _p0_1 = _is_spx ? 7000.0 : 25900.0
         if not na(_p0_1)
             array.push(_lines, line.new(_bi0, _p0_1, _bi0 + W, _p0_1, color=C_POS, style=f_style(STY_P1), width=2))
-            array.push(_labels, label.new(_bi0 + W, _p0_1, "p1 " + str.tostring(math.round(_p0_1)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
+            array.push(_labels, label.new(_bi0 + W, _p0_1, "p1 + agg " + str.tostring(math.round(_p0_1)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p0_2 = _is_spx ? 6900.0 : 25300.0
         if not na(_p0_2)
             array.push(_lines, line.new(_bi0, _p0_2, _bi0 + W, _p0_2, color=C_POS, style=f_style(STY_P2), width=2))
@@ -99,15 +95,3 @@ if barstate.islast and _valid
         if not na(_p0_6)
             array.push(_lines, line.new(_bi0, _p0_6, _bi0 + W, _p0_6, color=C_NEG, style=f_style(STY_N3), width=2))
             array.push(_labels, label.new(_bi0 + W, _p0_6, "n3 " + str.tostring(math.round(_p0_6)) + (_is_spx ? "" : " ★"), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
-        float _p0_7 = _is_spx ? 7000.0 : 25900.0
-        if not na(_p0_7)
-            array.push(_lines, line.new(_bi0, _p0_7, _bi0 + W, _p0_7, color=C_AGG, style=f_style(STY_AGG), width=2))
-            array.push(_labels, label.new(_bi0 + W, _p0_7, "agg " + str.tostring(math.round(_p0_7)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_AGG, style=label.style_none, size=size.small))
-        float _p0_8 = _is_spx ? 6670.0 : 23850.0
-        if not na(_p0_8)
-            array.push(_lines, line.new(_bi0, _p0_8, _bi0 + W, _p0_8, color=C_PZ, style=f_style(STY_PZ), width=2))
-            array.push(_labels, label.new(_bi0 + W, _p0_8, "pos zone " + str.tostring(math.round(_p0_8)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_PZ, style=label.style_none, size=size.small))
-        float _p0_9 = _is_spx ? 6665.0 : float(na)
-        if not na(_p0_9)
-            array.push(_lines, line.new(_bi0, _p0_9, _bi0 + W, _p0_9, color=C_NZ, style=f_style(STY_NZ), width=2))
-            array.push(_labels, label.new(_bi0 + W, _p0_9, "neg zone " + str.tostring(math.round(_p0_9)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_NZ, style=label.style_none, size=size.small))

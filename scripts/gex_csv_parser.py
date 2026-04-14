@@ -80,12 +80,10 @@ _valid  = _is_spx or _is_ndx
 
 // --- INPUTS (Colors) ------------------------------------------------
 var string _GC = "Colors"
-C_GFLIP = input.color(color.white,                           "Gamma Flip",   group=_GC, display=display.none)
+C_GFLIP = input.color(color.rgb(128, 0, 200),                "Gamma Flip",   group=_GC, display=display.none)
 C_POS   = input.color(color.rgb(0, 200, 83),                 "Positive GEX", group=_GC, display=display.none)
 C_NEG   = input.color(color.rgb(255, 23, 68),                "Negative GEX", group=_GC, display=display.none)
 C_AGG   = input.color(color.rgb(170, 0, 255),                "Aggregate",    group=_GC, display=display.none)
-C_PZ    = input.color(color.new(color.rgb(0, 200, 83),  45), "Pos Zone",     group=_GC, display=display.none)
-C_NZ    = input.color(color.new(color.rgb(255, 23, 68), 45), "Neg Zone",     group=_GC, display=display.none)
 C_SEP_W = color.new(color.gray, 40)
 C_SEP_D = color.new(color.gray, 72)
 
@@ -99,8 +97,6 @@ STY_N1    = input.string("Solid",   "Neg GEX n1",   options=["Solid", "Dashed", 
 STY_N2    = input.string("Dashed",  "Neg GEX n2",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
 STY_N3    = input.string("Dotted",  "Neg GEX n3",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
 STY_AGG   = input.string("Dotted",  "Aggregate",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_PZ    = input.string("Dashed",  "Pos Zone",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_NZ    = input.string("Dashed",  "Neg Zone",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
 
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
@@ -387,8 +383,6 @@ LEVEL_SPEC = [
     ("neg",      1,    "n2",       "C_NEG",   "STY_N2"),
     ("neg",      2,    "n3",       "C_NEG",   "STY_N3"),
     ("agg",      None, "agg",      "C_AGG",   "STY_AGG"),
-    ("pos_zone", None, "pos zone", "C_PZ",    "STY_PZ"),
-    ("neg_zone", None, "neg zone", "C_NZ",    "STY_NZ"),
 ]
 
 
@@ -442,15 +436,31 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
                 f"color={clr}, style=line.style_dashed, width=1, extend=extend.both))"
             )
 
-        # GEX level lines
-        for spec_i, (key, rank, lbl, clr, sty) in enumerate(LEVEL_SPEC):
+        # GEX level lines — merge overlapping strikes into combined labels
+        # Step 1: collect all (spx_p, ndx_p, lbl, clr, sty) entries
+        raw_levels = []
+        for key, rank, lbl, clr, sty in LEVEL_SPEC:
             spx_p = _get_price(spx_e, key, rank)
             ndx_p = _get_price(ndx_e, key, rank)
-
             if spx_p is None and ndx_p is None:
                 continue
+            raw_levels.append((spx_p, ndx_p, lbl, clr, sty))
 
-            var = f"_p{i}_{spec_i}"
+        # Step 2: merge entries that share the same (spx_price, ndx_price) pair
+        # First entry in LEVEL_SPEC order wins for color/style; labels are concatenated
+        seen_pairs: dict[tuple, int] = {}
+        merged_levels: list[list] = []  # [spx_p, ndx_p, combined_lbl, clr, sty]
+        for spx_p, ndx_p, lbl, clr, sty in raw_levels:
+            pair = (spx_p, ndx_p)
+            if pair not in seen_pairs:
+                seen_pairs[pair] = len(merged_levels)
+                merged_levels.append([spx_p, ndx_p, lbl, clr, sty])
+            else:
+                merged_levels[seen_pairs[pair]][2] += f" + {lbl}"
+
+        # Step 3: generate Pine variables for each merged entry
+        for spec_i, (spx_p, ndx_p, combined_lbl, clr, sty) in enumerate(merged_levels):
+            var     = f"_p{i}_{spec_i}"
             spx_val = _pf(spx_p)
             ndx_val = _pf(ndx_p)
 
@@ -459,7 +469,7 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
             ndx_star = '" ★"' if _is_conf(ndx_p, ndx_conf, TICKER_CONFIG["NDX"]["conf_tol"]) else '""'
 
             lbl_expr = (
-                f'"{lbl} " + str.tostring(math.round({var})) + '
+                f'"{combined_lbl} " + str.tostring(math.round({var})) + '
                 f'(_is_spx ? {spx_star} : {ndx_star})'
             )
 
