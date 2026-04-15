@@ -2,13 +2,11 @@ name: Morning Briefing
 
 on:
   workflow_dispatch:
-    # PRIMARY: disparado pelo cron-job.org às 12:30 UTC (9:30 BRT) via GitHub API
-    # POST https://api.github.com/repos/joaoschmidt1201-dev/prop-desk-quant/actions/workflows/morning_briefing.yml/dispatches
-    # Body: {"ref":"main"} — executa em <2 min → briefing às ~9:32-9:40 BRT (50+ min antes da abertura)
+    # Permite disparo manual pela aba GitHub Actions (útil para testes)
   schedule:
-    # BACKUP: só dispara se o cron-job.org falhar
-    # 11:00 UTC = 8:00 BRT — ainda pré-market, garante que o briefing saia de qualquer forma
-    - cron: '0 11 * * 1-5'
+    # 10:00 UTC = 7:00 BRT — 3.5h antes da abertura do mercado (10:30 BRT)
+    # Buffer generoso: mesmo com 2h de delay do GitHub, chega às 9:00 BRT no pior caso
+    - cron: '0 10 * * 1-5'
 
 jobs:
   morning-briefing:
