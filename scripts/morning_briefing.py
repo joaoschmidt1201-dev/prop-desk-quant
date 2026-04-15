@@ -44,10 +44,14 @@ HISTORY_NDX  = ROOT / "gex_history_ndx.json"   # new pipeline
 
 # Top S&P 500 tickers by market cap — used to filter earnings calendar
 _SP500_MAJORS = {
+    # Magnificent Seven
     "AAPL", "NVDA", "MSFT", "AMZN", "META", "GOOGL", "GOOG", "TSLA",
-    "JPM", "V", "UNH", "MA", "XOM", "JNJ", "PG", "HD", "AVGO",
-    "LLY", "MRK", "BAC", "ABBV", "KO", "PEP", "WMT", "COST",
-    "CRM", "NFLX", "AMD", "ORCL", "TMO",
+    # Major banks (earnings season movers)
+    "JPM", "BAC", "GS", "MS", "C", "WFC", "BK", "USB", "SCHW",
+    # Other mega-caps
+    "V", "MA", "UNH", "XOM", "JNJ", "PG", "HD", "AVGO",
+    "LLY", "MRK", "ABBV", "KO", "PEP", "WMT", "COST",
+    "CRM", "NFLX", "AMD", "ORCL", "TMO", "INTC", "QCOM",
 }
 
 # ─── MARKET DATA ─────────────────────────────────────────────────────────────
@@ -169,16 +173,25 @@ def fetch_economic_calendar(today: date, api_key: str) -> str:
 
 
 def fetch_earnings_calendar(today: date, api_key: str) -> str:
-    """Fetches earnings releases for major S&P 500 components from Finnhub.
-    Returns formatted string to inject into Perplexity prompt.
-    Returns '' on failure (graceful degradation)."""
+    """Fetches earnings for major S&P 500 components: yesterday → next 7 days.
+    Grouped by day with labels (YESTERDAY / TODAY / TOMORROW / weekday).
+    Returns formatted string to inject into Perplexity prompt."""
     if not api_key:
         return ""
-    date_str = today.strftime("%Y-%m-%d")
+
+    from collections import defaultdict
+
+    from_date = today - timedelta(days=1)
+    to_date   = today + timedelta(days=7)
+
     try:
         resp = requests.get(
             "https://finnhub.io/api/v1/calendar/earnings",
-            params={"from": date_str, "to": date_str, "token": api_key},
+            params={
+                "from":  from_date.strftime("%Y-%m-%d"),
+                "to":    to_date.strftime("%Y-%m-%d"),
+                "token": api_key,
+            },
             timeout=15,
         )
         resp.raise_for_status()
@@ -187,27 +200,46 @@ def fetch_earnings_calendar(today: date, api_key: str) -> str:
         print(f"  [WARNING] Finnhub earnings calendar failed: {e}")
         return ""
 
-    # Filter: only major S&P 500 tickers
+    # Filter: only major tickers
     filtered = [e for e in events if e.get("symbol", "") in _SP500_MAJORS]
     if not filtered:
-        return "No major S&P 500 earnings scheduled."
+        return "No major S&P 500 earnings in the next 7 days."
 
-    _HOUR_LABEL = {"bmo": "pre-market", "amc": "after-close", "dmh": "during session"}
+    _HOUR_LABEL = {"bmo": "pre-mkt", "amc": "after-close", "dmh": "intraday"}
 
-    date_label = today.strftime("%A, %B %d")
-    lines = [f"--- EARNINGS CALENDAR — {date_label} (source: Finnhub) ---"]
-    for e in sorted(filtered, key=lambda x: x.get("symbol", "")):
-        sym   = e.get("symbol", "?")
-        hour  = _HOUR_LABEL.get(e.get("hour", ""), e.get("hour", ""))
-        eps   = e.get("epsEstimate")
-        rev   = e.get("revenueEstimate")
-        line  = f"• {sym}  ({hour})"
-        if eps is not None:
-            line += f"  EPS est: {eps:.2f}"
-        if rev is not None:
-            rev_b = rev / 1e9
-            line += f"  Rev est: ${rev_b:.1f}B"
-        lines.append(line)
+    def day_label(d: date) -> str:
+        delta = (d - today).days
+        if delta == -1: return "YESTERDAY (results may be out — search web)"
+        if delta ==  0: return "TODAY"
+        if delta ==  1: return "TOMORROW"
+        return d.strftime("%A %b %d")
+
+    # Group by date
+    by_date: dict = defaultdict(list)
+    for e in filtered:
+        try:
+            ed = datetime.strptime(e.get("date", ""), "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        by_date[ed].append(e)
+
+    lines = [
+        f"--- EARNINGS CALENDAR — {from_date.strftime('%b %d')} to {to_date.strftime('%b %d')} (source: Finnhub) ---",
+        "Finnhub provides estimates only. For YESTERDAY/TODAY, search the web for actual reported results.",
+    ]
+    for d in sorted(by_date.keys()):
+        lines.append(f"\n  [{day_label(d)}]")
+        for e in sorted(by_date[d], key=lambda x: x.get("symbol", "")):
+            sym  = e.get("symbol", "?")
+            hour = _HOUR_LABEL.get(e.get("hour", ""), e.get("hour", ""))
+            eps  = e.get("epsEstimate")
+            rev  = e.get("revenueEstimate")
+            line = f"  • {sym} ({hour})"
+            if eps is not None:
+                line += f"  EPS est: {eps:.2f}"
+            if rev is not None:
+                line += f"  Rev est: ${rev / 1e9:.1f}B"
+            lines.append(line)
 
     return "\n".join(lines)
 
@@ -634,10 +666,11 @@ def generate_briefing(
     calendar_block = ""
     if econ_block or earnings_block:
         calendar_block = (
-            f"\n--- ECONOMIC CALENDAR (authoritative, from Finnhub) ---\n"
-            f"{econ_block or 'No high-impact US macro releases scheduled.'}\n"
-            f"\n--- EARNINGS CALENDAR (authoritative, from Finnhub) ---\n"
-            f"{earnings_block or 'No major S&P 500 earnings scheduled.'}"
+            f"\n--- ECONOMIC CALENDAR — TODAY (authoritative, from Finnhub) ---\n"
+            f"{econ_block or 'No high-impact US macro releases scheduled today.'}\n"
+            f"\n--- EARNINGS CALENDAR — YESTERDAY through NEXT 7 DAYS (authoritative, from Finnhub) ---\n"
+            f"IMPORTANT: Finnhub only provides estimates. Use web search to find actual results for YESTERDAY/TODAY.\n"
+            f"{earnings_block or 'No major S&P 500 earnings in this window.'}"
         )
 
     prompt = f"""You are the senior quantitative analyst for a professional proprietary trading desk.
@@ -670,7 +703,17 @@ Do NOT make any ranking comparison between instruments (e.g. "X leads gains") wi
 Punchy, direct.
 
 §2§
-CRITICAL — SELECT ONLY GENUINE MARKET MOVERS: Use the ECONOMIC CALENDAR and EARNINGS CALENDAR above as your primary source. From these, pick ONLY the 2-3 events that are true market catalysts — e.g. Fed decisions/speeches, CPI/PPI/PCE, NFP/jobless claims, GDP prints, major index-weight earnings (AAPL, NVDA, MSFT, etc.). Ignore routine low-impact releases (mortgage rates, housing surveys, minor regional indices). Then search the web for 1-2 additional urgent macro developments not already covered (geopolitical risks, Fed commentary, policy shifts). Write each item on its own line starting with a dash (-). Include ET times when known. Maximum 5 items total — quality and relevance over completeness.
+Your job is a sharp intelligence brief — not a scheduled events list. Two mandatory components:
+
+COMPONENT A — EARNINGS INTELLIGENCE (always include during earnings season):
+Use the EARNINGS CALENDAR above as your base. Then search the web to fill in:
+  (a) REPORTED: For any major company that reported YESTERDAY or TODAY, find the actual results. State EPS actual vs estimate, revenue actual vs estimate, and whether it was a beat/miss/in-line. If results were record-breaking or a major surprise, say so explicitly.
+  (b) COMING UP: Flag the 1-2 most important earnings releases due THIS WEEK that matter for SPX/QQQ. Focus on Magnificent Seven (AAPL, NVDA, MSFT, AMZN, META, GOOGL, TSLA), mega-banks (JPM, GS, MS, BAC), and top index weights. State when they report (pre-mkt or after-close).
+
+COMPONENT B — MACRO CATALYSTS:
+From the ECONOMIC CALENDAR or web search, pick 1-2 genuine macro catalysts only: Fed decisions/speeches, CPI/PPI/PCE, NFP, GDP prints. Ignore routine low-impact releases.
+
+FORMAT: Each item on its own line starting with a dash (-). Include ET timing when known. Maximum 5-6 items total. Only include items that could genuinely move SPX.
 
 §3§
 3-4 sentences using the moving averages in the data above. State where SPX is relative to W EMA20, D SMA50, and D SMA200. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
