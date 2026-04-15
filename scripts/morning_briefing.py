@@ -780,12 +780,12 @@ Punchy, direct.
 §2§
 Your job is a sharp intelligence brief — not a scheduled events list. Two mandatory components:
 
-COMPONENT A — EARNINGS INTELLIGENCE (always include during earnings season):
-  (a) REPORTED (YESTERDAY/TODAY): If there are VERIFIED EPS RESULTS in the data above, use THOSE EXACT NUMBERS — do NOT search for EPS actuals, they are already provided and authoritative. For each company: state EPS actual vs estimate and the beat/miss verdict. Add brief context: was the result record-breaking? How is the stock reacting pre-market? What does it mean for the financial sector / SPX weight?
-  (b) COMING UP THIS WEEK: From the EARNINGS CALENDAR above, flag the 1-2 most important upcoming releases for SPX/QQQ. Focus on Magnificent Seven (AAPL, NVDA, MSFT, AMZN, META, GOOGL, TSLA) and mega-banks. State when they report (pre-mkt or after-close) and the EPS estimate.
+COMPONENT A — EARNINGS (include ONLY if relevant data exists):
+  (a) REPORTED: Include ONLY if there are VERIFIED EPS RESULTS in the data above. Use THOSE EXACT NUMBERS — do NOT search for or invent EPS actuals. For each company: EPS actual vs estimate, beat/miss verdict, brief context (record result? pre-market reaction? SPX/QQQ weight impact?). If the VERIFIED EPS block is absent or empty, skip this sub-section entirely.
+  (b) COMING UP: Include ONLY if the EARNINGS CALENDAR above contains Magnificent Seven (AAPL NVDA MSFT AMZN META GOOGL TSLA) or mega-bank (JPM GS MS BAC) earnings within the next 5 days. Flag the 1-2 most impactful with timing and EPS estimate. If no such names appear, skip this sub-section.
 
 COMPONENT B — MACRO CATALYSTS:
-From the ECONOMIC CALENDAR or web search, pick 1-2 genuine macro catalysts only: Fed decisions/speeches, CPI/PPI/PCE, NFP, GDP prints. Ignore routine low-impact releases.
+From the ECONOMIC CALENDAR or web search, pick 1-2 genuine macro catalysts only: Fed decisions/speeches, CPI/PPI/PCE, NFP, GDP prints. Ignore routine low-impact releases. If nothing significant is scheduled, state that in one short line.
 
 FORMAT: Each item on its own line starting with a dash (-). Include ET timing when known. Maximum 5-6 items total. Only include items that could genuinely move SPX.
 
