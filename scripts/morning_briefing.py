@@ -454,10 +454,16 @@ def _gex_ticker_block(
 ) -> str:
     """Format the GEX block for one ticker (SPX or NDX)."""
     expiry = entry.get("expiry", "?")
+    exp_fmt = expiry
+    exp_warning = ""
     try:
-        exp_fmt = datetime.strptime(expiry, "%Y-%m-%d").strftime("%b %d")
+        exp_date = datetime.strptime(expiry, "%Y-%m-%d").date()
+        exp_fmt  = exp_date.strftime("%b %d")
+        ref_date = (today or date.today())
+        if exp_date < ref_date:
+            exp_warning = f" ⚠ expired — download {ref_date.strftime('%b %d')} data"
     except (ValueError, TypeError):
-        exp_fmt = expiry
+        pass
 
     gflip    = entry.get("gflip")
     pos      = entry.get("pos", [])    # [p1, p2, p3] ints
@@ -470,7 +476,7 @@ def _gex_ticker_block(
     def star(v):
         return " ★" if v in conf else ""
 
-    lines = [f"**{ticker_name}** (7DTE, expires {exp_fmt})"]
+    lines = [f"**{ticker_name}** (7DTE, expires {exp_fmt}{exp_warning})"]
 
     if is_monday:
         if gflip is not None:
@@ -597,10 +603,17 @@ def generate_briefing(
 
     today_str = today.strftime("%A, %B %d, %Y")
 
-    # Build market summary string
-    mkt_lines = []
+    # Split market data: futures (live pre-market) vs indices (previous close only)
+    _FUTURES = ("VIX", "ES", "NQ", "RTY")
+    _INDICES  = ("SPX", "NDX")
+    futures_lines = []
+    index_lines   = []
     for name, d in market_data.items():
-        mkt_lines.append(f"  {name}: {d['price']:,.2f} {d['arrow']} {d['change_pct']:+.2f}%")
+        line = f"  {name}: {d['price']:,.2f} {d['arrow']} {d['change_pct']:+.2f}%"
+        if name in _FUTURES:
+            futures_lines.append(line)
+        elif name in _INDICES:
+            index_lines.append(line)
 
     # Build technicals summary
     tech_lines = []
@@ -628,8 +641,13 @@ def generate_briefing(
 The desk trades SPX options with a minimum 7DTE horizon. No individual stocks — only macro index ETFs.
 Today is {today_str}.
 
---- PRE-MARKET DATA (from yfinance) ---
-{chr(10).join(mkt_lines) if mkt_lines else "  (data unavailable)"}
+--- PRE-MARKET FUTURES (live, tradeable pre-market — use for §1§) ---
+{chr(10).join(futures_lines) if futures_lines else "  (data unavailable)"}
+
+--- INDEX PREVIOUS CLOSE (NOT live — SPX/NDX do not trade pre-market) ---
+IMPORTANT: These are yesterday's closing values. Do NOT present them as current prices.
+Do NOT say "SPX is up/down" or make any directional statement about SPX/NDX in §1§.
+{chr(10).join(index_lines) if index_lines else "  (data unavailable)"}
 
 --- SPX MOVING AVERAGES (from yfinance) ---
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
@@ -643,7 +661,10 @@ Do NOT write any text before §1§. Do NOT number or title the sections yourself
 Do NOT write a §4§ section — it will be filled in separately.
 
 §1§
-2-3 sentences on pre-market tone. State VIX (level and % change direction), then ES, NQ and RTY (price and % change). Punchy, direct.
+2-3 sentences on pre-market tone using ONLY the PRE-MARKET FUTURES data above (VIX, ES, NQ, RTY).
+Do NOT mention SPX or NDX in this section — they are yesterday's close, not live pre-market data.
+Do NOT make any ranking comparison between instruments (e.g. "X leads gains") without verifying the numbers.
+Punchy, direct.
 
 §2§
 CRITICAL — SELECT ONLY GENUINE MARKET MOVERS: Use the ECONOMIC CALENDAR and EARNINGS CALENDAR above as your primary source. From these, pick ONLY the 2-3 events that are true market catalysts — e.g. Fed decisions/speeches, CPI/PPI/PCE, NFP/jobless claims, GDP prints, major index-weight earnings (AAPL, NVDA, MSFT, etc.). Ignore routine low-impact releases (mortgage rates, housing surveys, minor regional indices). Then search the web for 1-2 additional urgent macro developments not already covered (geopolitical risks, Fed commentary, policy shifts). Write each item on its own line starting with a dash (-). Include ET times when known. Maximum 5 items total — quality and relevance over completeness.
