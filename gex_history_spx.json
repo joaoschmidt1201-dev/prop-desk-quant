@@ -2,21 +2,21 @@
   {
     "week": "2026-04-13",
     "ticker": "SPX",
-    "expiry": "2026-04-14",
+    "expiry": "2026-04-17",
     "gflip": 6667,
     "pos": [
       7000,
       6900,
-      6950
+      7100
     ],
     "neg": [
       6800,
       6700,
-      6725
+      6755
     ],
     "coi": [
       7000,
-      6800
+      7100
     ],
     "poi": [
       7000,
@@ -30,8 +30,9 @@
       6667,
       6670,
       6800,
-      7000
+      7000,
+      7100
     ],
-    "source_file": "$SPX-gamma-levels-exp-20260414-weekly (1).csv"
+    "source_file": "$SPX-gamma-levels-exp-20260417-monthly.csv"
   }
 ]
