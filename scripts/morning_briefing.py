@@ -303,73 +303,155 @@ def get_gex_context(today: date) -> dict:
 
 # ─── GEX SECTION (local JSON pipeline) ───────────────────────────────────────
 
-def _gex_regime_analysis(spot: float | None, gflip: int | None, pos: list, neg: list) -> str:
-    """
-    Returns a 2-sentence analytical interpretation of the current GEX regime.
-    Sentence 1: regime characterization + dealer behavior.
-    Sentence 2: key risk / level to watch.
-    """
+def _gex_regime_analysis_fallback(spot: float | None, gflip: int | None, pos: list, neg: list) -> str:
+    """Template fallback used when Perplexity AI analysis call fails."""
     if spot is None or gflip is None:
         return ""
 
     diff     = round(spot - gflip)
     dist_pct = abs(diff / gflip * 100) if gflip else 0
-
-    # Detect structural extreme: flip below ALL put walls (entire range in positive gamma)
     flip_below_all_neg = neg and all(v > gflip for v in neg)
 
     if diff >= 0:
-        # ── POSITIVE GAMMA ──────────────────────────────────────────────────
         if dist_pct >= 4.0:
             s1 = (
                 f"Gamma cushion is thick ({diff:,} pts above flip) — dealers are net long gamma "
-                f"across the entire visible range, buying dips and selling rips, which compresses "
-                f"volatility and biases price toward mean-reversion."
+                f"across the entire visible range, buying dips and selling rips, compressing volatility."
             )
             if flip_below_all_neg:
-                s1 += (
-                    f" Note: the flip sits below even the put walls — the whole structure is in "
-                    f"positive gamma territory, an unusually stable regime."
-                )
+                s1 += " Flip sits below all put walls — entire structure in positive gamma territory."
         elif dist_pct >= 1.5:
             s1 = (
                 f"Positive gamma with moderate cushion ({diff:,} pts above flip) — "
-                f"dealer flow is stabilizing, dampening moves in both directions, "
-                f"but the cushion is not thick enough to fully pin price."
+                f"dealer flow dampens moves in both directions."
             )
         else:
             s1 = (
-                f"Spot is hovering just above the gamma flip (+{diff} pts) — transition zone. "
-                f"A close below ${gflip:,} would flip dealer gamma negative and risk accelerating "
-                f"any downside move."
+                f"Spot hovering just above flip (+{diff} pts) — transition zone. "
+                f"Close below ${gflip:,} would shift dealer gamma negative."
             )
-
-        if dist_pct >= 1.5:
-            s2 = (
-                f"Key risk: a sustained break below the flip (${gflip:,}) shifts dealers "
-                f"to short-gamma, amplifying moves instead of absorbing them — "
-                f"treat that level as the volatility cliff."
-            )
-        else:
-            s2 = ""
-
-    else:
-        # ── NEGATIVE GAMMA ───────────────────────────────────────────────────
-        s1 = (
-            f"Negative gamma regime ({abs(diff):,} pts below flip) — dealers are short gamma "
-            f"and amplify directional moves in both directions; "
-            f"expect elevated volatility and momentum-driven behavior."
-        )
         s2 = (
-            f"Recapturing the flip at ${gflip:,} would restore stabilizing dealer flow; "
-            f"until then, treat all intraday swings as structurally amplified."
+            f"Key risk: break below flip (${gflip:,}) shifts dealers short-gamma, "
+            f"amplifying moves — treat as volatility cliff."
+        ) if dist_pct >= 1.5 else ""
+    else:
+        s1 = (
+            f"Negative gamma regime ({abs(diff):,} pts below flip) — dealers amplify "
+            f"directional moves; expect elevated volatility."
+        )
+        s2 = f"Recapturing flip at ${gflip:,} would restore stabilizing dealer flow."
+
+    return "-> " + " ".join(s for s in [s1, s2] if s)
+
+
+def _gex_ai_analysis(
+    ticker: str,
+    spot: float,
+    gflip: int,
+    pos: list,
+    neg: list,
+    agg: int | None,
+    conf: set,
+    today: date,
+    api_key: str,
+) -> str:
+    """
+    Calls Perplexity sonar to generate a focused 2-3 sentence GEX regime analysis
+    specific to today's exact data. Falls back to template on any failure.
+    """
+    if not api_key or spot is None or gflip is None:
+        return _gex_regime_analysis_fallback(spot, gflip, pos, neg)
+
+    diff     = round(spot - gflip)
+    dist_pct = diff / gflip * 100 if gflip else 0
+    regime   = "POSITIVE" if diff >= 0 else "NEGATIVE"
+    flip_below_all_neg = neg and all(v > gflip for v in neg)
+
+    # Build structured data block — only numbers, no pre-baked interpretation
+    data_lines = [
+        f"Ticker: {ticker}",
+        f"Date: {today.strftime('%A, %B %d, %Y')}",
+        f"Spot: ${spot:,.0f}",
+        f"Gamma Flip: ${gflip:,}  ({diff:+,} pts / {dist_pct:+.1f}% from spot)",
+        f"Gamma regime: {regime} GAMMA",
+    ]
+
+    candidates_above = [(v, f"p{i+1}") for i, v in enumerate(pos) if v > spot]
+    if agg is not None and agg > spot:
+        candidates_above.append((agg, "agg"))
+    if candidates_above:
+        res_val, res_lbl = min(candidates_above, key=lambda x: x[0])
+        ctag = " [confluence]" if res_val in conf else ""
+        data_lines.append(f"Nearest resistance: {res_lbl} ${res_val:,} (+{round(res_val - spot)} pts){ctag}")
+
+    candidates_below = [(v, f"n{i+1}") for i, v in enumerate(neg) if v < spot]
+    if agg is not None and agg < spot:
+        candidates_below.append((agg, "agg"))
+    if candidates_below:
+        sup_val, sup_lbl = max(candidates_below, key=lambda x: x[0])
+        ctag = " [confluence]" if sup_val in conf else ""
+        data_lines.append(f"Nearest support: {sup_lbl} ${sup_val:,} (-{round(spot - sup_val)} pts){ctag}")
+
+    if flip_below_all_neg:
+        data_lines.append(
+            "Structural note: Gamma Flip is below ALL put walls — "
+            "entire visible price range is in positive gamma territory."
         )
 
-    parts = [s for s in [s1, s2] if s]
-    return "-> " + " ".join(parts)
+    data_block = "\n".join(data_lines)
+
+    prompt = (
+        f"Analyze the following GEX (Gamma Exposure) data and write a 2-3 sentence "
+        f"interpretation for today's trading session.\n\n"
+        f"{data_block}\n\n"
+        f"Address: (1) what the current gamma regime means for dealer hedging behavior today, "
+        f"(2) the single most important level to watch and why. "
+        f"Be specific to the numbers above. No bullet points. No headers. "
+        f"No citation markers. Professional, data-driven tone."
+    )
+
+    try:
+        resp = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type":  "application/json",
+            },
+            json={
+                "model": "sonar",
+                "messages": [
+                    {
+                        "role":    "system",
+                        "content": "You are a senior derivatives analyst at a professional proprietary trading desk. Be concise, specific, and data-driven. Never use bullet points or headers.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.3,
+                "max_tokens":  220,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+        text = re.sub(r'\[\d+\]', '', text)
+        text = re.sub(r'\[[^\]]{1,60}\]', '', text)
+        text = re.sub(r'  +', ' ', text).strip()
+        if text:
+            return "-> " + text
+        return _gex_regime_analysis_fallback(spot, gflip, pos, neg)
+    except Exception as e:
+        print(f"  [WARNING] GEX AI analysis failed ({e}) — using template fallback")
+        return _gex_regime_analysis_fallback(spot, gflip, pos, neg)
 
 
-def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_monday: bool) -> str:
+def _gex_ticker_block(
+    entry: dict,
+    ticker_name: str,
+    spot: float | None,
+    is_monday: bool,
+    today: date | None = None,
+    api_key: str = "",
+) -> str:
     """Format the GEX block for one ticker (SPX or NDX)."""
     expiry = entry.get("expiry", "?")
     try:
@@ -408,7 +490,7 @@ def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_mond
         if conf:
             lines.append(f"• Confluences: " + " | ".join(f"${v:,}" for v in sorted(conf)))
         if spot is not None and gflip is not None:
-            analysis = _gex_regime_analysis(spot, gflip, pos, neg)
+            analysis = _gex_ai_analysis(ticker_name, spot, gflip, pos, neg, agg, conf, today or date.today(), api_key)
             if analysis:
                 lines.append(analysis)
     else:
@@ -441,17 +523,18 @@ def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_mond
                 lines.append(f"• Nearest support:    {sup_lbl} ${sup_val:,} (-{round(spot - sup_val)} pts){ctag}")
 
         if spot is not None and gflip is not None:
-            analysis = _gex_regime_analysis(spot, gflip, pos, neg)
+            analysis = _gex_ai_analysis(ticker_name, spot, gflip, pos, neg, agg, conf, today or date.today(), api_key)
             if analysis:
                 lines.append(analysis)
 
     return "\n".join(lines)
 
 
-def build_gex_section(today: date, market_data: dict) -> str:
+def build_gex_section(today: date, market_data: dict, perplexity_key: str = "") -> str:
     """
     Build the §4§ GEX content from local JSON files.
     Monday: full level listing. Tue–Fri: spot vs levels distances.
+    perplexity_key: if provided, generates AI analysis for each ticker block.
     Returns a plain text string to be injected into the briefing.
     """
     monday    = today - timedelta(days=today.weekday())
@@ -493,7 +576,7 @@ def build_gex_section(today: date, market_data: dict) -> str:
             )
             continue
 
-        blocks.append(_gex_ticker_block(latest, ticker_name, spot, is_monday))
+        blocks.append(_gex_ticker_block(latest, ticker_name, spot, is_monday, today=today, api_key=perplexity_key))
 
     return "\n\n".join(blocks) if blocks else "GEX data unavailable."
 
@@ -756,8 +839,8 @@ def main():
     if calendar_data["earnings"]:
         print(f"  [CALENDAR] Earnings: {calendar_data['earnings'][:120]}...")
 
-    print("  Building GEX section from local data...")
-    gex_section = build_gex_section(today, market_data)
+    print("  Building GEX section (local data + Perplexity AI analysis)...")
+    gex_section = build_gex_section(today, market_data, perplexity_key)
 
     print("  Generating briefing (Perplexity sonar-pro)...")
     briefing = post_process(
