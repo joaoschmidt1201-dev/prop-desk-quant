@@ -132,11 +132,11 @@ def fetch_economic_calendar(today: date, api_key: str) -> str:
         print(f"  [WARNING] Finnhub economic calendar failed: {e}")
         return ""
 
-    # Filter: US + high or medium impact
+    # Filter: US + high impact only (medium = too much noise for the desk)
     filtered = [
         e for e in events
         if e.get("country", "").upper() == "US"
-        and e.get("impact", "").lower() in {"high", "medium"}
+        and e.get("impact", "").lower() == "high"
     ]
     if not filtered:
         return "No high-impact US macro releases scheduled."
@@ -499,7 +499,7 @@ Do NOT write a §4§ section — it will be filled in separately.
 2-3 sentences on pre-market tone. State VIX (level and % change direction), then ES, NQ and RTY (price and % change). Punchy, direct.
 
 §2§
-CRITICAL — CALENDAR DATA IS AUTHORITATIVE: The ECONOMIC CALENDAR and EARNINGS CALENDAR blocks above are structured data pulled directly from Finnhub. Every event listed there MUST appear in this section — do NOT omit any. If a calendar block shows events, you cannot say "no events found." After reporting all calendar items, search the web for 1-2 additional relevant market-moving news items not already covered (geopolitical, policy, Fed commentary). Write each item on its own line starting with a dash (-). Include ET times when known.
+CRITICAL — SELECT ONLY GENUINE MARKET MOVERS: Use the ECONOMIC CALENDAR and EARNINGS CALENDAR above as your primary source. From these, pick ONLY the 2-3 events that are true market catalysts — e.g. Fed decisions/speeches, CPI/PPI/PCE, NFP/jobless claims, GDP prints, major index-weight earnings (AAPL, NVDA, MSFT, etc.). Ignore routine low-impact releases (mortgage rates, housing surveys, minor regional indices). Then search the web for 1-2 additional urgent macro developments not already covered (geopolitical risks, Fed commentary, policy shifts). Write each item on its own line starting with a dash (-). Include ET times when known. Maximum 5 items total — quality and relevance over completeness.
 
 §3§
 3-4 sentences using the moving averages in the data above. State where SPX is relative to W EMA20, D SMA50, and D SMA200. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
