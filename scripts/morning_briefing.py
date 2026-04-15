@@ -584,7 +584,10 @@ def build_gex_section(today: date, market_data: dict, perplexity_key: str = "") 
 
         blocks.append(_gex_ticker_block(latest, ticker_name, spot, is_monday, today=today, api_key=perplexity_key))
 
-    return "\n\n".join(blocks) if blocks else "GEX data unavailable."
+    if not blocks:
+        return "GEX data unavailable."
+    source_header = "Source: Barchart  |  7DTE GEX by strike"
+    return source_header + "\n\n" + "\n\n".join(blocks)
 
 
 # ─── PERPLEXITY — RESEARCH + BRIEFING ────────────────────────────────────────
