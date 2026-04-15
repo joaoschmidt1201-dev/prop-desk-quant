@@ -303,6 +303,72 @@ def get_gex_context(today: date) -> dict:
 
 # ─── GEX SECTION (local JSON pipeline) ───────────────────────────────────────
 
+def _gex_regime_analysis(spot: float | None, gflip: int | None, pos: list, neg: list) -> str:
+    """
+    Returns a 2-sentence analytical interpretation of the current GEX regime.
+    Sentence 1: regime characterization + dealer behavior.
+    Sentence 2: key risk / level to watch.
+    """
+    if spot is None or gflip is None:
+        return ""
+
+    diff     = round(spot - gflip)
+    dist_pct = abs(diff / gflip * 100) if gflip else 0
+
+    # Detect structural extreme: flip below ALL put walls (entire range in positive gamma)
+    flip_below_all_neg = neg and all(v > gflip for v in neg)
+
+    if diff >= 0:
+        # ── POSITIVE GAMMA ──────────────────────────────────────────────────
+        if dist_pct >= 4.0:
+            s1 = (
+                f"Gamma cushion is thick ({diff:,} pts above flip) — dealers are net long gamma "
+                f"across the entire visible range, buying dips and selling rips, which compresses "
+                f"volatility and biases price toward mean-reversion."
+            )
+            if flip_below_all_neg:
+                s1 += (
+                    f" Note: the flip sits below even the put walls — the whole structure is in "
+                    f"positive gamma territory, an unusually stable regime."
+                )
+        elif dist_pct >= 1.5:
+            s1 = (
+                f"Positive gamma with moderate cushion ({diff:,} pts above flip) — "
+                f"dealer flow is stabilizing, dampening moves in both directions, "
+                f"but the cushion is not thick enough to fully pin price."
+            )
+        else:
+            s1 = (
+                f"Spot is hovering just above the gamma flip (+{diff} pts) — transition zone. "
+                f"A close below ${gflip:,} would flip dealer gamma negative and risk accelerating "
+                f"any downside move."
+            )
+
+        if dist_pct >= 1.5:
+            s2 = (
+                f"Key risk: a sustained break below the flip (${gflip:,}) shifts dealers "
+                f"to short-gamma, amplifying moves instead of absorbing them — "
+                f"treat that level as the volatility cliff."
+            )
+        else:
+            s2 = ""
+
+    else:
+        # ── NEGATIVE GAMMA ───────────────────────────────────────────────────
+        s1 = (
+            f"Negative gamma regime ({abs(diff):,} pts below flip) — dealers are short gamma "
+            f"and amplify directional moves in both directions; "
+            f"expect elevated volatility and momentum-driven behavior."
+        )
+        s2 = (
+            f"Recapturing the flip at ${gflip:,} would restore stabilizing dealer flow; "
+            f"until then, treat all intraday swings as structurally amplified."
+        )
+
+    parts = [s for s in [s1, s2] if s]
+    return "-> " + " ".join(parts)
+
+
 def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_monday: bool) -> str:
     """Format the GEX block for one ticker (SPX or NDX)."""
     expiry = entry.get("expiry", "?")
@@ -342,10 +408,9 @@ def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_mond
         if conf:
             lines.append(f"• Confluences: " + " | ".join(f"${v:,}" for v in sorted(conf)))
         if spot is not None and gflip is not None:
-            if spot >= gflip:
-                lines.append("-> Gamma Condition: POSITIVE — spot above flip, mean-reversion bias")
-            else:
-                lines.append("-> Gamma Condition: NEGATIVE — spot below flip, volatility-expansion bias")
+            analysis = _gex_regime_analysis(spot, gflip, pos, neg)
+            if analysis:
+                lines.append(analysis)
     else:
         # Tue–Fri: spot vs levels
         if spot is not None and gflip is not None:
@@ -376,10 +441,9 @@ def _gex_ticker_block(entry: dict, ticker_name: str, spot: float | None, is_mond
                 lines.append(f"• Nearest support:    {sup_lbl} ${sup_val:,} (-{round(spot - sup_val)} pts){ctag}")
 
         if spot is not None and gflip is not None:
-            if spot >= gflip:
-                lines.append("-> Positive gamma: dealers dampen moves, pin risk near flip")
-            else:
-                lines.append("-> Negative gamma: dealers amplify directional moves")
+            analysis = _gex_regime_analysis(spot, gflip, pos, neg)
+            if analysis:
+                lines.append(analysis)
 
     return "\n".join(lines)
 
