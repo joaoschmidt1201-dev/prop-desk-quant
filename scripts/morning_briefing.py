@@ -42,6 +42,14 @@ HISTORY_FILE = ROOT / "gex_history.json"       # legacy (kept for backward compa
 HISTORY_SPX  = ROOT / "gex_history_spx.json"   # new pipeline
 HISTORY_NDX  = ROOT / "gex_history_ndx.json"   # new pipeline
 
+# Top S&P 500 tickers by market cap — used to filter earnings calendar
+_SP500_MAJORS = {
+    "AAPL", "NVDA", "MSFT", "AMZN", "META", "GOOGL", "GOOG", "TSLA",
+    "JPM", "V", "UNH", "MA", "XOM", "JNJ", "PG", "HD", "AVGO",
+    "LLY", "MRK", "BAC", "ABBV", "KO", "PEP", "WMT", "COST",
+    "CRM", "NFLX", "AMD", "ORCL", "TMO",
+}
+
 # ─── MARKET DATA ─────────────────────────────────────────────────────────────
 
 def fetch_market_data() -> dict:
@@ -102,6 +110,107 @@ def fetch_spx_technicals() -> dict:
     except Exception as e:
         print(f"  [WARNING] Could not compute SPX technicals: {e}")
         return {}
+
+# ─── FINNHUB — ECONOMIC & EARNINGS CALENDAR ──────────────────────────────────
+
+def fetch_economic_calendar(today: date, api_key: str) -> str:
+    """Fetches high-impact US economic events from Finnhub for today.
+    Returns formatted string to inject into Perplexity prompt.
+    Returns '' on failure (graceful degradation)."""
+    if not api_key:
+        return ""
+    date_str = today.strftime("%Y-%m-%d")
+    try:
+        resp = requests.get(
+            "https://finnhub.io/api/v1/calendar/economic",
+            params={"from": date_str, "to": date_str, "token": api_key},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        events = resp.json().get("economicCalendar", [])
+    except Exception as e:
+        print(f"  [WARNING] Finnhub economic calendar failed: {e}")
+        return ""
+
+    # Filter: US + high or medium impact
+    filtered = [
+        e for e in events
+        if e.get("country", "").upper() == "US"
+        and e.get("impact", "").lower() in {"high", "medium"}
+    ]
+    if not filtered:
+        return "No high-impact US macro releases scheduled."
+
+    filtered.sort(key=lambda e: e.get("time", ""))
+
+    date_label = today.strftime("%A, %B %d")
+    lines = [f"--- ECONOMIC CALENDAR — {date_label} (source: Finnhub) ---"]
+    for e in filtered:
+        name   = e.get("event", "Unknown")
+        impact = e.get("impact", "").upper()
+        est    = e.get("estimate", "")
+        unit   = e.get("unit", "")
+        time_str = ""
+        raw_time = e.get("time", "")
+        if raw_time:
+            try:
+                from datetime import datetime as _dt
+                t_utc = _dt.strptime(raw_time[:16], "%Y-%m-%d %H:%M")
+                t_et  = pytz.utc.localize(t_utc).astimezone(ET)
+                time_str = t_et.strftime("%H:%M ET") + "  "
+            except (ValueError, AttributeError):
+                pass
+        line = f"• {time_str}{name}  [{impact} IMPACT]"
+        if est:
+            line += f"  est: {est}{unit}"
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
+def fetch_earnings_calendar(today: date, api_key: str) -> str:
+    """Fetches earnings releases for major S&P 500 components from Finnhub.
+    Returns formatted string to inject into Perplexity prompt.
+    Returns '' on failure (graceful degradation)."""
+    if not api_key:
+        return ""
+    date_str = today.strftime("%Y-%m-%d")
+    try:
+        resp = requests.get(
+            "https://finnhub.io/api/v1/calendar/earnings",
+            params={"from": date_str, "to": date_str, "token": api_key},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        events = resp.json().get("earningsCalendar", [])
+    except Exception as e:
+        print(f"  [WARNING] Finnhub earnings calendar failed: {e}")
+        return ""
+
+    # Filter: only major S&P 500 tickers
+    filtered = [e for e in events if e.get("symbol", "") in _SP500_MAJORS]
+    if not filtered:
+        return "No major S&P 500 earnings scheduled."
+
+    _HOUR_LABEL = {"bmo": "pre-market", "amc": "after-close", "dmh": "during session"}
+
+    date_label = today.strftime("%A, %B %d")
+    lines = [f"--- EARNINGS CALENDAR — {date_label} (source: Finnhub) ---"]
+    for e in sorted(filtered, key=lambda x: x.get("symbol", "")):
+        sym   = e.get("symbol", "?")
+        hour  = _HOUR_LABEL.get(e.get("hour", ""), e.get("hour", ""))
+        eps   = e.get("epsEstimate")
+        rev   = e.get("revenueEstimate")
+        line  = f"• {sym}  ({hour})"
+        if eps is not None:
+            line += f"  EPS est: {eps:.2f}"
+        if rev is not None:
+            rev_b = rev / 1e9
+            line += f"  Rev est: ${rev_b:.1f}B"
+        lines.append(line)
+
+    return "\n".join(lines)
+
 
 # ─── GEX LEVELS ──────────────────────────────────────────────────────────────
 
@@ -333,9 +442,11 @@ def generate_briefing(
     today: date,
     api_key: str,
     gex_section: str = "",
+    calendar_data: dict = None,
 ) -> str:
     """Calls Perplexity sonar-pro to research news and generate the morning briefing.
-    §4§ (GEX levels) is built locally and injected — Perplexity handles §1§–§3§ and §5§ only."""
+    §4§ (GEX levels) is built locally and injected — Perplexity handles §1§–§3§ and §5§ only.
+    calendar_data: dict with 'economic' and 'earnings' strings (from Finnhub)."""
 
     today_str = today.strftime("%A, %B %d, %Y")
 
@@ -353,6 +464,19 @@ def generate_briefing(
                 f"  {ma}: {round(data['value'])}  ({data['dist_pct']:+.1f}% — SPX is {data['side']})"
             )
 
+    # Build calendar block (from Finnhub — authoritative structured data)
+    cal = calendar_data or {}
+    econ_block     = cal.get("economic", "") or ""
+    earnings_block = cal.get("earnings", "") or ""
+    calendar_block = ""
+    if econ_block or earnings_block:
+        calendar_block = (
+            f"\n--- ECONOMIC CALENDAR (authoritative, from Finnhub) ---\n"
+            f"{econ_block or 'No high-impact US macro releases scheduled.'}\n"
+            f"\n--- EARNINGS CALENDAR (authoritative, from Finnhub) ---\n"
+            f"{earnings_block or 'No major S&P 500 earnings scheduled.'}"
+        )
+
     prompt = f"""You are the senior quantitative analyst for a professional proprietary trading desk.
 The desk trades SPX options with a minimum 7DTE horizon. No individual stocks — only macro index ETFs.
 Today is {today_str}.
@@ -362,6 +486,7 @@ Today is {today_str}.
 
 --- SPX MOVING AVERAGES (from yfinance) ---
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
+{calendar_block}
 
 --- YOUR TASK ---
 Write a Morning Briefing with exactly four sections.
@@ -374,7 +499,7 @@ Do NOT write a §4§ section — it will be filled in separately.
 2-3 sentences on pre-market tone. State VIX (level and % change direction), then ES, NQ and RTY (price and % change). Punchy, direct.
 
 §2§
-Search the web for the 3-4 most relevant macro events or news for SPX/ES/NQ on {today_str}. Include: scheduled data releases (CPI, PPI, jobs, Fed speakers, FOMC), earnings from top S&P 500 components (Apple, Nvidia, Microsoft, Amazon, Meta, etc.), any major geopolitical or policy event moving markets. Write each item on its own line starting with a dash (-). Include ET times when known.
+CRITICAL — CALENDAR DATA IS AUTHORITATIVE: The ECONOMIC CALENDAR and EARNINGS CALENDAR blocks above are structured data pulled directly from Finnhub. Every event listed there MUST appear in this section — do NOT omit any. If a calendar block shows events, you cannot say "no events found." After reporting all calendar items, search the web for 1-2 additional relevant market-moving news items not already covered (geopolitical, policy, Fed commentary). Write each item on its own line starting with a dash (-). Include ET times when known.
 
 §3§
 3-4 sentences using the moving averages in the data above. State where SPX is relative to W EMA20, D SMA50, and D SMA200. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
@@ -386,7 +511,7 @@ One direct sentence: the desk's tactical bias for today and the single most impo
 - The ONLY special characters allowed are the four delimiters §1§ §2§ §3§ §5§ and dashes (-) for bullet lines.
 - Do NOT write section titles or headers.
 - Do NOT include any citation markers like [1], [2], [provided data], or anything in square brackets.
-- Total content: 280-400 words (excluding delimiters).
+- Total content: 280-420 words (excluding delimiters).
 - Professional, data-driven tone."""
 
     try:
@@ -537,6 +662,7 @@ def post_to_discord(webhook_url: str, briefing: str, today: date, market_data: d
 def main():
     perplexity_key  = os.environ.get("PERPLEXITY_API_KEY", "").strip()
     discord_webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+    finnhub_key     = os.environ.get("FINNHUB_API_KEY", "").strip()
 
     if not perplexity_key:
         print("[ERROR] PERPLEXITY_API_KEY not set in environment.")
@@ -544,6 +670,8 @@ def main():
     if not discord_webhook:
         print("[ERROR] DISCORD_WEBHOOK_URL not set in environment.")
         sys.exit(1)
+    if not finnhub_key:
+        print("  [WARNING] FINNHUB_API_KEY not set — calendar data unavailable, Perplexity will search instead.")
 
     today = datetime.now(ET).date()
     print(f"Morning Briefing — {today.strftime('%A %B %d, %Y')} (ET)")
@@ -554,11 +682,23 @@ def main():
     print("  Computing SPX moving averages...")
     technicals = fetch_spx_technicals()
 
+    print("  Fetching economic & earnings calendar (Finnhub)...")
+    calendar_data = {
+        "economic": fetch_economic_calendar(today, finnhub_key),
+        "earnings": fetch_earnings_calendar(today, finnhub_key),
+    }
+    if calendar_data["economic"]:
+        print(f"  [CALENDAR] Economic: {calendar_data['economic'][:120]}...")
+    if calendar_data["earnings"]:
+        print(f"  [CALENDAR] Earnings: {calendar_data['earnings'][:120]}...")
+
     print("  Building GEX section from local data...")
     gex_section = build_gex_section(today, market_data)
 
     print("  Generating briefing (Perplexity sonar-pro)...")
-    briefing = post_process(generate_briefing(market_data, technicals, today, perplexity_key, gex_section))
+    briefing = post_process(
+        generate_briefing(market_data, technicals, today, perplexity_key, gex_section, calendar_data)
+    )
 
     print("  Posting to Discord...")
     post_to_discord(discord_webhook, briefing, today, market_data)
