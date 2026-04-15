@@ -172,12 +172,13 @@ def fetch_economic_calendar(today: date, api_key: str) -> str:
     return "\n".join(lines)
 
 
-def fetch_earnings_calendar(today: date, api_key: str) -> str:
+def fetch_earnings_calendar(today: date, api_key: str) -> dict:
     """Fetches earnings for major S&P 500 components: yesterday → next 7 days.
     Grouped by day with labels (YESTERDAY / TODAY / TOMORROW / weekday).
-    Returns formatted string to inject into Perplexity prompt."""
+    Returns {'text': str, 'recent': [str]} where 'recent' = symbols that reported
+    yesterday or today (used to fetch verified EPS actuals)."""
     if not api_key:
-        return ""
+        return {"text": "", "recent": []}
 
     from collections import defaultdict
 
@@ -198,18 +199,18 @@ def fetch_earnings_calendar(today: date, api_key: str) -> str:
         events = resp.json().get("earningsCalendar", [])
     except Exception as e:
         print(f"  [WARNING] Finnhub earnings calendar failed: {e}")
-        return ""
+        return {"text": "", "recent": []}
 
     # Filter: only major tickers
     filtered = [e for e in events if e.get("symbol", "") in _SP500_MAJORS]
     if not filtered:
-        return "No major S&P 500 earnings in the next 7 days."
+        return {"text": "No major S&P 500 earnings in the next 7 days.", "recent": []}
 
     _HOUR_LABEL = {"bmo": "pre-mkt", "amc": "after-close", "dmh": "intraday"}
 
     def day_label(d: date) -> str:
         delta = (d - today).days
-        if delta == -1: return "YESTERDAY (results may be out — search web)"
+        if delta == -1: return "YESTERDAY"
         if delta ==  0: return "TODAY"
         if delta ==  1: return "TOMORROW"
         return d.strftime("%A %b %d")
@@ -225,9 +226,10 @@ def fetch_earnings_calendar(today: date, api_key: str) -> str:
 
     lines = [
         f"--- EARNINGS CALENDAR — {from_date.strftime('%b %d')} to {to_date.strftime('%b %d')} (source: Finnhub) ---",
-        "Finnhub provides estimates only. For YESTERDAY/TODAY, search the web for actual reported results.",
     ]
+    recent: list = []
     for d in sorted(by_date.keys()):
+        delta = (d - today).days
         lines.append(f"\n  [{day_label(d)}]")
         for e in sorted(by_date[d], key=lambda x: x.get("symbol", "")):
             sym  = e.get("symbol", "?")
@@ -240,8 +242,60 @@ def fetch_earnings_calendar(today: date, api_key: str) -> str:
             if rev is not None:
                 line += f"  Rev est: ${rev / 1e9:.1f}B"
             lines.append(line)
+            # Track recent reporters (yesterday + today) for EPS actuals lookup
+            if delta in (-1, 0) and sym != "?":
+                recent.append(sym)
 
-    return "\n".join(lines)
+    return {"text": "\n".join(lines), "recent": recent}
+
+
+def fetch_earnings_surprises(symbols: list, api_key: str) -> dict:
+    """Fetches verified EPS actuals from Finnhub for a list of symbols.
+    Call only for companies known to have reported recently (yesterday/today).
+    Returns: {sym: {actual, estimate, surprise_pct, period, beat_miss}}"""
+    results = {}
+    cutoff = date.today() - timedelta(days=120)  # só aceita resultados dos últimos ~2 trimestres
+    for sym in symbols:
+        try:
+            resp = requests.get(
+                "https://finnhub.io/api/v1/stock/earnings",
+                params={"symbol": sym, "limit": 1, "token": api_key},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not data:
+                continue
+            latest = data[0]
+            actual = latest.get("actual")
+            if actual is None:
+                continue
+            # Validar que o período é recente (não trimestre antigo)
+            try:
+                period_date = datetime.strptime(latest.get("period", ""), "%Y-%m-%d").date()
+                if period_date < cutoff:
+                    print(f"  [ACTUALS] {sym}: period {latest.get('period')} too old — skipping")
+                    continue
+            except (ValueError, TypeError):
+                pass
+            estimate = latest.get("estimate")
+            surp_pct = latest.get("surprisePercent")
+            period   = latest.get("period", "")
+            beat_miss = (
+                "BEAT"    if (surp_pct or 0) > 3  else
+                "MISS"    if (surp_pct or 0) < -3 else
+                "IN-LINE"
+            )
+            results[sym] = {
+                "actual":       actual,
+                "estimate":     estimate,
+                "surprise_pct": surp_pct,
+                "period":       period,
+                "beat_miss":    beat_miss,
+            }
+        except Exception as e:
+            print(f"  [WARNING] earnings surprise fetch failed for {sym}: {e}")
+    return results
 
 
 # ─── GEX LEVELS ──────────────────────────────────────────────────────────────
@@ -669,9 +723,29 @@ def generate_briefing(
             f"\n--- ECONOMIC CALENDAR — TODAY (authoritative, from Finnhub) ---\n"
             f"{econ_block or 'No high-impact US macro releases scheduled today.'}\n"
             f"\n--- EARNINGS CALENDAR — YESTERDAY through NEXT 7 DAYS (authoritative, from Finnhub) ---\n"
-            f"IMPORTANT: Finnhub only provides estimates. Use web search to find actual results for YESTERDAY/TODAY.\n"
             f"{earnings_block or 'No major S&P 500 earnings in this window.'}"
         )
+
+    # Build verified EPS actuals block (authoritative — Perplexity must use these exact numbers)
+    actuals = cal.get("earnings_actuals", {})
+    verified_eps_block = ""
+    if actuals:
+        vlines = [
+            "--- VERIFIED EPS RESULTS (source: Finnhub — AUTHORITATIVE, do NOT search for EPS actuals) ---",
+        ]
+        for sym, d in actuals.items():
+            actual = d.get("actual")
+            est    = d.get("estimate")
+            surp   = d.get("surprise_pct")
+            period = d.get("period", "")
+            bm     = d.get("beat_miss", "")
+            line   = f"• {sym} {period}: EPS actual {actual:.2f}"
+            if est is not None:
+                line += f" vs est {est:.2f}"
+            if surp is not None:
+                line += f" ({surp:+.1f}% — {bm})"
+            vlines.append(line)
+        verified_eps_block = "\n".join(vlines)
 
     prompt = f"""You are the senior quantitative analyst for a professional proprietary trading desk.
 The desk trades SPX options with a minimum 7DTE horizon. No individual stocks — only macro index ETFs.
@@ -688,6 +762,7 @@ Do NOT say "SPX is up/down" or make any directional statement about SPX/NDX in �
 --- SPX MOVING AVERAGES (from yfinance) ---
 {chr(10).join(tech_lines) if tech_lines else "  (data unavailable)"}
 {calendar_block}
+{verified_eps_block}
 
 --- YOUR TASK ---
 Write a Morning Briefing with exactly four sections.
@@ -706,9 +781,8 @@ Punchy, direct.
 Your job is a sharp intelligence brief — not a scheduled events list. Two mandatory components:
 
 COMPONENT A — EARNINGS INTELLIGENCE (always include during earnings season):
-Use the EARNINGS CALENDAR above as your base. Then search the web to fill in:
-  (a) REPORTED: For any major company that reported YESTERDAY or TODAY, find the actual results. State EPS actual vs estimate, revenue actual vs estimate, and whether it was a beat/miss/in-line. If results were record-breaking or a major surprise, say so explicitly.
-  (b) COMING UP: Flag the 1-2 most important earnings releases due THIS WEEK that matter for SPX/QQQ. Focus on Magnificent Seven (AAPL, NVDA, MSFT, AMZN, META, GOOGL, TSLA), mega-banks (JPM, GS, MS, BAC), and top index weights. State when they report (pre-mkt or after-close).
+  (a) REPORTED (YESTERDAY/TODAY): If there are VERIFIED EPS RESULTS in the data above, use THOSE EXACT NUMBERS — do NOT search for EPS actuals, they are already provided and authoritative. For each company: state EPS actual vs estimate and the beat/miss verdict. Add brief context: was the result record-breaking? How is the stock reacting pre-market? What does it mean for the financial sector / SPX weight?
+  (b) COMING UP THIS WEEK: From the EARNINGS CALENDAR above, flag the 1-2 most important upcoming releases for SPX/QQQ. Focus on Magnificent Seven (AAPL, NVDA, MSFT, AMZN, META, GOOGL, TSLA) and mega-banks. State when they report (pre-mkt or after-close) and the EPS estimate.
 
 COMPONENT B — MACRO CATALYSTS:
 From the ECONOMIC CALENDAR or web search, pick 1-2 genuine macro catalysts only: Fed decisions/speeches, CPI/PPI/PCE, NFP, GDP prints. Ignore routine low-impact releases.
@@ -897,14 +971,23 @@ def main():
     technicals = fetch_spx_technicals()
 
     print("  Fetching economic & earnings calendar (Finnhub)...")
+    ec_result = fetch_earnings_calendar(today, finnhub_key)
     calendar_data = {
-        "economic": fetch_economic_calendar(today, finnhub_key),
-        "earnings": fetch_earnings_calendar(today, finnhub_key),
+        "economic":         fetch_economic_calendar(today, finnhub_key),
+        "earnings":         ec_result.get("text", ""),
+        "earnings_actuals": {},
     }
     if calendar_data["economic"]:
         print(f"  [CALENDAR] Economic: {calendar_data['economic'][:120]}...")
     if calendar_data["earnings"]:
         print(f"  [CALENDAR] Earnings: {calendar_data['earnings'][:120]}...")
+
+    recent_reporters = ec_result.get("recent", [])
+    if recent_reporters and finnhub_key:
+        print(f"  Fetching verified EPS actuals for: {', '.join(recent_reporters)}...")
+        calendar_data["earnings_actuals"] = fetch_earnings_surprises(recent_reporters, finnhub_key)
+        if calendar_data["earnings_actuals"]:
+            print(f"  [ACTUALS] {calendar_data['earnings_actuals']}")
 
     print("  Building GEX section (local data + Perplexity AI analysis)...")
     gex_section = build_gex_section(today, market_data, perplexity_key)
