@@ -15,23 +15,30 @@ _valid  = _is_spx or _is_ndx
 
 // --- INPUTS (Colors) ------------------------------------------------
 var string _GC = "Colors"
-C_GFLIP = input.color(color.rgb(128, 0, 200),                "Gamma Flip",   group=_GC, display=display.none)
-C_POS   = input.color(color.rgb(0, 200, 83),                 "Positive GEX", group=_GC, display=display.none)
-C_NEG   = input.color(color.rgb(255, 23, 68),                "Negative GEX", group=_GC, display=display.none)
-C_AGG   = input.color(color.rgb(170, 0, 255),                "Aggregate",    group=_GC, display=display.none)
-C_SEP_W = color.new(color.gray, 40)
-C_SEP_D = color.new(color.gray, 72)
+C_GFLIP = input.color(color.rgb(128, 0, 200),   "Gamma Flip",    group=_GC, display=display.none)
+C_POS   = input.color(color.rgb(0, 200, 83),    "Positive GEX",  group=_GC, display=display.none)
+C_NEG   = input.color(color.rgb(255, 23, 68),   "Negative GEX",  group=_GC, display=display.none)
+C_AGG   = input.color(color.rgb(170, 0, 255),   "Aggregate",     group=_GC, display=display.none)
+C_SEP_W = input.color(color.new(color.gray, 40), "Sep. Monday",  group=_GC, display=display.none)
+C_SEP_D = input.color(color.new(color.gray, 72), "Sep. Tue-Thu", group=_GC, display=display.none)
 
 // --- INPUTS (Styles) ------------------------------------------------
 var string _GS = "Styles"
-STY_GFLIP = input.string("Dashed",  "Gamma Flip",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P1    = input.string("Solid",   "Pos GEX p1",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P2    = input.string("Dashed",  "Pos GEX p2",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P3    = input.string("Dotted",  "Pos GEX p3",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N1    = input.string("Solid",   "Neg GEX n1",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N2    = input.string("Dashed",  "Neg GEX n2",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N3    = input.string("Dotted",  "Neg GEX n3",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_AGG   = input.string("Dotted",  "Aggregate",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_GFLIP = input.string("Dashed",  "Gamma Flip",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_P1    = input.string("Solid",   "Pos GEX p1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_P2    = input.string("Dashed",  "Pos GEX p2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_P3    = input.string("Dotted",  "Pos GEX p3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_N1    = input.string("Solid",   "Neg GEX n1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_N2    = input.string("Dashed",  "Neg GEX n2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_N3    = input.string("Dotted",  "Neg GEX n3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_AGG   = input.string("Dotted",  "Aggregate",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_SEP_W = input.string("Dashed",  "Sep. Monday",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_SEP_D = input.string("Dashed",  "Sep. Tue-Thu",  options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+
+// --- INPUTS (Widths) ------------------------------------------------
+var string _GW = "Widths"
+LW_GEX = input.int(2, "GEX Lines",  minval=1, maxval=4, group=_GW, display=display.none)
+LW_SEP = input.int(2, "Separators", minval=1, maxval=4, group=_GW, display=display.none)
 
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
@@ -66,70 +73,70 @@ if barstate.islast and _valid
     array.clear(_labels)
     // --- Week 0: 2026-04-13 ---
     if not na(_bi0)
-        array.push(_lines, line.new(_bi0, close, _bi0, close + 1, color=C_SEP_W, style=line.style_dashed, width=1, extend=extend.both))
-        array.push(_lines, line.new(_bi0 + D, close, _bi0 + D, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
-        array.push(_lines, line.new(_bi0 + D * 2, close, _bi0 + D * 2, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
-        array.push(_lines, line.new(_bi0 + D * 3, close, _bi0 + D * 3, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
+        array.push(_lines, line.new(_bi0, close, _bi0, close + 1, color=C_SEP_W, style=f_style(STY_SEP_W), width=LW_SEP, extend=extend.both))
+        array.push(_lines, line.new(_bi0 + D, close, _bi0 + D, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP, extend=extend.both))
+        array.push(_lines, line.new(_bi0 + D * 2, close, _bi0 + D * 2, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP, extend=extend.both))
+        array.push(_lines, line.new(_bi0 + D * 3, close, _bi0 + D * 3, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP, extend=extend.both))
         float _p0_0 = _is_spx ? 6667.0 : 23825.0
         if not na(_p0_0)
-            array.push(_lines, line.new(_bi0, _p0_0, _bi0 + W, _p0_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=2))
+            array.push(_lines, line.new(_bi0, _p0_0, _bi0 + W, _p0_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_0, "g-flip " + str.tostring(math.round(_p0_0)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=size.small))
         float _p0_1 = _is_spx ? 7000.0 : 25900.0
         if not na(_p0_1)
-            array.push(_lines, line.new(_bi0, _p0_1, _bi0 + W, _p0_1, color=C_POS, style=f_style(STY_P1), width=2))
+            array.push(_lines, line.new(_bi0, _p0_1, _bi0 + W, _p0_1, color=C_POS, style=f_style(STY_P1), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_1, "p1 + agg " + str.tostring(math.round(_p0_1)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p0_2 = _is_spx ? 6900.0 : 25300.0
         if not na(_p0_2)
-            array.push(_lines, line.new(_bi0, _p0_2, _bi0 + W, _p0_2, color=C_POS, style=f_style(STY_P2), width=2))
+            array.push(_lines, line.new(_bi0, _p0_2, _bi0 + W, _p0_2, color=C_POS, style=f_style(STY_P2), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_2, "p2 " + str.tostring(math.round(_p0_2)) + (_is_spx ? "" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p0_3 = _is_spx ? 7100.0 : 25700.0
         if not na(_p0_3)
-            array.push(_lines, line.new(_bi0, _p0_3, _bi0 + W, _p0_3, color=C_POS, style=f_style(STY_P3), width=2))
+            array.push(_lines, line.new(_bi0, _p0_3, _bi0 + W, _p0_3, color=C_POS, style=f_style(STY_P3), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_3, "p3 " + str.tostring(math.round(_p0_3)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p0_4 = _is_spx ? 6800.0 : 24500.0
         if not na(_p0_4)
-            array.push(_lines, line.new(_bi0, _p0_4, _bi0 + W, _p0_4, color=C_NEG, style=f_style(STY_N1), width=2))
+            array.push(_lines, line.new(_bi0, _p0_4, _bi0 + W, _p0_4, color=C_NEG, style=f_style(STY_N1), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_4, "n1 " + str.tostring(math.round(_p0_4)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
         float _p0_5 = _is_spx ? 6700.0 : 24800.0
         if not na(_p0_5)
-            array.push(_lines, line.new(_bi0, _p0_5, _bi0 + W, _p0_5, color=C_NEG, style=f_style(STY_N2), width=2))
+            array.push(_lines, line.new(_bi0, _p0_5, _bi0 + W, _p0_5, color=C_NEG, style=f_style(STY_N2), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_5, "n2 " + str.tostring(math.round(_p0_5)) + (_is_spx ? "" : " ★"), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
         float _p0_6 = _is_spx ? 6755.0 : 24000.0
         if not na(_p0_6)
-            array.push(_lines, line.new(_bi0, _p0_6, _bi0 + W, _p0_6, color=C_NEG, style=f_style(STY_N3), width=2))
+            array.push(_lines, line.new(_bi0, _p0_6, _bi0 + W, _p0_6, color=C_NEG, style=f_style(STY_N3), width=LW_GEX))
             array.push(_labels, label.new(_bi0 + W, _p0_6, "n3 " + str.tostring(math.round(_p0_6)) + (_is_spx ? "" : " ★"), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
 
     // --- Week 1: 2026-04-20 ---
     if not na(_bi1)
-        array.push(_lines, line.new(_bi1, close, _bi1, close + 1, color=C_SEP_W, style=line.style_dashed, width=1, extend=extend.both))
-        array.push(_lines, line.new(_bi1 + D, close, _bi1 + D, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
-        array.push(_lines, line.new(_bi1 + D * 2, close, _bi1 + D * 2, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
-        array.push(_lines, line.new(_bi1 + D * 3, close, _bi1 + D * 3, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
+        array.push(_lines, line.new(_bi1, close, _bi1, close + 1, color=C_SEP_W, style=f_style(STY_SEP_W), width=LW_SEP, extend=extend.both))
+        array.push(_lines, line.new(_bi1 + D, close, _bi1 + D, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP, extend=extend.both))
+        array.push(_lines, line.new(_bi1 + D * 2, close, _bi1 + D * 2, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP, extend=extend.both))
+        array.push(_lines, line.new(_bi1 + D * 3, close, _bi1 + D * 3, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP, extend=extend.both))
         float _p1_0 = _is_spx ? 6625.0 : 25700.0
         if not na(_p1_0)
-            array.push(_lines, line.new(_bi1, _p1_0, _bi1 + W, _p1_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=2))
+            array.push(_lines, line.new(_bi1, _p1_0, _bi1 + W, _p1_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_0, "g-flip " + str.tostring(math.round(_p1_0)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=size.small))
         float _p1_1 = _is_spx ? 7050.0 : 25850.0
         if not na(_p1_1)
-            array.push(_lines, line.new(_bi1, _p1_1, _bi1 + W, _p1_1, color=C_POS, style=f_style(STY_P1), width=2))
+            array.push(_lines, line.new(_bi1, _p1_1, _bi1 + W, _p1_1, color=C_POS, style=f_style(STY_P1), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_1, "p1 + agg " + str.tostring(math.round(_p1_1)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p1_2 = _is_spx ? 7200.0 : 25750.0
         if not na(_p1_2)
-            array.push(_lines, line.new(_bi1, _p1_2, _bi1 + W, _p1_2, color=C_POS, style=f_style(STY_P2), width=2))
+            array.push(_lines, line.new(_bi1, _p1_2, _bi1 + W, _p1_2, color=C_POS, style=f_style(STY_P2), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_2, "p2 " + str.tostring(math.round(_p1_2)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p1_3 = _is_spx ? 7100.0 : 26250.0
         if not na(_p1_3)
-            array.push(_lines, line.new(_bi1, _p1_3, _bi1 + W, _p1_3, color=C_POS, style=f_style(STY_P3), width=2))
+            array.push(_lines, line.new(_bi1, _p1_3, _bi1 + W, _p1_3, color=C_POS, style=f_style(STY_P3), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_3, "p3 " + str.tostring(math.round(_p1_3)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
         float _p1_4 = _is_spx ? 6800.0 : 26080.0
         if not na(_p1_4)
-            array.push(_lines, line.new(_bi1, _p1_4, _bi1 + W, _p1_4, color=C_NEG, style=f_style(STY_N1), width=2))
+            array.push(_lines, line.new(_bi1, _p1_4, _bi1 + W, _p1_4, color=C_NEG, style=f_style(STY_N1), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_4, "n1 " + str.tostring(math.round(_p1_4)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
         float _p1_5 = _is_spx ? 7030.0 : 26160.0
         if not na(_p1_5)
-            array.push(_lines, line.new(_bi1, _p1_5, _bi1 + W, _p1_5, color=C_NEG, style=f_style(STY_N2), width=2))
+            array.push(_lines, line.new(_bi1, _p1_5, _bi1 + W, _p1_5, color=C_NEG, style=f_style(STY_N2), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_5, "n2 " + str.tostring(math.round(_p1_5)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
         float _p1_6 = _is_spx ? 6850.0 : 26070.0
         if not na(_p1_6)
-            array.push(_lines, line.new(_bi1, _p1_6, _bi1 + W, _p1_6, color=C_NEG, style=f_style(STY_N3), width=2))
+            array.push(_lines, line.new(_bi1, _p1_6, _bi1 + W, _p1_6, color=C_NEG, style=f_style(STY_N3), width=LW_GEX))
             array.push(_labels, label.new(_bi1 + W, _p1_6, "n3 " + str.tostring(math.round(_p1_6)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))

@@ -80,23 +80,30 @@ _valid  = _is_spx or _is_ndx
 
 // --- INPUTS (Colors) ------------------------------------------------
 var string _GC = "Colors"
-C_GFLIP = input.color(color.rgb(128, 0, 200),                "Gamma Flip",   group=_GC, display=display.none)
-C_POS   = input.color(color.rgb(0, 200, 83),                 "Positive GEX", group=_GC, display=display.none)
-C_NEG   = input.color(color.rgb(255, 23, 68),                "Negative GEX", group=_GC, display=display.none)
-C_AGG   = input.color(color.rgb(170, 0, 255),                "Aggregate",    group=_GC, display=display.none)
-C_SEP_W = color.new(color.gray, 40)
-C_SEP_D = color.new(color.gray, 72)
+C_GFLIP = input.color(color.rgb(128, 0, 200),   "Gamma Flip",    group=_GC, display=display.none)
+C_POS   = input.color(color.rgb(0, 200, 83),    "Positive GEX",  group=_GC, display=display.none)
+C_NEG   = input.color(color.rgb(255, 23, 68),   "Negative GEX",  group=_GC, display=display.none)
+C_AGG   = input.color(color.rgb(170, 0, 255),   "Aggregate",     group=_GC, display=display.none)
+C_SEP_W = input.color(color.new(color.gray, 40), "Sep. Monday",  group=_GC, display=display.none)
+C_SEP_D = input.color(color.new(color.gray, 72), "Sep. Tue-Thu", group=_GC, display=display.none)
 
 // --- INPUTS (Styles) ------------------------------------------------
 var string _GS = "Styles"
-STY_GFLIP = input.string("Dashed",  "Gamma Flip",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P1    = input.string("Solid",   "Pos GEX p1",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P2    = input.string("Dashed",  "Pos GEX p2",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P3    = input.string("Dotted",  "Pos GEX p3",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N1    = input.string("Solid",   "Neg GEX n1",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N2    = input.string("Dashed",  "Neg GEX n2",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N3    = input.string("Dotted",  "Neg GEX n3",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_AGG   = input.string("Dotted",  "Aggregate",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_GFLIP = input.string("Dashed",  "Gamma Flip",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_P1    = input.string("Solid",   "Pos GEX p1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_P2    = input.string("Dashed",  "Pos GEX p2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_P3    = input.string("Dotted",  "Pos GEX p3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_N1    = input.string("Solid",   "Neg GEX n1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_N2    = input.string("Dashed",  "Neg GEX n2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_N3    = input.string("Dotted",  "Neg GEX n3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_AGG   = input.string("Dotted",  "Aggregate",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_SEP_W = input.string("Dashed",  "Sep. Monday",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+STY_SEP_D = input.string("Dashed",  "Sep. Tue-Thu",  options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+
+// --- INPUTS (Widths) ------------------------------------------------
+var string _GW = "Widths"
+LW_GEX = input.int(2, "GEX Lines",  minval=1, maxval=4, group=_GW, display=display.none)
+LW_SEP = input.int(2, "Separators", minval=1, maxval=4, group=_GW, display=display.none)
 
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
@@ -425,15 +432,15 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
         ]
 
         # Vertical separators (identical for both tickers — same calendar)
-        for offset, clr in [
-            (f"_bi{i}",         "C_SEP_W"),
-            (f"_bi{i} + D",     "C_SEP_D"),
-            (f"_bi{i} + D * 2", "C_SEP_D"),
-            (f"_bi{i} + D * 3", "C_SEP_D"),
+        for offset, clr, sty in [
+            (f"_bi{i}",         "C_SEP_W", "STY_SEP_W"),
+            (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D"),
+            (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D"),
+            (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D"),
         ]:
             block.append(
                 f"        array.push(_lines, line.new({offset}, close, {offset}, close + 1, "
-                f"color={clr}, style=line.style_dashed, width=1, extend=extend.both))"
+                f"color={clr}, style=f_style({sty}), width=LW_SEP, extend=extend.both))"
             )
 
         # GEX level lines — merge overlapping strikes into combined labels
@@ -477,7 +484,7 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
                 f"        float {var} = _is_spx ? {spx_val} : {ndx_val}",
                 f"        if not na({var})",
                 f"            array.push(_lines, line.new(_bi{i}, {var}, _bi{i} + W, {var}, "
-                f"color={clr}, style=f_style({sty}), width=2))",
+                f"color={clr}, style=f_style({sty}), width=LW_GEX))",
                 f"            array.push(_labels, label.new(_bi{i} + W, {var}, "
                 f"{lbl_expr}, color=color.new(color.black, 100), textcolor={clr}, "
                 f"style=label.style_none, size=size.small))",
