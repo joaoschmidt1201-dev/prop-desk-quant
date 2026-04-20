@@ -3,8 +3,8 @@
 // GEX Weekly Levels [TradingLitt Style] — SPX + NDX — AUTO-GENERATED
 // DO NOT EDIT MANUALLY. Regenerate via:
 //   python scripts/gex_csv_parser.py <csv_path> --week YYYY-MM-DD
-// Last updated : 2026-04-15
-// Weeks stored : 1
+// Last updated : 2026-04-20
+// Weeks stored : 2
 // =======================================================================
 indicator("GEX Weekly Levels [TradingLitt]", overlay=true, max_lines_count=500, max_labels_count=500, shorttitle="GEX Levels")
 
@@ -45,9 +45,12 @@ D = 26
 
 // --- MONDAY BAR INDEX DETECTION (auto-generated) --------------------
 var int _bi0 = na
+var int _bi1 = na
 
 if is_week_start(1776087000000) and _valid
     _bi0 := bar_index
+if is_week_start(1776691800000) and _valid
+    _bi1 := bar_index
 
 // --- GLOBAL LINE / LABEL STORAGE ------------------------------------
 var line[]  _lines  = array.new_line()
@@ -95,3 +98,38 @@ if barstate.islast and _valid
         if not na(_p0_6)
             array.push(_lines, line.new(_bi0, _p0_6, _bi0 + W, _p0_6, color=C_NEG, style=f_style(STY_N3), width=2))
             array.push(_labels, label.new(_bi0 + W, _p0_6, "n3 " + str.tostring(math.round(_p0_6)) + (_is_spx ? "" : " ★"), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
+
+    // --- Week 1: 2026-04-20 ---
+    if not na(_bi1)
+        array.push(_lines, line.new(_bi1, close, _bi1, close + 1, color=C_SEP_W, style=line.style_dashed, width=1, extend=extend.both))
+        array.push(_lines, line.new(_bi1 + D, close, _bi1 + D, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
+        array.push(_lines, line.new(_bi1 + D * 2, close, _bi1 + D * 2, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
+        array.push(_lines, line.new(_bi1 + D * 3, close, _bi1 + D * 3, close + 1, color=C_SEP_D, style=line.style_dashed, width=1, extend=extend.both))
+        float _p1_0 = _is_spx ? 6625.0 : 25700.0
+        if not na(_p1_0)
+            array.push(_lines, line.new(_bi1, _p1_0, _bi1 + W, _p1_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_0, "g-flip " + str.tostring(math.round(_p1_0)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=size.small))
+        float _p1_1 = _is_spx ? 7050.0 : 25850.0
+        if not na(_p1_1)
+            array.push(_lines, line.new(_bi1, _p1_1, _bi1 + W, _p1_1, color=C_POS, style=f_style(STY_P1), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_1, "p1 + agg " + str.tostring(math.round(_p1_1)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
+        float _p1_2 = _is_spx ? 7200.0 : 25750.0
+        if not na(_p1_2)
+            array.push(_lines, line.new(_bi1, _p1_2, _bi1 + W, _p1_2, color=C_POS, style=f_style(STY_P2), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_2, "p2 " + str.tostring(math.round(_p1_2)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
+        float _p1_3 = _is_spx ? 7100.0 : 26250.0
+        if not na(_p1_3)
+            array.push(_lines, line.new(_bi1, _p1_3, _bi1 + W, _p1_3, color=C_POS, style=f_style(STY_P3), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_3, "p3 " + str.tostring(math.round(_p1_3)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
+        float _p1_4 = _is_spx ? 6800.0 : 26080.0
+        if not na(_p1_4)
+            array.push(_lines, line.new(_bi1, _p1_4, _bi1 + W, _p1_4, color=C_NEG, style=f_style(STY_N1), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_4, "n1 " + str.tostring(math.round(_p1_4)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
+        float _p1_5 = _is_spx ? 7030.0 : 26160.0
+        if not na(_p1_5)
+            array.push(_lines, line.new(_bi1, _p1_5, _bi1 + W, _p1_5, color=C_NEG, style=f_style(STY_N2), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_5, "n2 " + str.tostring(math.round(_p1_5)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
+        float _p1_6 = _is_spx ? 6850.0 : 26070.0
+        if not na(_p1_6)
+            array.push(_lines, line.new(_bi1, _p1_6, _bi1 + W, _p1_6, color=C_NEG, style=f_style(STY_N3), width=2))
+            array.push(_labels, label.new(_bi1 + W, _p1_6, "n3 " + str.tostring(math.round(_p1_6)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
