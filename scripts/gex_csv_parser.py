@@ -102,8 +102,16 @@ STY_SEP_D = input.string("Dashed",  "Sep. Tue-Thu",  options=["Solid", "Dashed",
 
 // --- INPUTS (Widths) ------------------------------------------------
 var string _GW = "Widths"
-LW_GEX = input.int(2, "GEX Lines",  minval=1, maxval=4, group=_GW, display=display.none)
-LW_SEP = input.int(2, "Separators", minval=1, maxval=4, group=_GW, display=display.none)
+LW_GFLIP  = input.int(2, "Gamma Flip",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_P1     = input.int(2, "Pos GEX p1",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_P2     = input.int(1, "Pos GEX p2",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_P3     = input.int(1, "Pos GEX p3",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_N1     = input.int(2, "Neg GEX n1",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_N2     = input.int(1, "Neg GEX n2",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_N3     = input.int(1, "Neg GEX n3",   minval=1, maxval=4, group=_GW, display=display.none)
+LW_AGG    = input.int(1, "Aggregate",    minval=1, maxval=4, group=_GW, display=display.none)
+LW_SEP_W  = input.int(2, "Sep. Monday",  minval=1, maxval=4, group=_GW, display=display.none)
+LW_SEP_D  = input.int(2, "Sep. Tue-Thu", minval=1, maxval=4, group=_GW, display=display.none)
 
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
@@ -380,16 +388,16 @@ def _is_conf(price: int | None, conf_list: list[int], tol: int) -> bool:
     return any(abs(price - c) <= tol for c in conf_list)
 
 
-# Each entry: (json_key, list_rank_or_None, label_prefix, color_var, style_var)
+# Each entry: (json_key, list_rank_or_None, label_prefix, color_var, style_var, width_var)
 LEVEL_SPEC = [
-    ("gflip",    None, "g-flip",   "C_GFLIP", "STY_GFLIP"),
-    ("pos",      0,    "p1",       "C_POS",   "STY_P1"),
-    ("pos",      1,    "p2",       "C_POS",   "STY_P2"),
-    ("pos",      2,    "p3",       "C_POS",   "STY_P3"),
-    ("neg",      0,    "n1",       "C_NEG",   "STY_N1"),
-    ("neg",      1,    "n2",       "C_NEG",   "STY_N2"),
-    ("neg",      2,    "n3",       "C_NEG",   "STY_N3"),
-    ("agg",      None, "agg",      "C_AGG",   "STY_AGG"),
+    ("gflip",    None, "g-flip",   "C_GFLIP", "STY_GFLIP", "LW_GFLIP"),
+    ("pos",      0,    "p1",       "C_POS",   "STY_P1",    "LW_P1"),
+    ("pos",      1,    "p2",       "C_POS",   "STY_P2",    "LW_P2"),
+    ("pos",      2,    "p3",       "C_POS",   "STY_P3",    "LW_P3"),
+    ("neg",      0,    "n1",       "C_NEG",   "STY_N1",    "LW_N1"),
+    ("neg",      1,    "n2",       "C_NEG",   "STY_N2",    "LW_N2"),
+    ("neg",      2,    "n3",       "C_NEG",   "STY_N3",    "LW_N3"),
+    ("agg",      None, "agg",      "C_AGG",   "STY_AGG",   "LW_AGG"),
 ]
 
 
@@ -414,7 +422,8 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
     draw_blocks         = []
 
     for i, week_date in enumerate(all_weeks):
-        mon_ts = monday_ts_ms(week_date)
+        mon_ts     = monday_ts_ms(week_date)
+        is_current = (i == len(all_weeks) - 1)
         spx_e  = spx_by_week.get(week_date)
         ndx_e  = ndx_by_week.get(week_date)
 
@@ -432,41 +441,41 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
         ]
 
         # Vertical separators (identical for both tickers — same calendar)
-        for offset, clr, sty in [
-            (f"_bi{i}",         "C_SEP_W", "STY_SEP_W"),
-            (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D"),
-            (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D"),
-            (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D"),
+        for offset, clr, sty, lw in [
+            (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
+            (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+            (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+            (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
         ]:
             block.append(
                 f"        array.push(_lines, line.new({offset}, close, {offset}, close + 1, "
-                f"color={clr}, style=f_style({sty}), width=LW_SEP, extend=extend.both))"
+                f"color={clr}, style=f_style({sty}), width={lw}, extend=extend.both))"
             )
 
         # GEX level lines — merge overlapping strikes into combined labels
-        # Step 1: collect all (spx_p, ndx_p, lbl, clr, sty) entries
+        # Step 1: collect all (spx_p, ndx_p, lbl, clr, sty, lw) entries
         raw_levels = []
-        for key, rank, lbl, clr, sty in LEVEL_SPEC:
+        for key, rank, lbl, clr, sty, lw in LEVEL_SPEC:
             spx_p = _get_price(spx_e, key, rank)
             ndx_p = _get_price(ndx_e, key, rank)
             if spx_p is None and ndx_p is None:
                 continue
-            raw_levels.append((spx_p, ndx_p, lbl, clr, sty))
+            raw_levels.append((spx_p, ndx_p, lbl, clr, sty, lw))
 
         # Step 2: merge entries that share the same (spx_price, ndx_price) pair
-        # First entry in LEVEL_SPEC order wins for color/style; labels are concatenated
+        # First entry in LEVEL_SPEC order wins for color/style/width; labels are concatenated
         seen_pairs: dict[tuple, int] = {}
-        merged_levels: list[list] = []  # [spx_p, ndx_p, combined_lbl, clr, sty]
-        for spx_p, ndx_p, lbl, clr, sty in raw_levels:
+        merged_levels: list[list] = []  # [spx_p, ndx_p, combined_lbl, clr, sty, lw]
+        for spx_p, ndx_p, lbl, clr, sty, lw in raw_levels:
             pair = (spx_p, ndx_p)
             if pair not in seen_pairs:
                 seen_pairs[pair] = len(merged_levels)
-                merged_levels.append([spx_p, ndx_p, lbl, clr, sty])
+                merged_levels.append([spx_p, ndx_p, lbl, clr, sty, lw])
             else:
                 merged_levels[seen_pairs[pair]][2] += f" + {lbl}"
 
         # Step 3: generate Pine variables for each merged entry
-        for spec_i, (spx_p, ndx_p, combined_lbl, clr, sty) in enumerate(merged_levels):
+        for spec_i, (spx_p, ndx_p, combined_lbl, clr, sty, lw) in enumerate(merged_levels):
             var     = f"_p{i}_{spec_i}"
             spx_val = _pf(spx_p)
             ndx_val = _pf(ndx_p)
@@ -484,11 +493,14 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
                 f"        float {var} = _is_spx ? {spx_val} : {ndx_val}",
                 f"        if not na({var})",
                 f"            array.push(_lines, line.new(_bi{i}, {var}, _bi{i} + W, {var}, "
-                f"color={clr}, style=f_style({sty}), width=LW_GEX))",
-                f"            array.push(_labels, label.new(_bi{i} + W, {var}, "
-                f"{lbl_expr}, color=color.new(color.black, 100), textcolor={clr}, "
-                f"style=label.style_none, size=size.small))",
+                f"color={clr}, style=f_style({sty}), width={lw}))",
             ]
+            if is_current:
+                block.append(
+                    f"            array.push(_labels, label.new(_bi{i} + W, {var}, "
+                    f"{lbl_expr}, color=color.new(color.black, 100), textcolor={clr}, "
+                    f"style=label.style_none, size=size.small))"
+                )
 
         draw_blocks.append("\n".join(block))
 
