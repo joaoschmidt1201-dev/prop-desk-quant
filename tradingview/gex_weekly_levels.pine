@@ -1,9 +1,9 @@
 //@version=5
 // =======================================================================
-// GEX Weekly Levels [TradingLitt Style] — SPX + NDX — AUTO-GENERATED
+// GEX Weekly Levels [TradingLitt Style] — SPX + NDX + SPY + QQQ — AUTO-GENERATED
 // DO NOT EDIT MANUALLY. Regenerate via:
 //   python scripts/gex_csv_parser.py <csv_path> --week YYYY-MM-DD
-// Last updated : 2026-04-20
+// Last updated : 2026-04-21
 // Weeks stored : 2
 // =======================================================================
 indicator("GEX Weekly Levels [TradingLitt]", overlay=true, max_lines_count=500, max_labels_count=500, shorttitle="GEX Levels")
@@ -11,52 +11,90 @@ indicator("GEX Weekly Levels [TradingLitt]", overlay=true, max_lines_count=500, 
 // --- TICKER DETECTION -----------------------------------------------
 _is_spx = syminfo.ticker == "SPX" or str.contains(syminfo.ticker, "ES1")
 _is_ndx = syminfo.ticker == "NDX" or str.contains(syminfo.ticker, "NQ1")
-_valid  = _is_spx or _is_ndx
+_is_spy = syminfo.ticker == "SPY"
+_is_qqq = syminfo.ticker == "QQQ"
+_valid  = _is_spx or _is_ndx or _is_spy or _is_qqq
 
-// --- INPUTS (Colors) ------------------------------------------------
-var string _GC = "Colors"
-C_GFLIP = input.color(color.rgb(128, 0, 200),   "Gamma Flip",    group=_GC, display=display.none)
-C_POS   = input.color(color.rgb(0, 200, 83),    "Positive GEX",  group=_GC, display=display.none)
-C_NEG   = input.color(color.rgb(255, 23, 68),   "Negative GEX",  group=_GC, display=display.none)
-C_AGG   = input.color(color.rgb(170, 0, 255),   "Aggregate",     group=_GC, display=display.none)
-C_SEP_W = input.color(color.new(color.gray, 40), "Sep. Monday",  group=_GC, display=display.none)
-C_SEP_D = input.color(color.new(color.gray, 72), "Sep. Tue-Thu", group=_GC, display=display.none)
+// --- INPUTS (Indicator Inputs) --------------------------------------
+var string _GI = "Indicator Inputs"
+SHOW_TS    = input.bool(false,     "Show Timestamp",    group=_GI)
+SHORT_NAME = input.bool(false,     "Short Name",        group=_GI)
+LBL_POS    = input.string("Right", "Labels Position",   group=_GI, options=["Right", "Left", "Center"])
+LBL_OFFSET = input.int(0,          "Labels Offset",     group=_GI, minval=-200, maxval=200)
+LBL_SIZE   = input.string("Small", "Labels Text Size",  group=_GI, options=["Tiny", "Small", "Normal", "Large"])
 
-// --- INPUTS (Styles) ------------------------------------------------
-var string _GS = "Styles"
-STY_GFLIP = input.string("Dashed",  "Gamma Flip",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P1    = input.string("Solid",   "Pos GEX p1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P2    = input.string("Dashed",  "Pos GEX p2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P3    = input.string("Dotted",  "Pos GEX p3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N1    = input.string("Solid",   "Neg GEX n1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N2    = input.string("Dashed",  "Neg GEX n2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N3    = input.string("Dotted",  "Neg GEX n3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_AGG   = input.string("Dotted",  "Aggregate",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_SEP_W = input.string("Dashed",  "Sep. Monday",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_SEP_D = input.string("Dashed",  "Sep. Tue-Thu",  options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+// --- INPUTS (Level Settings) — cor + estilo + largura por linha -----
+var string _GLS = "Level Settings"
+C_GFLIP   = input.color( color.rgb(128, 0, 200),     "Gamma Flip  ", group=_GLS, inline="gflip",  display=display.none)
+STY_GFLIP = input.string("Dashed", "",                group=_GLS, inline="gflip",  options=["Solid","Dashed","Dotted"], display=display.none)
+LW_GFLIP  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="gflip",  display=display.none)
 
-// --- INPUTS (Widths) ------------------------------------------------
-var string _GW = "Widths"
-LW_GFLIP  = input.int(2, "Gamma Flip",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_P1     = input.int(2, "Pos GEX p1",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_P2     = input.int(1, "Pos GEX p2",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_P3     = input.int(1, "Pos GEX p3",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_N1     = input.int(2, "Neg GEX n1",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_N2     = input.int(1, "Neg GEX n2",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_N3     = input.int(1, "Neg GEX n3",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_AGG    = input.int(1, "Aggregate",    minval=1, maxval=4, group=_GW, display=display.none)
-LW_SEP_W  = input.int(2, "Sep. Monday",  minval=1, maxval=4, group=_GW, display=display.none)
-LW_SEP_D  = input.int(2, "Sep. Tue-Thu", minval=1, maxval=4, group=_GW, display=display.none)
+C_P1    = input.color( color.rgb(0, 200, 83),        "Pos GEX p1  ", group=_GLS, inline="p1",    display=display.none)
+STY_P1  = input.string("Solid",  "",                 group=_GLS, inline="p1",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_P1   = input.int(2,  "",      minval=1, maxval=4,  group=_GLS, inline="p1",    display=display.none)
 
+C_P2    = input.color( color.rgb(0, 200, 83),        "Pos GEX p2  ", group=_GLS, inline="p2",    display=display.none)
+STY_P2  = input.string("Dashed", "",                 group=_GLS, inline="p2",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_P2   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="p2",    display=display.none)
+
+C_P3    = input.color( color.rgb(0, 200, 83),        "Pos GEX p3  ", group=_GLS, inline="p3",    display=display.none)
+STY_P3  = input.string("Dotted", "",                 group=_GLS, inline="p3",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_P3   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="p3",    display=display.none)
+
+C_N1    = input.color( color.rgb(255, 23, 68),       "Neg GEX n1  ", group=_GLS, inline="n1",    display=display.none)
+STY_N1  = input.string("Solid",  "",                 group=_GLS, inline="n1",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_N1   = input.int(2,  "",      minval=1, maxval=4,  group=_GLS, inline="n1",    display=display.none)
+
+C_N2    = input.color( color.rgb(255, 23, 68),       "Neg GEX n2  ", group=_GLS, inline="n2",    display=display.none)
+STY_N2  = input.string("Dashed", "",                 group=_GLS, inline="n2",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_N2   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="n2",    display=display.none)
+
+C_N3    = input.color( color.rgb(255, 23, 68),       "Neg GEX n3  ", group=_GLS, inline="n3",    display=display.none)
+STY_N3  = input.string("Dotted", "",                 group=_GLS, inline="n3",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_N3   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="n3",    display=display.none)
+
+C_AGG   = input.color( color.rgb(170, 0, 255),       "Aggregate   ", group=_GLS, inline="agg",   display=display.none)
+STY_AGG = input.string("Dotted", "",                 group=_GLS, inline="agg",   options=["Solid","Dashed","Dotted"], display=display.none)
+LW_AGG  = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="agg",   display=display.none)
+
+C_SEP_W   = input.color( color.new(color.gray, 40),  "Sep. Monday ", group=_GLS, inline="sep_w", display=display.none)
+STY_SEP_W = input.string("Dashed", "",                group=_GLS, inline="sep_w", options=["Solid","Dashed","Dotted"], display=display.none)
+LW_SEP_W  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="sep_w", display=display.none)
+
+C_SEP_D   = input.color( color.new(color.gray, 72),  "Sep. Tue-Thu", group=_GLS, inline="sep_d", display=display.none)
+STY_SEP_D = input.string("Dashed", "",                group=_GLS, inline="sep_d", options=["Solid","Dashed","Dotted"], display=display.none)
+LW_SEP_D  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="sep_d", display=display.none)
+
+// --- INPUTS (Single Levels) — toggle por level ----------------------
+var string _GSL = "Single Levels"
+SH_GFLIP = input.bool(true, "Gamma Flip", group=_GSL)
+SH_P1    = input.bool(true, "Pos GEX p1", group=_GSL)
+SH_P2    = input.bool(true, "Pos GEX p2", group=_GSL)
+SH_P3    = input.bool(true, "Pos GEX p3", group=_GSL)
+SH_N1    = input.bool(true, "Neg GEX n1", group=_GSL)
+SH_N2    = input.bool(true, "Neg GEX n2", group=_GSL)
+SH_N3    = input.bool(true, "Neg GEX n3", group=_GSL)
+SH_AGG   = input.bool(true, "Aggregate",  group=_GSL)
+
+// --- CONSTANTS ------------------------------------------------------
+// D = bars per trading day; W = bars per week — auto-adapted to any timeframe
+// US equity session: 9:30-16:00 = 390 minutes
+int D = timeframe.isintraday ? math.max(1, math.round(390.0 / (timeframe.in_seconds() / 60.0))) : 1
+int W = D * 5
+string _update_date = "2026-04-21"
+
+// --- HELPERS --------------------------------------------------------
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
 
-// True on the first 15m bar of a given Monday (by timestamp)
-is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
+f_lbl_x(bi, lpos, loff) =>
+    lpos == "Left" ? bi + loff : lpos == "Center" ? bi + W / 2 + loff : bi + W + loff
 
-// 15m chart: 26 bars/day, 130 bars/week
-W = 130
-D = 26
+f_lbl_size(s) =>
+    s == "Tiny" ? size.tiny : s == "Large" ? size.large : s == "Normal" ? size.normal : size.small
+
+// True on the first bar of a given Monday (by timestamp)
+is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
 
 // --- MONDAY BAR INDEX DETECTION (auto-generated) --------------------
 var int _bi0 = na
@@ -85,27 +123,50 @@ if barstate.islast and _valid
         array.push(_lines, line.new(_bi0 + D, close, _bi0 + D, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP_D, extend=extend.both))
         array.push(_lines, line.new(_bi0 + D * 2, close, _bi0 + D * 2, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP_D, extend=extend.both))
         array.push(_lines, line.new(_bi0 + D * 3, close, _bi0 + D * 3, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP_D, extend=extend.both))
-        float _p0_0 = _is_spx ? 6667.0 : 23825.0
-        if not na(_p0_0)
-            array.push(_lines, line.new(_bi0, _p0_0, _bi0 + W, _p0_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
-        float _p0_1 = _is_spx ? 7000.0 : 25900.0
-        if not na(_p0_1)
-            array.push(_lines, line.new(_bi0, _p0_1, _bi0 + W, _p0_1, color=C_POS, style=f_style(STY_P1), width=LW_P1))
-        float _p0_2 = _is_spx ? 6900.0 : 25300.0
-        if not na(_p0_2)
-            array.push(_lines, line.new(_bi0, _p0_2, _bi0 + W, _p0_2, color=C_POS, style=f_style(STY_P2), width=LW_P2))
-        float _p0_3 = _is_spx ? 7100.0 : 25700.0
-        if not na(_p0_3)
-            array.push(_lines, line.new(_bi0, _p0_3, _bi0 + W, _p0_3, color=C_POS, style=f_style(STY_P3), width=LW_P3))
-        float _p0_4 = _is_spx ? 6800.0 : 24500.0
-        if not na(_p0_4)
-            array.push(_lines, line.new(_bi0, _p0_4, _bi0 + W, _p0_4, color=C_NEG, style=f_style(STY_N1), width=LW_N1))
-        float _p0_5 = _is_spx ? 6700.0 : 24800.0
-        if not na(_p0_5)
-            array.push(_lines, line.new(_bi0, _p0_5, _bi0 + W, _p0_5, color=C_NEG, style=f_style(STY_N2), width=LW_N2))
-        float _p0_6 = _is_spx ? 6755.0 : 24000.0
-        if not na(_p0_6)
-            array.push(_lines, line.new(_bi0, _p0_6, _bi0 + W, _p0_6, color=C_NEG, style=f_style(STY_N3), width=LW_N3))
+        if _is_spx
+            float _p0_spx_0 = 6667.0
+            if (SH_GFLIP) and not na(_p0_spx_0)
+                array.push(_lines, line.new(_bi0, _p0_spx_0, _bi0 + W, _p0_spx_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
+            float _p0_spx_1 = 7000.0
+            if (SH_P1 or SH_AGG) and not na(_p0_spx_1)
+                array.push(_lines, line.new(_bi0, _p0_spx_1, _bi0 + W, _p0_spx_1, color=C_P1, style=f_style(STY_P1), width=LW_P1))
+            float _p0_spx_2 = 6900.0
+            if (SH_P2) and not na(_p0_spx_2)
+                array.push(_lines, line.new(_bi0, _p0_spx_2, _bi0 + W, _p0_spx_2, color=C_P2, style=f_style(STY_P2), width=LW_P2))
+            float _p0_spx_3 = 7100.0
+            if (SH_P3) and not na(_p0_spx_3)
+                array.push(_lines, line.new(_bi0, _p0_spx_3, _bi0 + W, _p0_spx_3, color=C_P3, style=f_style(STY_P3), width=LW_P3))
+            float _p0_spx_4 = 6800.0
+            if (SH_N1) and not na(_p0_spx_4)
+                array.push(_lines, line.new(_bi0, _p0_spx_4, _bi0 + W, _p0_spx_4, color=C_N1, style=f_style(STY_N1), width=LW_N1))
+            float _p0_spx_5 = 6700.0
+            if (SH_N2) and not na(_p0_spx_5)
+                array.push(_lines, line.new(_bi0, _p0_spx_5, _bi0 + W, _p0_spx_5, color=C_N2, style=f_style(STY_N2), width=LW_N2))
+            float _p0_spx_6 = 6755.0
+            if (SH_N3) and not na(_p0_spx_6)
+                array.push(_lines, line.new(_bi0, _p0_spx_6, _bi0 + W, _p0_spx_6, color=C_N3, style=f_style(STY_N3), width=LW_N3))
+        if _is_ndx
+            float _p0_ndx_0 = 23825.0
+            if (SH_GFLIP) and not na(_p0_ndx_0)
+                array.push(_lines, line.new(_bi0, _p0_ndx_0, _bi0 + W, _p0_ndx_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
+            float _p0_ndx_1 = 25900.0
+            if (SH_P1 or SH_AGG) and not na(_p0_ndx_1)
+                array.push(_lines, line.new(_bi0, _p0_ndx_1, _bi0 + W, _p0_ndx_1, color=C_P1, style=f_style(STY_P1), width=LW_P1))
+            float _p0_ndx_2 = 25300.0
+            if (SH_P2) and not na(_p0_ndx_2)
+                array.push(_lines, line.new(_bi0, _p0_ndx_2, _bi0 + W, _p0_ndx_2, color=C_P2, style=f_style(STY_P2), width=LW_P2))
+            float _p0_ndx_3 = 25700.0
+            if (SH_P3) and not na(_p0_ndx_3)
+                array.push(_lines, line.new(_bi0, _p0_ndx_3, _bi0 + W, _p0_ndx_3, color=C_P3, style=f_style(STY_P3), width=LW_P3))
+            float _p0_ndx_4 = 24500.0
+            if (SH_N1) and not na(_p0_ndx_4)
+                array.push(_lines, line.new(_bi0, _p0_ndx_4, _bi0 + W, _p0_ndx_4, color=C_N1, style=f_style(STY_N1), width=LW_N1))
+            float _p0_ndx_5 = 24800.0
+            if (SH_N2) and not na(_p0_ndx_5)
+                array.push(_lines, line.new(_bi0, _p0_ndx_5, _bi0 + W, _p0_ndx_5, color=C_N2, style=f_style(STY_N2), width=LW_N2))
+            float _p0_ndx_6 = 24000.0
+            if (SH_N3) and not na(_p0_ndx_6)
+                array.push(_lines, line.new(_bi0, _p0_ndx_6, _bi0 + W, _p0_ndx_6, color=C_N3, style=f_style(STY_N3), width=LW_N3))
 
     // --- Week 1: 2026-04-20 ---
     if not na(_bi1)
@@ -113,31 +174,119 @@ if barstate.islast and _valid
         array.push(_lines, line.new(_bi1 + D, close, _bi1 + D, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP_D, extend=extend.both))
         array.push(_lines, line.new(_bi1 + D * 2, close, _bi1 + D * 2, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP_D, extend=extend.both))
         array.push(_lines, line.new(_bi1 + D * 3, close, _bi1 + D * 3, close + 1, color=C_SEP_D, style=f_style(STY_SEP_D), width=LW_SEP_D, extend=extend.both))
-        float _p1_0 = _is_spx ? 6625.0 : 25700.0
-        if not na(_p1_0)
-            array.push(_lines, line.new(_bi1, _p1_0, _bi1 + W, _p1_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
-            array.push(_labels, label.new(_bi1 + W, _p1_0, "g-flip " + str.tostring(math.round(_p1_0)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=size.small))
-        float _p1_1 = _is_spx ? 7050.0 : 25850.0
-        if not na(_p1_1)
-            array.push(_lines, line.new(_bi1, _p1_1, _bi1 + W, _p1_1, color=C_POS, style=f_style(STY_P1), width=LW_P1))
-            array.push(_labels, label.new(_bi1 + W, _p1_1, "p1 + agg " + str.tostring(math.round(_p1_1)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
-        float _p1_2 = _is_spx ? 7200.0 : 25750.0
-        if not na(_p1_2)
-            array.push(_lines, line.new(_bi1, _p1_2, _bi1 + W, _p1_2, color=C_POS, style=f_style(STY_P2), width=LW_P2))
-            array.push(_labels, label.new(_bi1 + W, _p1_2, "p2 " + str.tostring(math.round(_p1_2)) + (_is_spx ? " ★" : " ★"), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
-        float _p1_3 = _is_spx ? 7100.0 : 26250.0
-        if not na(_p1_3)
-            array.push(_lines, line.new(_bi1, _p1_3, _bi1 + W, _p1_3, color=C_POS, style=f_style(STY_P3), width=LW_P3))
-            array.push(_labels, label.new(_bi1 + W, _p1_3, "p3 " + str.tostring(math.round(_p1_3)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_POS, style=label.style_none, size=size.small))
-        float _p1_4 = _is_spx ? 6800.0 : 26080.0
-        if not na(_p1_4)
-            array.push(_lines, line.new(_bi1, _p1_4, _bi1 + W, _p1_4, color=C_NEG, style=f_style(STY_N1), width=LW_N1))
-            array.push(_labels, label.new(_bi1 + W, _p1_4, "n1 " + str.tostring(math.round(_p1_4)) + (_is_spx ? " ★" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
-        float _p1_5 = _is_spx ? 7030.0 : 26160.0
-        if not na(_p1_5)
-            array.push(_lines, line.new(_bi1, _p1_5, _bi1 + W, _p1_5, color=C_NEG, style=f_style(STY_N2), width=LW_N2))
-            array.push(_labels, label.new(_bi1 + W, _p1_5, "n2 " + str.tostring(math.round(_p1_5)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
-        float _p1_6 = _is_spx ? 6850.0 : 26070.0
-        if not na(_p1_6)
-            array.push(_lines, line.new(_bi1, _p1_6, _bi1 + W, _p1_6, color=C_NEG, style=f_style(STY_N3), width=LW_N3))
-            array.push(_labels, label.new(_bi1 + W, _p1_6, "n3 " + str.tostring(math.round(_p1_6)) + (_is_spx ? "" : ""), color=color.new(color.black, 100), textcolor=C_NEG, style=label.style_none, size=size.small))
+        if _is_spx
+            float _p1_spx_0 = 6845.0
+            if (SH_GFLIP) and not na(_p1_spx_0)
+                array.push(_lines, line.new(_bi1, _p1_spx_0, _bi1 + W, _p1_spx_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_0, (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(_p1_spx_0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spx_1 = 7200.0
+            if (SH_P1) and not na(_p1_spx_1)
+                array.push(_lines, line.new(_bi1, _p1_spx_1, _bi1 + W, _p1_spx_1, color=C_P1, style=f_style(STY_P1), width=LW_P1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_1, (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(_p1_spx_1)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spx_2 = 7150.0
+            if (SH_P2) and not na(_p1_spx_2)
+                array.push(_lines, line.new(_bi1, _p1_spx_2, _bi1 + W, _p1_spx_2, color=C_P2, style=f_style(STY_P2), width=LW_P2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_2, (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(_p1_spx_2)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spx_3 = 7050.0
+            if (SH_P3 or SH_AGG) and not na(_p1_spx_3)
+                array.push(_lines, line.new(_bi1, _p1_spx_3, _bi1 + W, _p1_spx_3, color=C_P3, style=f_style(STY_P3), width=LW_P3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_3, (SHORT_NAME ? "p3 + agg" : "Pos p3 + Aggregate") + " " + str.tostring(math.round(_p1_spx_3)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spx_4 = 7045.0
+            if (SH_N1) and not na(_p1_spx_4)
+                array.push(_lines, line.new(_bi1, _p1_spx_4, _bi1 + W, _p1_spx_4, color=C_N1, style=f_style(STY_N1), width=LW_N1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_4, (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(_p1_spx_4)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spx_5 = 7040.0
+            if (SH_N2) and not na(_p1_spx_5)
+                array.push(_lines, line.new(_bi1, _p1_spx_5, _bi1 + W, _p1_spx_5, color=C_N2, style=f_style(STY_N2), width=LW_N2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_5, (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(_p1_spx_5)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spx_6 = 7100.0
+            if (SH_N3) and not na(_p1_spx_6)
+                array.push(_lines, line.new(_bi1, _p1_spx_6, _bi1 + W, _p1_spx_6, color=C_N3, style=f_style(STY_N3), width=LW_N3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spx_6, (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(_p1_spx_6)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+        if _is_ndx
+            float _p1_ndx_0 = 26380.0
+            if (SH_GFLIP) and not na(_p1_ndx_0)
+                array.push(_lines, line.new(_bi1, _p1_ndx_0, _bi1 + W, _p1_ndx_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_0, (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(_p1_ndx_0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_ndx_1 = 26700.0
+            if (SH_P1 or SH_AGG) and not na(_p1_ndx_1)
+                array.push(_lines, line.new(_bi1, _p1_ndx_1, _bi1 + W, _p1_ndx_1, color=C_P1, style=f_style(STY_P1), width=LW_P1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_1, (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(_p1_ndx_1)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_ndx_2 = 26500.0
+            if (SH_P2) and not na(_p1_ndx_2)
+                array.push(_lines, line.new(_bi1, _p1_ndx_2, _bi1 + W, _p1_ndx_2, color=C_P2, style=f_style(STY_P2), width=LW_P2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_2, (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(_p1_ndx_2)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_ndx_3 = 26600.0
+            if (SH_P3) and not na(_p1_ndx_3)
+                array.push(_lines, line.new(_bi1, _p1_ndx_3, _bi1 + W, _p1_ndx_3, color=C_P3, style=f_style(STY_P3), width=LW_P3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_3, (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(_p1_ndx_3)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_ndx_4 = 26620.0
+            if (SH_N1) and not na(_p1_ndx_4)
+                array.push(_lines, line.new(_bi1, _p1_ndx_4, _bi1 + W, _p1_ndx_4, color=C_N1, style=f_style(STY_N1), width=LW_N1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_4, (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(_p1_ndx_4)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_ndx_5 = 26540.0
+            if (SH_N2) and not na(_p1_ndx_5)
+                array.push(_lines, line.new(_bi1, _p1_ndx_5, _bi1 + W, _p1_ndx_5, color=C_N2, style=f_style(STY_N2), width=LW_N2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_5, (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(_p1_ndx_5)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_ndx_6 = 26710.0
+            if (SH_N3) and not na(_p1_ndx_6)
+                array.push(_lines, line.new(_bi1, _p1_ndx_6, _bi1 + W, _p1_ndx_6, color=C_N3, style=f_style(STY_N3), width=LW_N3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_ndx_6, (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(_p1_ndx_6)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+        if _is_spy
+            float _p1_spy_0 = 699.0
+            if (SH_GFLIP) and not na(_p1_spy_0)
+                array.push(_lines, line.new(_bi1, _p1_spy_0, _bi1 + W, _p1_spy_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_0, (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(_p1_spy_0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spy_1 = 710.0
+            if (SH_P1) and not na(_p1_spy_1)
+                array.push(_lines, line.new(_bi1, _p1_spy_1, _bi1 + W, _p1_spy_1, color=C_P1, style=f_style(STY_P1), width=LW_P1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_1, (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(_p1_spy_1)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spy_2 = 715.0
+            if (SH_P2) and not na(_p1_spy_2)
+                array.push(_lines, line.new(_bi1, _p1_spy_2, _bi1 + W, _p1_spy_2, color=C_P2, style=f_style(STY_P2), width=LW_P2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_2, (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(_p1_spy_2)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spy_3 = 720.0
+            if (SH_P3) and not na(_p1_spy_3)
+                array.push(_lines, line.new(_bi1, _p1_spy_3, _bi1 + W, _p1_spy_3, color=C_P3, style=f_style(STY_P3), width=LW_P3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_3, (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(_p1_spy_3)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spy_4 = 700.0
+            if (SH_N1 or SH_AGG) and not na(_p1_spy_4)
+                array.push(_lines, line.new(_bi1, _p1_spy_4, _bi1 + W, _p1_spy_4, color=C_N1, style=f_style(STY_N1), width=LW_N1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_4, (SHORT_NAME ? "n1 + agg" : "Neg n1 + Aggregate") + " " + str.tostring(math.round(_p1_spy_4)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spy_5 = 702.0
+            if (SH_N2) and not na(_p1_spy_5)
+                array.push(_lines, line.new(_bi1, _p1_spy_5, _bi1 + W, _p1_spy_5, color=C_N2, style=f_style(STY_N2), width=LW_N2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_5, (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(_p1_spy_5)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_spy_6 = 695.0
+            if (SH_N3) and not na(_p1_spy_6)
+                array.push(_lines, line.new(_bi1, _p1_spy_6, _bi1 + W, _p1_spy_6, color=C_N3, style=f_style(STY_N3), width=LW_N3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_spy_6, (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(_p1_spy_6)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+        if _is_qqq
+            float _p1_qqq_0 = 633.0
+            if (SH_GFLIP) and not na(_p1_qqq_0)
+                array.push(_lines, line.new(_bi1, _p1_qqq_0, _bi1 + W, _p1_qqq_0, color=C_GFLIP, style=f_style(STY_GFLIP), width=LW_GFLIP))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_0, (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(_p1_qqq_0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_GFLIP, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_qqq_1 = 660.0
+            if (SH_P1) and not na(_p1_qqq_1)
+                array.push(_lines, line.new(_bi1, _p1_qqq_1, _bi1 + W, _p1_qqq_1, color=C_P1, style=f_style(STY_P1), width=LW_P1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_1, (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(_p1_qqq_1)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_qqq_2 = 648.0
+            if (SH_P2) and not na(_p1_qqq_2)
+                array.push(_lines, line.new(_bi1, _p1_qqq_2, _bi1 + W, _p1_qqq_2, color=C_P2, style=f_style(STY_P2), width=LW_P2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_2, (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(_p1_qqq_2)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_qqq_3 = 635.0
+            if (SH_P3) and not na(_p1_qqq_3)
+                array.push(_lines, line.new(_bi1, _p1_qqq_3, _bi1 + W, _p1_qqq_3, color=C_P3, style=f_style(STY_P3), width=LW_P3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_3, (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(_p1_qqq_3)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_P3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_qqq_4 = 636.0
+            if (SH_N1) and not na(_p1_qqq_4)
+                array.push(_lines, line.new(_bi1, _p1_qqq_4, _bi1 + W, _p1_qqq_4, color=C_N1, style=f_style(STY_N1), width=LW_N1))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_4, (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(_p1_qqq_4)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N1, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_qqq_5 = 645.0
+            if (SH_N2 or SH_AGG) and not na(_p1_qqq_5)
+                array.push(_lines, line.new(_bi1, _p1_qqq_5, _bi1 + W, _p1_qqq_5, color=C_N2, style=f_style(STY_N2), width=LW_N2))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_5, (SHORT_NAME ? "n2 + agg" : "Neg n2 + Aggregate") + " " + str.tostring(math.round(_p1_qqq_5)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N2, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+            float _p1_qqq_6 = 640.0
+            if (SH_N3) and not na(_p1_qqq_6)
+                array.push(_lines, line.new(_bi1, _p1_qqq_6, _bi1 + W, _p1_qqq_6, color=C_N3, style=f_style(STY_N3), width=LW_N3))
+                array.push(_labels, label.new(f_lbl_x(_bi1, LBL_POS, LBL_OFFSET), _p1_qqq_6, (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(_p1_qqq_6)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""), color=color.new(color.black, 100), textcolor=C_N3, style=label.style_none, size=f_lbl_size(LBL_SIZE)))

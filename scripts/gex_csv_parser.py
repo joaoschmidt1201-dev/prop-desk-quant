@@ -2,15 +2,17 @@
 """
 gex_csv_parser.py
 ─────────────────
-Reads a Barchart GEX CSV (SPX or NDX/IUXX) and:
+Reads a Barchart GEX CSV (SPX, NDX, SPY, or QQQ) and:
   1. Calculates all GEX levels (Gamma Flip, p1/p2/p3, n1/n2/n3, coi, poi, agg, zones, confluences)
-  2. Saves to gex_history_spx.json or gex_history_ndx.json
-  3. Regenerates tradingview/gex_weekly_levels.pine (single indicator — auto-switches SPX ↔ NDX)
+  2. Saves to the ticker's history JSON
+  3. Regenerates tradingview/gex_weekly_levels.pine (single indicator — auto-switches ticker)
   4. Prints terminal summary with distances to spot
 
 Usage:
   python scripts/gex_csv_parser.py "data/$SPX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
-  python scripts/gex_csv_parser.py "data/$IUXX-gamma-levels-exp-20260421-monthly.csv" --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/$IUXX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/SPY-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/QQQ-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
 """
 
 import argparse
@@ -40,23 +42,49 @@ ROOT      = Path(__file__).parent.parent
 PINE_FILE = ROOT / "tradingview" / "gex_weekly_levels.pine"
 
 # ─── TICKER CONFIGURATION ─────────────────────────────────────────────────────
+# pine_aliases  : exact syminfo.ticker values to match in Pine
+# pine_contains : substrings to match via str.contains (for futures like ES1!, NQ1!)
 
 TICKER_CONFIG = {
     "SPX": {
-        "filename_prefix": "$SPX-",
+        "filename_prefix": ["$SPX-"],
         "yf_symbol":       "^GSPC",
         "strike_min":      4000,
         "strike_max":      10000,
         "history_file":    ROOT / "gex_history_spx.json",
         "conf_tol":        5,
+        "pine_aliases":    ["SPX"],
+        "pine_contains":   ["ES1"],
     },
     "NDX": {
-        "filename_prefix": "$IUXX-",
+        "filename_prefix": ["$IUXX-"],
         "yf_symbol":       "^NDX",
         "strike_min":      15000,
         "strike_max":      30000,
         "history_file":    ROOT / "gex_history_ndx.json",
         "conf_tol":        25,
+        "pine_aliases":    ["NDX"],
+        "pine_contains":   ["NQ1"],
+    },
+    "SPY": {
+        "filename_prefix": ["SPY-", "$SPY-"],
+        "yf_symbol":       "SPY",
+        "strike_min":      200,
+        "strike_max":      800,
+        "history_file":    ROOT / "gex_history_spy.json",
+        "conf_tol":        2,
+        "pine_aliases":    ["SPY"],
+        "pine_contains":   [],
+    },
+    "QQQ": {
+        "filename_prefix": ["QQQ-", "$QQQ-"],
+        "yf_symbol":       "QQQ",
+        "strike_min":      150,
+        "strike_max":      700,
+        "history_file":    ROOT / "gex_history_qqq.json",
+        "conf_tol":        2,
+        "pine_aliases":    ["QQQ"],
+        "pine_contains":   [],
     },
 }
 
@@ -65,7 +93,7 @@ TICKER_CONFIG = {
 PINE_TEMPLATE = """\
 //@version=5
 // =======================================================================
-// GEX Weekly Levels [TradingLitt Style] — SPX + NDX — AUTO-GENERATED
+// GEX Weekly Levels [TradingLitt Style] — SPX + NDX + SPY + QQQ — AUTO-GENERATED
 // DO NOT EDIT MANUALLY. Regenerate via:
 //   python scripts/gex_csv_parser.py <csv_path> --week YYYY-MM-DD
 // Last updated : {generated_date}
@@ -74,54 +102,88 @@ PINE_TEMPLATE = """\
 indicator("GEX Weekly Levels [TradingLitt]", overlay=true, max_lines_count=500, max_labels_count=500, shorttitle="GEX Levels")
 
 // --- TICKER DETECTION -----------------------------------------------
-_is_spx = syminfo.ticker == "SPX" or str.contains(syminfo.ticker, "ES1")
-_is_ndx = syminfo.ticker == "NDX" or str.contains(syminfo.ticker, "NQ1")
-_valid  = _is_spx or _is_ndx
+{ticker_detection}
 
-// --- INPUTS (Colors) ------------------------------------------------
-var string _GC = "Colors"
-C_GFLIP = input.color(color.rgb(128, 0, 200),   "Gamma Flip",    group=_GC, display=display.none)
-C_POS   = input.color(color.rgb(0, 200, 83),    "Positive GEX",  group=_GC, display=display.none)
-C_NEG   = input.color(color.rgb(255, 23, 68),   "Negative GEX",  group=_GC, display=display.none)
-C_AGG   = input.color(color.rgb(170, 0, 255),   "Aggregate",     group=_GC, display=display.none)
-C_SEP_W = input.color(color.new(color.gray, 40), "Sep. Monday",  group=_GC, display=display.none)
-C_SEP_D = input.color(color.new(color.gray, 72), "Sep. Tue-Thu", group=_GC, display=display.none)
+// --- INPUTS (Indicator Inputs) --------------------------------------
+var string _GI = "Indicator Inputs"
+SHOW_TS    = input.bool(false,     "Show Timestamp",    group=_GI)
+SHORT_NAME = input.bool(false,     "Short Name",        group=_GI)
+LBL_POS    = input.string("Right", "Labels Position",   group=_GI, options=["Right", "Left", "Center"])
+LBL_OFFSET = input.int(0,          "Labels Offset",     group=_GI, minval=-200, maxval=200)
+LBL_SIZE   = input.string("Small", "Labels Text Size",  group=_GI, options=["Tiny", "Small", "Normal", "Large"])
 
-// --- INPUTS (Styles) ------------------------------------------------
-var string _GS = "Styles"
-STY_GFLIP = input.string("Dashed",  "Gamma Flip",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P1    = input.string("Solid",   "Pos GEX p1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P2    = input.string("Dashed",  "Pos GEX p2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_P3    = input.string("Dotted",  "Pos GEX p3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N1    = input.string("Solid",   "Neg GEX n1",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N2    = input.string("Dashed",  "Neg GEX n2",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_N3    = input.string("Dotted",  "Neg GEX n3",    options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_AGG   = input.string("Dotted",  "Aggregate",     options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_SEP_W = input.string("Dashed",  "Sep. Monday",   options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
-STY_SEP_D = input.string("Dashed",  "Sep. Tue-Thu",  options=["Solid", "Dashed", "Dotted"], group=_GS, display=display.none)
+// --- INPUTS (Level Settings) — cor + estilo + largura por linha -----
+var string _GLS = "Level Settings"
+C_GFLIP   = input.color( color.rgb(128, 0, 200),     "Gamma Flip  ", group=_GLS, inline="gflip",  display=display.none)
+STY_GFLIP = input.string("Dashed", "",                group=_GLS, inline="gflip",  options=["Solid","Dashed","Dotted"], display=display.none)
+LW_GFLIP  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="gflip",  display=display.none)
 
-// --- INPUTS (Widths) ------------------------------------------------
-var string _GW = "Widths"
-LW_GFLIP  = input.int(2, "Gamma Flip",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_P1     = input.int(2, "Pos GEX p1",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_P2     = input.int(1, "Pos GEX p2",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_P3     = input.int(1, "Pos GEX p3",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_N1     = input.int(2, "Neg GEX n1",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_N2     = input.int(1, "Neg GEX n2",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_N3     = input.int(1, "Neg GEX n3",   minval=1, maxval=4, group=_GW, display=display.none)
-LW_AGG    = input.int(1, "Aggregate",    minval=1, maxval=4, group=_GW, display=display.none)
-LW_SEP_W  = input.int(2, "Sep. Monday",  minval=1, maxval=4, group=_GW, display=display.none)
-LW_SEP_D  = input.int(2, "Sep. Tue-Thu", minval=1, maxval=4, group=_GW, display=display.none)
+C_P1    = input.color( color.rgb(0, 200, 83),        "Pos GEX p1  ", group=_GLS, inline="p1",    display=display.none)
+STY_P1  = input.string("Solid",  "",                 group=_GLS, inline="p1",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_P1   = input.int(2,  "",      minval=1, maxval=4,  group=_GLS, inline="p1",    display=display.none)
 
+C_P2    = input.color( color.rgb(0, 200, 83),        "Pos GEX p2  ", group=_GLS, inline="p2",    display=display.none)
+STY_P2  = input.string("Dashed", "",                 group=_GLS, inline="p2",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_P2   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="p2",    display=display.none)
+
+C_P3    = input.color( color.rgb(0, 200, 83),        "Pos GEX p3  ", group=_GLS, inline="p3",    display=display.none)
+STY_P3  = input.string("Dotted", "",                 group=_GLS, inline="p3",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_P3   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="p3",    display=display.none)
+
+C_N1    = input.color( color.rgb(255, 23, 68),       "Neg GEX n1  ", group=_GLS, inline="n1",    display=display.none)
+STY_N1  = input.string("Solid",  "",                 group=_GLS, inline="n1",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_N1   = input.int(2,  "",      minval=1, maxval=4,  group=_GLS, inline="n1",    display=display.none)
+
+C_N2    = input.color( color.rgb(255, 23, 68),       "Neg GEX n2  ", group=_GLS, inline="n2",    display=display.none)
+STY_N2  = input.string("Dashed", "",                 group=_GLS, inline="n2",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_N2   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="n2",    display=display.none)
+
+C_N3    = input.color( color.rgb(255, 23, 68),       "Neg GEX n3  ", group=_GLS, inline="n3",    display=display.none)
+STY_N3  = input.string("Dotted", "",                 group=_GLS, inline="n3",    options=["Solid","Dashed","Dotted"], display=display.none)
+LW_N3   = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="n3",    display=display.none)
+
+C_AGG   = input.color( color.rgb(170, 0, 255),       "Aggregate   ", group=_GLS, inline="agg",   display=display.none)
+STY_AGG = input.string("Dotted", "",                 group=_GLS, inline="agg",   options=["Solid","Dashed","Dotted"], display=display.none)
+LW_AGG  = input.int(1,  "",      minval=1, maxval=4,  group=_GLS, inline="agg",   display=display.none)
+
+C_SEP_W   = input.color( color.new(color.gray, 40),  "Sep. Monday ", group=_GLS, inline="sep_w", display=display.none)
+STY_SEP_W = input.string("Dashed", "",                group=_GLS, inline="sep_w", options=["Solid","Dashed","Dotted"], display=display.none)
+LW_SEP_W  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="sep_w", display=display.none)
+
+C_SEP_D   = input.color( color.new(color.gray, 72),  "Sep. Tue-Thu", group=_GLS, inline="sep_d", display=display.none)
+STY_SEP_D = input.string("Dashed", "",                group=_GLS, inline="sep_d", options=["Solid","Dashed","Dotted"], display=display.none)
+LW_SEP_D  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="sep_d", display=display.none)
+
+// --- INPUTS (Single Levels) — toggle por level ----------------------
+var string _GSL = "Single Levels"
+SH_GFLIP = input.bool(true, "Gamma Flip", group=_GSL)
+SH_P1    = input.bool(true, "Pos GEX p1", group=_GSL)
+SH_P2    = input.bool(true, "Pos GEX p2", group=_GSL)
+SH_P3    = input.bool(true, "Pos GEX p3", group=_GSL)
+SH_N1    = input.bool(true, "Neg GEX n1", group=_GSL)
+SH_N2    = input.bool(true, "Neg GEX n2", group=_GSL)
+SH_N3    = input.bool(true, "Neg GEX n3", group=_GSL)
+SH_AGG   = input.bool(true, "Aggregate",  group=_GSL)
+
+// --- CONSTANTS ------------------------------------------------------
+// D = bars per trading day; W = bars per week — auto-adapted to any timeframe
+// US equity session: 9:30-16:00 = 390 minutes
+int D = timeframe.isintraday ? math.max(1, math.round(390.0 / (timeframe.in_seconds() / 60.0))) : 1
+int W = D * 5
+string _update_date = "{generated_date}"
+
+// --- HELPERS --------------------------------------------------------
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
 
-// True on the first 15m bar of a given Monday (by timestamp)
-is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
+f_lbl_x(bi, lpos, loff) =>
+    lpos == "Left" ? bi + loff : lpos == "Center" ? bi + W / 2 + loff : bi + W + loff
 
-// 15m chart: 26 bars/day, 130 bars/week
-W = 130
-D = 26
+f_lbl_size(s) =>
+    s == "Tiny" ? size.tiny : s == "Large" ? size.large : s == "Normal" ? size.normal : size.small
+
+// True on the first bar of a given Monday (by timestamp)
+is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
 
 // --- MONDAY BAR INDEX DETECTION (auto-generated) --------------------
 {bi_vars}
@@ -148,16 +210,16 @@ if barstate.islast and _valid
 def detect_ticker(csv_path: Path, override: str | None = None) -> str:
     if override:
         if override not in TICKER_CONFIG:
-            raise ValueError(f"Invalid ticker: {override}. Choose SPX or NDX.")
+            raise ValueError(f"Invalid ticker: {override}. Choose {'/'.join(TICKER_CONFIG)}.")
         return override
     name = csv_path.name
     for ticker, cfg in TICKER_CONFIG.items():
-        if name.startswith(cfg["filename_prefix"]):
+        prefixes = cfg["filename_prefix"] if isinstance(cfg["filename_prefix"], list) else [cfg["filename_prefix"]]
+        if any(name.startswith(p) for p in prefixes):
             return ticker
     raise ValueError(
         f"Cannot detect ticker from filename '{name}'.\n"
-        f"Expected prefix: {[c['filename_prefix'] for c in TICKER_CONFIG.values()]}\n"
-        f"Use --ticker SPX|NDX to override."
+        f"Use --ticker {'/'.join(TICKER_CONFIG)} to override."
     )
 
 
@@ -166,7 +228,6 @@ def load_csv(csv_path: Path, ticker: str) -> pd.DataFrame:
     lines = [l for l in raw.splitlines() if not l.startswith("Downloaded from")]
     df    = pd.read_csv(StringIO("\n".join(lines)))
 
-    # Drop non-numeric strike rows (extra footer lines)
     df = df[pd.to_numeric(df["Strike"], errors="coerce").notna()].copy()
 
     float_cols = [
@@ -199,20 +260,16 @@ def calc_gamma_flip(df: pd.DataFrame) -> int:
             s1, s2 = strikes[i], strikes[i + 1]
             t = -a / (b - a) if (b - a) != 0 else 0.5
             return round(s1 + t * (s2 - s1))
-    # Fallback: strike closest to zero in the profile
     return int(df.loc[df["Gamma Exposure Profile"].abs().idxmin(), "Strike"])
 
 
 def top_strikes(series: pd.Series, strikes: pd.Series, n: int) -> list[int]:
-    """Top-N strikes by absolute magnitude of series, sorted by descending magnitude."""
     df_tmp = pd.DataFrame({"val": series.abs(), "strike": strikes})
     top    = df_tmp.nlargest(n, "val")
-    # Return in descending magnitude order
     return [int(s) for s in top.sort_values("val", ascending=False)["strike"].tolist()]
 
 
 def detect_confluences(levels: dict, tol: int) -> list[int]:
-    """Strikes where ≥2 distinct categories land within ±tol points."""
     cat_strikes: dict[str, list[int]] = {}
     for cat in ("gflip", "pos", "neg", "coi", "poi", "agg", "pos_zone", "neg_zone"):
         val = levels.get(cat)
@@ -220,7 +277,6 @@ def detect_confluences(levels: dict, tol: int) -> list[int]:
             continue
         cat_strikes[cat] = val if isinstance(val, list) else [val]
 
-    # Build flat list of (cat, strike) pairs
     pairs = [(cat, s) for cat, strikes in cat_strikes.items() for s in strikes if s]
 
     conf_set = set()
@@ -237,26 +293,24 @@ def calculate_levels(df: pd.DataFrame, ticker: str) -> dict:
     cfg   = TICKER_CONFIG[ticker]
     gflip = calc_gamma_flip(df)
 
-    # Positive GEX levels: top-3 strikes with highest positive Net GEX (Call Walls)
     pos_rows = df[df["Net Gamma Exposure"] > 0].nlargest(3, "Net Gamma Exposure")
     pos = [int(s) for s in pos_rows.sort_values("Net Gamma Exposure", ascending=False)["Strike"].tolist()]
 
-    # Negative GEX levels: top-3 strikes with most negative Net GEX (Put Walls)
     neg_rows = df[df["Net Gamma Exposure"] < 0].nsmallest(3, "Net Gamma Exposure")
     neg = [int(s) for s in neg_rows.sort_values("Net Gamma Exposure")["Strike"].tolist()]
 
-    coi      = top_strikes(df["Call Open Interest"],  df["Strike"], 2)
-    poi      = top_strikes(df["Put Open Interest"],   df["Strike"], 2)
-    agg_idx  = df["Absolute Gamma Exposure"].idxmax()
-    agg      = int(df.loc[agg_idx, "Strike"])
+    coi     = top_strikes(df["Call Open Interest"], df["Strike"], 2)
+    poi     = top_strikes(df["Put Open Interest"],  df["Strike"], 2)
+    agg_idx = df["Absolute Gamma Exposure"].idxmax()
+    agg     = int(df.loc[agg_idx, "Strike"])
 
-    above    = df[df["Strike"] > gflip]
+    above         = df[df["Strike"] > gflip]
     pos_zone_rows = above[above["Gamma Exposure Profile"] > 0]
-    pos_zone = int(pos_zone_rows["Strike"].iloc[0]) if not pos_zone_rows.empty else None
+    pos_zone      = int(pos_zone_rows["Strike"].iloc[0]) if not pos_zone_rows.empty else None
 
-    below    = df[df["Strike"] < gflip]
+    below         = df[df["Strike"] < gflip]
     neg_zone_rows = below[below["Gamma Exposure Profile"] < 0]
-    neg_zone = int(neg_zone_rows["Strike"].iloc[-1]) if not neg_zone_rows.empty else None
+    neg_zone      = int(neg_zone_rows["Strike"].iloc[-1]) if not neg_zone_rows.empty else None
 
     levels = {
         "gflip":    gflip,
@@ -335,13 +389,7 @@ def load_history(ticker: str) -> list:
     return []
 
 
-def save_history(
-    ticker: str,
-    week_date: str,
-    expiry: str,
-    levels: dict,
-    source_file: str,
-) -> list:
+def save_history(ticker: str, week_date: str, expiry: str, levels: dict, source_file: str) -> list:
     history = load_history(ticker)
     entry   = {
         "week":        week_date,
@@ -388,16 +436,30 @@ def _is_conf(price: int | None, conf_list: list[int], tol: int) -> bool:
     return any(abs(price - c) <= tol for c in conf_list)
 
 
-# Each entry: (json_key, list_rank_or_None, label_prefix, color_var, style_var, width_var)
+def _build_ticker_detection() -> str:
+    """Generate Pine ticker detection block from TICKER_CONFIG."""
+    lines  = []
+    is_vars = []
+    for ticker, cfg in TICKER_CONFIG.items():
+        t     = ticker.lower()
+        conds = [f'syminfo.ticker == "{a}"' for a in cfg.get("pine_aliases", [ticker])]
+        conds += [f'str.contains(syminfo.ticker, "{c}")' for c in cfg.get("pine_contains", [])]
+        lines.append(f"_is_{t} = {' or '.join(conds)}")
+        is_vars.append(f"_is_{t}")
+    lines.append(f"_valid  = {' or '.join(is_vars)}")
+    return "\n".join(lines)
+
+
+# (json_key, rank, short_name, full_name, clr_var, sty_var, lw_var, show_var)
 LEVEL_SPEC = [
-    ("gflip",    None, "g-flip",   "C_GFLIP", "STY_GFLIP", "LW_GFLIP"),
-    ("pos",      0,    "p1",       "C_POS",   "STY_P1",    "LW_P1"),
-    ("pos",      1,    "p2",       "C_POS",   "STY_P2",    "LW_P2"),
-    ("pos",      2,    "p3",       "C_POS",   "STY_P3",    "LW_P3"),
-    ("neg",      0,    "n1",       "C_NEG",   "STY_N1",    "LW_N1"),
-    ("neg",      1,    "n2",       "C_NEG",   "STY_N2",    "LW_N2"),
-    ("neg",      2,    "n3",       "C_NEG",   "STY_N3",    "LW_N3"),
-    ("agg",      None, "agg",      "C_AGG",   "STY_AGG",   "LW_AGG"),
+    ("gflip", None, "g-flip", "Gamma Flip", "C_GFLIP", "STY_GFLIP", "LW_GFLIP", "SH_GFLIP"),
+    ("pos",   0,    "p1",     "Pos p1",     "C_P1",    "STY_P1",    "LW_P1",    "SH_P1"),
+    ("pos",   1,    "p2",     "Pos p2",     "C_P2",    "STY_P2",    "LW_P2",    "SH_P2"),
+    ("pos",   2,    "p3",     "Pos p3",     "C_P3",    "STY_P3",    "LW_P3",    "SH_P3"),
+    ("neg",   0,    "n1",     "Neg n1",     "C_N1",    "STY_N1",    "LW_N1",    "SH_N1"),
+    ("neg",   1,    "n2",     "Neg n2",     "C_N2",    "STY_N2",    "LW_N2",    "SH_N2"),
+    ("neg",   2,    "n3",     "Neg n3",     "C_N3",    "STY_N3",    "LW_N3",    "SH_N3"),
+    ("agg",   None, "agg",    "Aggregate",  "C_AGG",   "STY_AGG",   "LW_AGG",   "SH_AGG"),
 ]
 
 
@@ -412,10 +474,16 @@ def _get_price(entry: dict | None, key: str, rank: int | None) -> int | None:
     return val
 
 
-def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
-    all_weeks   = sorted(set([e["week"] for e in hist_spx] + [e["week"] for e in hist_ndx]))
-    spx_by_week = {e["week"]: e for e in hist_spx}
-    ndx_by_week = {e["week"]: e for e in hist_ndx}
+def generate_pine_combined(histories: dict[str, list]) -> str:
+    """
+    histories: {ticker: [week_entries, ...]}
+    Merge is done per-ticker: if two levels land on the same price for a given ticker,
+    they become one line with a combined label (e.g. "p1 + agg").
+    Each ticker gets its own if _is_{t} block in the Pine draw section.
+    """
+    tickers   = list(TICKER_CONFIG.keys())
+    all_weeks = sorted(set(e["week"] for entries in histories.values() for e in entries))
+    by_week   = {t: {e["week"]: e for e in histories.get(t, [])} for t in tickers}
 
     bi_vars_lines       = []
     bi_detections_lines = []
@@ -424,11 +492,8 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
     for i, week_date in enumerate(all_weeks):
         mon_ts     = monday_ts_ms(week_date)
         is_current = (i == len(all_weeks) - 1)
-        spx_e  = spx_by_week.get(week_date)
-        ndx_e  = ndx_by_week.get(week_date)
-
-        spx_conf = spx_e.get("conf", []) if spx_e else []
-        ndx_conf = ndx_e.get("conf", []) if ndx_e else []
+        entries    = {t: by_week[t].get(week_date) for t in tickers}
+        confs      = {t: (entries[t].get("conf", []) if entries[t] else []) for t in tickers}
 
         bi_vars_lines.append(f"var int _bi{i} = na")
         bi_detections_lines.append(
@@ -440,7 +505,7 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
             f"    if not na(_bi{i})",
         ]
 
-        # Vertical separators (identical for both tickers — same calendar)
+        # Vertical separators — shared, drawn for any valid ticker
         for offset, clr, sty, lw in [
             (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
             (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
@@ -452,61 +517,73 @@ def generate_pine_combined(hist_spx: list, hist_ndx: list) -> str:
                 f"color={clr}, style=f_style({sty}), width={lw}, extend=extend.both))"
             )
 
-        # GEX level lines — merge overlapping strikes into combined labels
-        # Step 1: collect all (spx_p, ndx_p, lbl, clr, sty, lw) entries
-        raw_levels = []
-        for key, rank, lbl, clr, sty, lw in LEVEL_SPEC:
-            spx_p = _get_price(spx_e, key, rank)
-            ndx_p = _get_price(ndx_e, key, rank)
-            if spx_p is None and ndx_p is None:
+        # Per-ticker GEX levels — merged independently per ticker
+        for t in tickers:
+            tl    = t.lower()
+            entry = entries[t]
+            conf  = confs[t]
+
+            # Collect all LEVEL_SPEC entries that have a price for this ticker
+            raw: list[tuple] = []
+            for key, rank, short_lbl, full_lbl, clr, sty, lw, show_var in LEVEL_SPEC:
+                price = _get_price(entry, key, rank)
+                if price is None:
+                    continue
+                raw.append((price, short_lbl, full_lbl, clr, sty, lw, show_var))
+
+            if not raw:
                 continue
-            raw_levels.append((spx_p, ndx_p, lbl, clr, sty, lw))
 
-        # Step 2: merge entries that share the same (spx_price, ndx_price) pair
-        # First entry in LEVEL_SPEC order wins for color/style/width; labels are concatenated
-        seen_pairs: dict[tuple, int] = {}
-        merged_levels: list[list] = []  # [spx_p, ndx_p, combined_lbl, clr, sty, lw]
-        for spx_p, ndx_p, lbl, clr, sty, lw in raw_levels:
-            pair = (spx_p, ndx_p)
-            if pair not in seen_pairs:
-                seen_pairs[pair] = len(merged_levels)
-                merged_levels.append([spx_p, ndx_p, lbl, clr, sty, lw])
-            else:
-                merged_levels[seen_pairs[pair]][2] += f" + {lbl}"
+            # Merge levels that share the same price FOR THIS TICKER
+            # First entry in LEVEL_SPEC order wins for color/style/width
+            seen: dict[int, int] = {}
+            merged: list[list] = []  # [price, short_lbl, full_lbl, clr, sty, lw, [show_vars]]
 
-        # Step 3: generate Pine variables for each merged entry
-        for spec_i, (spx_p, ndx_p, combined_lbl, clr, sty, lw) in enumerate(merged_levels):
-            var     = f"_p{i}_{spec_i}"
-            spx_val = _pf(spx_p)
-            ndx_val = _pf(ndx_p)
+            for price, short_lbl, full_lbl, clr, sty, lw, show_var in raw:
+                if price not in seen:
+                    seen[price] = len(merged)
+                    merged.append([price, short_lbl, full_lbl, clr, sty, lw, [show_var]])
+                else:
+                    idx = seen[price]
+                    merged[idx][1] += f" + {short_lbl}"
+                    merged[idx][2] += f" + {full_lbl}"
+                    merged[idx][6].append(show_var)
 
-            # Confluence star suffix per ticker
-            spx_star = '" ★"' if _is_conf(spx_p, spx_conf, TICKER_CONFIG["SPX"]["conf_tol"]) else '""'
-            ndx_star = '" ★"' if _is_conf(ndx_p, ndx_conf, TICKER_CONFIG["NDX"]["conf_tol"]) else '""'
+            block.append(f"        if _is_{tl}")
 
-            lbl_expr = (
-                f'"{combined_lbl} " + str.tostring(math.round({var})) + '
-                f'(_is_spx ? {spx_star} : {ndx_star})'
-            )
+            for j, (price, short_lbl, full_lbl, clr, sty, lw, show_vars) in enumerate(merged):
+                var       = f"_p{i}_{tl}_{j}"
+                pval      = _pf(price)
+                star      = '" ★"' if _is_conf(price, conf, TICKER_CONFIG[t]["conf_tol"]) else '""'
+                show_expr = " or ".join(show_vars)
 
-            block += [
-                f"        float {var} = _is_spx ? {spx_val} : {ndx_val}",
-                f"        if not na({var})",
-                f"            array.push(_lines, line.new(_bi{i}, {var}, _bi{i} + W, {var}, "
-                f"color={clr}, style=f_style({sty}), width={lw}))",
-            ]
-            if is_current:
-                block.append(
-                    f"            array.push(_labels, label.new(_bi{i} + W, {var}, "
-                    f"{lbl_expr}, color=color.new(color.black, 100), textcolor={clr}, "
-                    f"style=label.style_none, size=size.small))"
+                lbl_expr = (
+                    f'(SHORT_NAME ? "{short_lbl}" : "{full_lbl}") + " " + '
+                    f'str.tostring(math.round({var})) + {star} + '
+                    f'(SHOW_TS ? " [" + _update_date + "]" : "")'
                 )
+
+                block += [
+                    f"            float {var} = {pval}",
+                    f"            if ({show_expr}) and not na({var})",
+                    f"                array.push(_lines, line.new(_bi{i}, {var}, _bi{i} + W, {var}, "
+                    f"color={clr}, style=f_style({sty}), width={lw}))",
+                ]
+                if is_current:
+                    block.append(
+                        f"                array.push(_labels, label.new("
+                        f"f_lbl_x(_bi{i}, LBL_POS, LBL_OFFSET), {var}, "
+                        f"{lbl_expr}, "
+                        f"color=color.new(color.black, 100), textcolor={clr}, "
+                        f"style=label.style_none, size=f_lbl_size(LBL_SIZE)))"
+                    )
 
         draw_blocks.append("\n".join(block))
 
     return PINE_TEMPLATE.format(
         generated_date   = date.today().strftime("%Y-%m-%d"),
         total_weeks      = len(all_weeks),
+        ticker_detection = _build_ticker_detection(),
         bi_vars          = "\n".join(bi_vars_lines),
         bi_detections    = "\n".join(bi_detections_lines),
         draw_weeks_block = "\n\n".join(draw_blocks),
@@ -540,12 +617,13 @@ def main():
         epilog=(
             "Examples:\n"
             '  python scripts/gex_csv_parser.py "data/$SPX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14\n'
-            '  python scripts/gex_csv_parser.py "data/$IUXX-gamma-levels-exp-20260421-monthly.csv" --week 2026-04-14'
+            '  python scripts/gex_csv_parser.py "data/SPY-gamma-levels-exp-20260421-weekly.csv"  --week 2026-04-14\n'
+            '  python scripts/gex_csv_parser.py "data/QQQ-gamma-levels-exp-20260421-weekly.csv"  --week 2026-04-14'
         ),
     )
-    parser.add_argument("csv",     help="Path to the Barchart CSV file")
-    parser.add_argument("--week",  default=None, help="Monday date YYYY-MM-DD (default: this week)")
-    parser.add_argument("--ticker", default=None, choices=["SPX", "NDX"],
+    parser.add_argument("csv",      help="Path to the Barchart CSV file")
+    parser.add_argument("--week",   default=None, help="Monday date YYYY-MM-DD (default: this week)")
+    parser.add_argument("--ticker", default=None, choices=list(TICKER_CONFIG.keys()),
                         help="Override ticker detection (default: auto from filename)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show calculated levels without saving")
@@ -562,8 +640,8 @@ def main():
         print(f"[ERROR] {e}")
         sys.exit(1)
 
-    week_date  = resolve_week(args.week)
-    expiry     = detect_expiry(csv_path)
+    week_date = resolve_week(args.week)
+    expiry    = detect_expiry(csv_path)
 
     print(f"\n  Ticker  : {ticker}")
     print(f"  Week    : {week_date}")
@@ -588,13 +666,11 @@ def main():
         print("  [DRY-RUN] Nothing saved.\n")
         return
 
-    # Save history
     save_history(ticker, week_date, expiry, levels, csv_path.name)
 
-    # Regenerate Pine (reads both histories — one may be empty)
-    hist_spx  = load_history("SPX")
-    hist_ndx  = load_history("NDX")
-    pine_code = generate_pine_combined(hist_spx, hist_ndx)
+    # Regenerate Pine from all histories
+    histories = {t: load_history(t) for t in TICKER_CONFIG}
+    pine_code = generate_pine_combined(histories)
 
     PINE_FILE.parent.mkdir(parents=True, exist_ok=True)
     PINE_FILE.write_text(pine_code, encoding="utf-8")
