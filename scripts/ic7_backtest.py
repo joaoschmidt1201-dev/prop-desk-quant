@@ -503,15 +503,20 @@ def compute_daily_mtm_ic7(
     short_call: float,
     long_call: float,
     entry_credit: float,
+    iv_atm_entry: float,
 ) -> list[dict]:
     """
     Calcula o P&L mark-to-market diário de um único trade IC7.
 
-    Para dias intermediários usa mid prices das 4 pernas filtradas pelo DTE
-    restante até o vencimento.  No dia de expiração usa valor intrínseco.
+    Estratégia de precificação por dia (cascata):
+      1. Mid prices reais das 4 pernas no parquet (filtra por DTE restante ±1).
+      2. Fallback Black-Scholes: IV de entrada + spot do dia.
+         Garante um ponto para CADA dia de trading — sem isso as Close Rules
+         não conseguem disparar em dias onde o chain não tem os strikes OTM.
+      3. Expiração: valor intrínseco (exercício europeu).
 
     Retorna lista de dicts:
-        {trade_date, calendar_date, dte_remaining, spot, pnl_usd}
+        {trade_date, calendar_date, dte_remaining, spot, pnl_usd, source}
     """
     records: list[dict] = []
     current = entry_date
@@ -526,20 +531,39 @@ def compute_daily_mtm_ic7(
         dte_rem = (exp_date - current).days
 
         if current == exp_date:
+            # ── Expiração: intrínseco ─────────────────────────────────────
             put_cost  = max(0.0, short_put  - spot) - max(0.0, long_put  - spot)
             call_cost = max(0.0, spot - short_call) - max(0.0, spot - long_call)
             current_debit = put_cost + call_cost
+            source = "intrinsic"
+
         else:
+            # ── Tentativa 1: mid prices reais ─────────────────────────────
             mid_sp = _get_leg_mid(chain, "put",  short_put,  dte_rem)
             mid_lp = _get_leg_mid(chain, "put",  long_put,   dte_rem)
             mid_sc = _get_leg_mid(chain, "call", short_call, dte_rem)
             mid_lc = _get_leg_mid(chain, "call", long_call,  dte_rem)
 
-            if any(m is None for m in (mid_sp, mid_lp, mid_sc, mid_lc)):
-                current += timedelta(days=1)
-                continue
+            if all(m is not None for m in (mid_sp, mid_lp, mid_sc, mid_lc)):
+                current_debit = (mid_sp - mid_lp) + (mid_sc - mid_lc)
+                source = "market"
 
-            current_debit = (mid_sp - mid_lp) + (mid_sc - mid_lc)
+            else:
+                # ── Tentativa 2: Black-Scholes com IV de entrada ──────────
+                T  = dte_rem / 365.0
+                iv = iv_atm_entry
+
+                bs_sp = _bs_price(spot, short_put,  T, RISK_FREE_RATE, iv, "put")
+                bs_lp = _bs_price(spot, long_put,   T, RISK_FREE_RATE, iv, "put")
+                bs_sc = _bs_price(spot, short_call, T, RISK_FREE_RATE, iv, "call")
+                bs_lc = _bs_price(spot, long_call,  T, RISK_FREE_RATE, iv, "call")
+
+                if any(math.isnan(v) for v in (bs_sp, bs_lp, bs_sc, bs_lc)):
+                    current += timedelta(days=1)
+                    continue
+
+                current_debit = (bs_sp - bs_lp) + (bs_sc - bs_lc)
+                source = "bs_model"
 
         pnl_usd = (entry_credit - current_debit) * NDX_MULTIPLIER
         records.append({
@@ -548,6 +572,7 @@ def compute_daily_mtm_ic7(
             "dte_remaining": dte_rem,
             "spot":          round(spot, 2),
             "pnl_usd":       round(pnl_usd, 2),
+            "source":        source,
         })
         current += timedelta(days=1)
 
@@ -672,6 +697,7 @@ def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
                     optimal["short_put"],  optimal["long_put"],
                     optimal["short_call"], optimal["long_call"],
                     optimal["total_credit"],
+                    iv_atm,          # BS fallback usa IV do dia de entrada
                 )
                 all_daily.extend(daily_records)
             except Exception as exc:
