@@ -231,6 +231,7 @@ def calc_iv_atm(
     puts: pd.DataFrame,
     calls: pd.DataFrame,
     spot: float,
+    dte_calendar: int = ENTRY_DTE,
     r: float = RISK_FREE_RATE,
 ) -> tuple[float | None, float]:
     """
@@ -238,7 +239,7 @@ def calc_iv_atm(
     Strike ATM = strike mais próximo do spot no universo combinado.
     Retorna (iv_atm, atm_strike).  iv_atm é None se ambos os lados falharem.
     """
-    T = ENTRY_DTE / 365.0
+    T = dte_calendar / 365.0
 
     # Strike ATM no universo combinado
     all_strikes = pd.concat([
@@ -270,6 +271,21 @@ def calc_iv_atm(
         iv_atm = None
 
     return iv_atm, atm_strike
+
+
+def calc_iv_atm_for_day(
+    chain: pd.DataFrame,
+    spot: float,
+    target_dte: int,
+    min_bid: float = 0.0,
+) -> float | None:
+    """Calcula a IV ATM do dia corrente para um DTE específico."""
+    puts = filter_chain_by_dte(chain, "put", target_dte=target_dte, min_bid=min_bid)
+    calls = filter_chain_by_dte(chain, "call", target_dte=target_dte, min_bid=min_bid)
+    if puts.empty or calls.empty:
+        return None
+    iv_atm, _ = calc_iv_atm(puts, calls, spot, dte_calendar=target_dte)
+    return iv_atm
 
 
 def calc_expected_move(spot: float, iv_atm: float,
@@ -529,6 +545,7 @@ def compute_daily_mtm_ic7(
 
         spot    = float(chain["underlying_price"].median())
         dte_rem = (exp_date - current).days
+        current_iv: float | None = None
 
         if current == exp_date:
             # ── Expiração: intrínseco ─────────────────────────────────────
@@ -543,27 +560,35 @@ def compute_daily_mtm_ic7(
             mid_lp = _get_leg_mid(chain, "put",  long_put,   dte_rem)
             mid_sc = _get_leg_mid(chain, "call", short_call, dte_rem)
             mid_lc = _get_leg_mid(chain, "call", long_call,  dte_rem)
+            raw_market_legs = sum(m is not None for m in (mid_sp, mid_lp, mid_sc, mid_lc))
+            current_iv = calc_iv_atm_for_day(chain, spot, dte_rem)
 
-            if all(m is not None for m in (mid_sp, mid_lp, mid_sc, mid_lc)):
-                current_debit = (mid_sp - mid_lp) + (mid_sc - mid_lc)
-                source = "market"
-
-            else:
-                # ── Tentativa 2: Black-Scholes com IV de entrada ──────────
-                T  = dte_rem / 365.0
-                iv = iv_atm_entry
-
-                bs_sp = _bs_price(spot, short_put,  T, RISK_FREE_RATE, iv, "put")
-                bs_lp = _bs_price(spot, long_put,   T, RISK_FREE_RATE, iv, "put")
-                bs_sc = _bs_price(spot, short_call, T, RISK_FREE_RATE, iv, "call")
-                bs_lc = _bs_price(spot, long_call,  T, RISK_FREE_RATE, iv, "call")
-
-                if any(math.isnan(v) for v in (bs_sp, bs_lp, bs_sc, bs_lc)):
+            if raw_market_legs < 4:
+                if current_iv is None:
                     current += timedelta(days=1)
                     continue
 
-                current_debit = (bs_sp - bs_lp) + (bs_sc - bs_lc)
-                source = "bs_model"
+                T = dte_rem / 365.0
+                if mid_sp is None:
+                    mid_sp = _bs_price(spot, short_put,  T, RISK_FREE_RATE, current_iv, "put")
+                if mid_lp is None:
+                    mid_lp = _bs_price(spot, long_put,   T, RISK_FREE_RATE, current_iv, "put")
+                if mid_sc is None:
+                    mid_sc = _bs_price(spot, short_call, T, RISK_FREE_RATE, current_iv, "call")
+                if mid_lc is None:
+                    mid_lc = _bs_price(spot, long_call,  T, RISK_FREE_RATE, current_iv, "call")
+
+            if any(v is None or math.isnan(float(v)) for v in (mid_sp, mid_lp, mid_sc, mid_lc)):
+                current += timedelta(days=1)
+                continue
+
+            current_debit = (mid_sp - mid_lp) + (mid_sc - mid_lc)
+            if raw_market_legs == 4:
+                source = "market"
+            elif raw_market_legs == 0:
+                source = "bs_day_iv"
+            else:
+                source = "hybrid_day_iv"
 
         pnl_usd = (entry_credit - current_debit) * NDX_MULTIPLIER
         records.append({
@@ -572,6 +597,8 @@ def compute_daily_mtm_ic7(
             "dte_remaining": dte_rem,
             "spot":          round(spot, 2),
             "pnl_usd":       round(pnl_usd, 2),
+            "debit_points":  round(current_debit, 4),
+            "iv_used":       round(current_iv, 6) if current_iv is not None else float("nan"),
             "source":        source,
         })
         current += timedelta(days=1)
@@ -1122,3 +1149,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

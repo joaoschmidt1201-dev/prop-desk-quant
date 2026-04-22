@@ -346,7 +346,9 @@ def apply_close_rule(
         thresholds = {
             "25% Profit Target":   (0.25,  None),
             "50% Profit Target":   (0.50,  None),
+            "50% Max Profit":      (0.50,  None),
             "75% Profit Target":   (0.75,  None),
+            "Loss = Max Profit":   (None, -1.0),
             "Stop: 1× Max Profit": (None, -1.0),   # IC7: loss = max profit
         }
         tp_pct, sl_pct = thresholds.get(rule, (None, None))
@@ -813,7 +815,7 @@ def build_pnl_timeline(
                         _rule_dit = dte_max - int(r["dte_remaining"])
                         _rule_pnl = float(r["pnl_usd"])
                         break
-            elif close_rule == "Stop: 1× Max Profit":
+            elif close_rule in ("Stop: 1× Max Profit", "Loss = Max Profit"):
                 sl_thr = -max_p
                 for _, r in rows_scan.iterrows():
                     if float(r["pnl_usd"]) <= sl_thr:
@@ -824,6 +826,7 @@ def build_pnl_timeline(
                 pct_map = {
                     "25% Profit Target": 0.25,
                     "50% Profit Target": 0.50,
+                    "50% Max Profit": 0.50,
                     "75% Profit Target": 0.75,
                 }
                 tp_pct = pct_map.get(close_rule)
@@ -834,6 +837,14 @@ def build_pnl_timeline(
                             _rule_dit = dte_max - int(r["dte_remaining"])
                             _rule_pnl = float(r["pnl_usd"])
                             break
+
+            if _rule_dit is None and close_rule == "Loss = Max Profit":
+                sl_thr = -max_p
+                for _, r in rows_scan.iterrows():
+                    if float(r["pnl_usd"]) <= sl_thr:
+                        _rule_dit = dte_max - int(r["dte_remaining"])
+                        _rule_pnl = float(r["pnl_usd"])
+                        break
 
             if _rule_dit is not None:
                 fig.add_trace(go.Scatter(
@@ -1554,17 +1565,16 @@ with st.sidebar:
             close_rule = st.selectbox(
                 "Close Rule:",
                 options=[
-                    "Hold to Expiration",
-                    "50% Profit Target",
+                    "50% Max Profit",
                     "4 DTE",
-                    "Stop: 1× Max Profit",
+                    "Loss = Max Profit",
                 ],
                 index=0,
                 help=(
                     "Rules avaliadas diariamente via MTM. "
-                    "50% Profit: fecha no primeiro dia com P&L ≥ 50% do crédito. "
+                    "50% Max Profit: fecha no primeiro dia com P&L >= 50% do crédito recebido. "
                     "4 DTE: fecha na segunda-feira (4 dias antes do vencimento). "
-                    "Stop: fecha quando a perda diária iguala ou supera o max profit."
+                    "Loss = Max Profit: fecha quando a perda diária atinge 1x o crédito recebido."
                 ),
             )
             st.divider()
@@ -2175,3 +2185,5 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
