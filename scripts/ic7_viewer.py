@@ -1565,6 +1565,7 @@ with st.sidebar:
             close_rule = st.selectbox(
                 "Close Rule:",
                 options=[
+                    "Hold to Expiration",
                     "50% Max Profit",
                     "4 DTE",
                     "Loss = Max Profit",
@@ -1572,6 +1573,7 @@ with st.sidebar:
                 index=0,
                 help=(
                     "Rules avaliadas diariamente via MTM. "
+                    "Hold to Expiration: mantém a operação até o vencimento. "
                     "50% Max Profit: fecha no primeiro dia com P&L >= 50% do crédito recebido. "
                     "4 DTE: fecha na segunda-feira (4 dias antes do vencimento). "
                     "Loss = Max Profit: fecha quando a perda diária atinge 1x o crédito recebido."
@@ -2185,5 +2187,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 
