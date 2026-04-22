@@ -261,6 +261,39 @@ def _close_at_dit(
     return fallback_pnl
 
 
+def _close_at_dte(
+    trade_date_str: str,
+    daily_df: pd.DataFrame,
+    dte_target: int,
+    tp_threshold: float | None,
+    sl_threshold: float | None,
+    fallback_pnl: float,
+) -> float:
+    """
+    Returns P&L on the first day where TP/SL is hit OR DTE remaining <= dte_target.
+    Falls back to fallback_pnl if no daily rows found.
+    """
+    rows = daily_df[daily_df["trade_date"] == trade_date_str].copy()
+    if rows.empty:
+        return fallback_pnl
+
+    rows = rows.sort_values("dte_remaining", ascending=False)
+    entry_dte = int(rows["dte_remaining"].iloc[0])
+    rows = rows[rows["dte_remaining"] < entry_dte]  # skip entry day
+
+    for _, row in rows.iterrows():
+        pnl = float(row["pnl_usd"])
+        dte = int(row["dte_remaining"])
+        if tp_threshold is not None and pnl >= tp_threshold:
+            return pnl
+        if sl_threshold is not None and pnl <= sl_threshold:
+            return pnl
+        if dte <= dte_target:
+            return pnl
+
+    return fallback_pnl
+
+
 def apply_close_rule(
     df: pd.DataFrame,
     rule: str,
@@ -295,12 +328,26 @@ def apply_close_rule(
                 eff = float(p21) if p21 == p21 else float(trade["pnl_usd"])
             df.at[idx, "effective_pnl_usd"] = eff
 
+    elif rule == "4 DTE":
+        for idx, trade in df.iterrows():
+            if daily_df is not None and not daily_df.empty:
+                eff = _close_at_dte(
+                    str(trade["trade_date"]), daily_df,
+                    dte_target=4,
+                    tp_threshold=None, sl_threshold=None,
+                    fallback_pnl=float(trade["pnl_usd"]),
+                )
+            else:
+                eff = float(trade["pnl_usd"])
+            df.at[idx, "effective_pnl_usd"] = eff
+
     else:
-        # Profit target rules: scan daily MTM for first day >= threshold
+        # Profit target rules and stop-loss rules — scan daily MTM for first crossing
         thresholds = {
-            "25% Profit Target": (0.25, None),
-            "50% Profit Target": (0.50, None),
-            "75% Profit Target": (0.75, None),
+            "25% Profit Target":   (0.25,  None),
+            "50% Profit Target":   (0.50,  None),
+            "75% Profit Target":   (0.75,  None),
+            "Stop: 1× Max Profit": (None, -1.0),   # IC7: loss = max profit
         }
         tp_pct, sl_pct = thresholds.get(rule, (None, None))
 
@@ -319,7 +366,8 @@ def apply_close_rule(
                 p21 = trade.get("pnl_usd_21dte", float("nan"))
                 if p21 == p21:
                     hit_tp = (tp_thr is not None) and (p21 >= tp_thr)
-                    eff = p21 if hit_tp else float(trade["pnl_usd"])
+                    hit_sl = (sl_thr is not None) and (p21 <= sl_thr)
+                    eff = p21 if (hit_tp or hit_sl) else float(trade["pnl_usd"])
                 else:
                     eff = float(trade["pnl_usd"])
 
@@ -367,6 +415,17 @@ def _get_close_date_for_trade(
                 return pd.to_datetime(row["calendar_date"]).date()
             if dit >= 24:
                 return pd.to_datetime(row["calendar_date"]).date()
+    elif rule == "4 DTE":
+        for _, row in rows_scan.iterrows():
+            if int(row["dte_remaining"]) <= 4:
+                return pd.to_datetime(row["calendar_date"]).date()
+
+    elif rule == "Stop: 1× Max Profit":
+        sl_thr = -1.0 * max_p
+        for _, row in rows_scan.iterrows():
+            if float(row["pnl_usd"]) <= sl_thr:
+                return pd.to_datetime(row["calendar_date"]).date()
+
     else:
         pct_map = {"25% Profit Target": 0.25, "50% Profit Target": 0.50, "75% Profit Target": 0.75}
         tp_pct = pct_map.get(rule)
@@ -712,21 +771,22 @@ def build_pnl_timeline(
         # Zero line
         fig.add_hline(y=0, line=dict(color=C["border"], width=1, dash="dot"))
 
-        # Mark 24 DIT checkpoint (dte_remaining ≈ dte_max - 24)
-        _ckpt_dte = dte_max - 24
-        ckpt = subset[subset["dte_remaining"] == _ckpt_dte]
-        if ckpt.empty:
-            idx  = (subset["dte_remaining"] - _ckpt_dte).abs().idxmin()
-            ckpt = subset.loc[[idx]]
-        if not ckpt.empty:
-            cx = dte_max - int(ckpt["dte_remaining"].iloc[0])
-            cy = float(ckpt["pnl_usd"].iloc[0])
-            fig.add_trace(go.Scatter(
-                x=[cx], y=[cy], mode="markers",
-                marker=dict(size=10, color=C["yellow"], symbol="circle",
-                            line=dict(width=2, color=C["bg"])),
-                hovertemplate=f"24 DIT checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
-            ))
+        # Mark 24 DIT checkpoint — only for long-DTE trades (≥ 25 DTE entry)
+        if dte_max >= 25:
+            _ckpt_dte = dte_max - 24
+            ckpt = subset[subset["dte_remaining"] == _ckpt_dte]
+            if ckpt.empty:
+                idx  = (subset["dte_remaining"] - _ckpt_dte).abs().idxmin()
+                ckpt = subset.loc[[idx]]
+            if not ckpt.empty:
+                cx = dte_max - int(ckpt["dte_remaining"].iloc[0])
+                cy = float(ckpt["pnl_usd"].iloc[0])
+                fig.add_trace(go.Scatter(
+                    x=[cx], y=[cy], mode="markers",
+                    marker=dict(size=10, color=C["yellow"], symbol="circle",
+                                line=dict(width=2, color=C["bg"])),
+                    hovertemplate=f"24 DIT checkpoint<br>P&L: ${cy:+,.0f}<extra></extra>",
+                ))
 
         # ── Close rule marker (orange star) ─────────────────────────────
         if close_rule not in ("Hold to Expiration", ""):
@@ -746,6 +806,19 @@ def build_pnl_timeline(
                         break
                     if dit >= 24:
                         _rule_dit, _rule_pnl = dit, pnl
+                        break
+            elif close_rule == "4 DTE":
+                for _, r in rows_scan.iterrows():
+                    if int(r["dte_remaining"]) <= 4:
+                        _rule_dit = dte_max - int(r["dte_remaining"])
+                        _rule_pnl = float(r["pnl_usd"])
+                        break
+            elif close_rule == "Stop: 1× Max Profit":
+                sl_thr = -max_p
+                for _, r in rows_scan.iterrows():
+                    if float(r["pnl_usd"]) <= sl_thr:
+                        _rule_dit = dte_max - int(r["dte_remaining"])
+                        _rule_pnl = float(r["pnl_usd"])
                         break
             else:
                 pct_map = {
@@ -785,7 +858,7 @@ def build_pnl_timeline(
 
     else:
         # ── Fallback: 3-point chart ───────────────────────────────────────────
-        credit_usd = row["total_credit"] * SS42_MULTIPLIER
+        credit_usd = row["total_credit"] * multiplier
         pnl_21     = row.get("pnl_usd_21dte", float("nan"))
         dte_entry  = int(row.get("dte_entry", 42))
 
@@ -1354,7 +1427,7 @@ with st.sidebar:
 
     def _backtest_label(p: Path) -> str:
         stem = p.stem
-        if stem == "trade_log":
+        if stem == "trade_log" or stem.startswith("IC7_"):
             return "IC7 NDX"
         if "SS42_SPX" in stem:
             return "Short Strangle 42 · SPX"
@@ -1387,7 +1460,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Auto-detect companion daily MTM CSV (SS42 only)
+    # Auto-detect companion daily MTM CSV
     daily_df_raw: pd.DataFrame | None = None
     if strategy == "SS42":
         daily_candidates = sorted(selected_csv.parent.glob("*_daily_*.csv"))
@@ -1395,8 +1468,12 @@ with st.sidebar:
         daily_candidates = [p for p in daily_candidates if prefix in p.stem]
         if daily_candidates:
             daily_df_raw = load_daily_mtm(daily_candidates[-1])
+    elif strategy == "IC7":
+        ic7_daily_candidates = sorted(selected_csv.parent.glob("IC7_*_daily_*.csv"))
+        if ic7_daily_candidates:
+            daily_df_raw = load_daily_mtm(ic7_daily_candidates[-1])
 
-    # ── Close Rule selector (SS42 only) ──────────────────────────────────
+    # ── Close Rule selector ───────────────────────────────────────────────
     daily_df_eff: pd.DataFrame | None = daily_df_raw  # default; may be augmented
     close_rule = "Hold to Expiration"
     if strategy == "SS42":
@@ -1470,6 +1547,30 @@ with st.sidebar:
             daily_df_eff = daily_df_raw
 
         df = apply_close_rule(df_sim, close_rule, SS42_MULTIPLIER, daily_df_eff)
+
+    elif strategy == "IC7":
+        if daily_df_raw is not None and not daily_df_raw.empty:
+            st.markdown(f"<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
+            close_rule = st.selectbox(
+                "Close Rule:",
+                options=[
+                    "Hold to Expiration",
+                    "50% Profit Target",
+                    "4 DTE",
+                    "Stop: 1× Max Profit",
+                ],
+                index=0,
+                help=(
+                    "Rules avaliadas diariamente via MTM. "
+                    "50% Profit: fecha no primeiro dia com P&L ≥ 50% do crédito. "
+                    "4 DTE: fecha na segunda-feira (4 dias antes do vencimento). "
+                    "Stop: fecha quando a perda diária iguala ou supera o max profit."
+                ),
+            )
+            st.divider()
+
+        df = apply_close_rule(df_raw, close_rule, NDX_MULTIPLIER, daily_df_eff)
+
     else:
         df = df_raw
         df["effective_pnl_usd"]  = df["pnl_usd"]
@@ -1760,10 +1861,10 @@ with tab1:
                   delta=f"{row['spot_exit'] - row['spot_entry']:+,.0f} pts",
                   delta_color=delta_color(row["spot_exit"] - row["spot_entry"]),
                   help="NDX price at expiration (exit)")
-        c6.metric("Final P&L", f"${row['pnl_usd']:+,.0f}",
-                  delta=f"{row['pnl_points']:+.2f} pts",
-                  delta_color=delta_color(row["pnl_usd"]),
-                  help="Realized P&L (credit − exercise cost) × $100")
+        c6.metric("Effective P&L", f"${row['effective_pnl_usd']:+,.0f}",
+                  delta=f"{row['pnl_points']:+.2f} pts at exp.",
+                  delta_color=delta_color(row["effective_pnl_usd"]),
+                  help="P&L per selected close rule (pts = valor na expiração)")
 
         # ── IC7: Card de estrutura ────────────────────────────────────────
         _cs = (row["constraint_satisfied"] if "constraint_satisfied" in row.index else True)
@@ -1798,6 +1899,13 @@ with tab1:
 
         # ── IC7: Gráfico de Payoff ────────────────────────────────────────
         st.plotly_chart(build_payoff_chart(row), use_container_width=True)
+
+        # ── IC7: P&L Journey (daily MTM) ─────────────────────────────────
+        if daily_df_eff is not None and not daily_df_eff.empty:
+            st.plotly_chart(
+                build_pnl_timeline(row, daily_df_eff, close_rule, NDX_MULTIPLIER),
+                use_container_width=True,
+            )
 
         st.markdown("---")
 
@@ -1973,7 +2081,7 @@ with tab1:
 
 with tab2:
     # Performance uses CLOSED trades only — open trades have no final P&L
-    if strategy == "SS42":
+    if strategy in ("SS42", "IC7"):
         df_perf = df_closed.copy()
         df_perf["pnl_usd"] = df_perf["effective_pnl_usd"]
         df_perf["result"]  = df_perf["effective_result"]
@@ -2003,9 +2111,9 @@ with tab2:
     k6.metric("Avg Credit",     f"{stats['avg_credit']:.2f} pts",
               delta=f"${stats['avg_credit'] * mult_used:,.0f} USD")
 
-    if strategy == "SS42" and close_rule != "Hold to Expiration":
-        using_daily = daily_df_raw is not None and close_rule not in ("Close at 21 DTE",)
-        src = "daily MTM scan" if using_daily else "21 DTE checkpoint fallback"
+    if close_rule != "Hold to Expiration":
+        using_daily = daily_df_raw is not None
+        src = "daily MTM scan" if using_daily else "checkpoint fallback"
         st.info(f"Rule: **{close_rule}** — evaluated via {src}", icon="ℹ️")
 
     st.markdown("---")

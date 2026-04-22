@@ -294,6 +294,28 @@ def _mid_for_strike(df: pd.DataFrame, strike: float) -> float | None:
     return v if v > 0 else None
 
 
+def _get_leg_mid(
+    chain: pd.DataFrame,
+    side: str,
+    strike: float,
+    target_dte: int,
+) -> float | None:
+    """
+    Mid price para uma perna específica (side + strike + dte).
+    Aceita ±1 DTE como fallback para deslocamentos por feriados.
+    """
+    mask = (chain["side"] == side) & (chain["strike"] == strike)
+    for tol in (0, 1):
+        nearby = chain.loc[
+            mask & chain["dte"].between(target_dte - tol, target_dte + tol),
+            "mid",
+        ]
+        if not nearby.empty:
+            v = float(nearby.iloc[0])
+            return v if v > 0 else None
+    return None
+
+
 def select_optimal_strikes(
     puts: pd.DataFrame,
     calls: pd.DataFrame,
@@ -470,20 +492,85 @@ def calc_trade_pnl(entry: dict, spot_exit: float) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECTION E — LOOP PRINCIPAL DO BACKTEST
+# SECTION E — DAILY MARK-TO-MARKET (base para Close Rules)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_backtest() -> pd.DataFrame:
+def compute_daily_mtm_ic7(
+    entry_date: date,
+    exp_date: date,
+    short_put: float,
+    long_put: float,
+    short_call: float,
+    long_call: float,
+    entry_credit: float,
+) -> list[dict]:
+    """
+    Calcula o P&L mark-to-market diário de um único trade IC7.
+
+    Para dias intermediários usa mid prices das 4 pernas filtradas pelo DTE
+    restante até o vencimento.  No dia de expiração usa valor intrínseco.
+
+    Retorna lista de dicts:
+        {trade_date, calendar_date, dte_remaining, spot, pnl_usd}
+    """
+    records: list[dict] = []
+    current = entry_date
+
+    while current <= exp_date:
+        chain = load_chain(current)
+        if chain is None:
+            current += timedelta(days=1)
+            continue
+
+        spot    = float(chain["underlying_price"].median())
+        dte_rem = (exp_date - current).days
+
+        if current == exp_date:
+            put_cost  = max(0.0, short_put  - spot) - max(0.0, long_put  - spot)
+            call_cost = max(0.0, spot - short_call) - max(0.0, spot - long_call)
+            current_debit = put_cost + call_cost
+        else:
+            mid_sp = _get_leg_mid(chain, "put",  short_put,  dte_rem)
+            mid_lp = _get_leg_mid(chain, "put",  long_put,   dte_rem)
+            mid_sc = _get_leg_mid(chain, "call", short_call, dte_rem)
+            mid_lc = _get_leg_mid(chain, "call", long_call,  dte_rem)
+
+            if any(m is None for m in (mid_sp, mid_lp, mid_sc, mid_lc)):
+                current += timedelta(days=1)
+                continue
+
+            current_debit = (mid_sp - mid_lp) + (mid_sc - mid_lc)
+
+        pnl_usd = (entry_credit - current_debit) * NDX_MULTIPLIER
+        records.append({
+            "trade_date":    entry_date.isoformat(),
+            "calendar_date": current.isoformat(),
+            "dte_remaining": dte_rem,
+            "spot":          round(spot, 2),
+            "pnl_usd":       round(pnl_usd, 2),
+        })
+        current += timedelta(days=1)
+
+    return records
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION F — LOOP PRINCIPAL DO BACKTEST
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_backtest() -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Itera todos os pares de sextas-feiras válidos e simula o Iron Condor 7DTE.
     Processa um arquivo por vez para RAM mínima (safe em 16 GB).
+    Retorna (trade_log, daily_mtm).
     """
     pairs = discover_friday_pairs(DATA_DIR)
     if not pairs:
         log.error("No valid pairs found — check DATA_DIR.")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
-    records: list[dict] = []
+    records:   list[dict] = []
+    all_daily: list[dict] = []
     skipped = 0
 
     for entry_date, exit_date in pairs:
@@ -578,6 +665,18 @@ def run_backtest() -> pd.DataFrame:
             pnl_rec = calc_trade_pnl(entry_rec, spot_exit)
             records.append({**entry_rec, **pnl_rec})
 
+            # ── DAILY MTM (base para Close Rules no viewer) ───────────────
+            try:
+                daily_records = compute_daily_mtm_ic7(
+                    entry_date, exit_date,
+                    optimal["short_put"],  optimal["long_put"],
+                    optimal["short_call"], optimal["long_call"],
+                    optimal["total_credit"],
+                )
+                all_daily.extend(daily_records)
+            except Exception as exc:
+                log.warning(f"[WARN] Daily MTM skipped for {entry_date}: {exc}")
+
             tier_tag = f" [bid≥{min_bid_used}]" if min_bid_used != MIN_BID else ""
             log.info(
                 f"{entry_date} → {exit_date} | "
@@ -603,11 +702,12 @@ def run_backtest() -> pd.DataFrame:
 
     log.info(f"\n{'─'*60}")
     log.info(f"Trades executed: {len(records)} | Skipped: {skipped}")
-    return pd.DataFrame(records)
+    daily_df = pd.DataFrame(all_daily) if all_daily else pd.DataFrame()
+    return pd.DataFrame(records), daily_df
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECTION F — ANALYTICS DE PERFORMANCE
+# SECTION G — ANALYTICS DE PERFORMANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _equity_curve(tl: pd.DataFrame) -> pd.Series:
@@ -685,7 +785,7 @@ def build_performance_report(tl: pd.DataFrame) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECTION G — CHARTS & REPORT
+# SECTION H — CHARTS & REPORT
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Estilo visual consistente
@@ -934,7 +1034,11 @@ def export_results(tl: pd.DataFrame, rpt: dict, outdir: Path):
 
 # ── Orchestrator ─────────────────────────────────────────────────────────
 
-def generate_all_outputs(tl: pd.DataFrame, outdir: Path = OUTPUT_DIR):
+def generate_all_outputs(
+    tl: pd.DataFrame,
+    daily_df: pd.DataFrame | None = None,
+    outdir: Path = OUTPUT_DIR,
+):
     if tl.empty:
         log.error("Trade log is empty — nothing to report.")
         return
@@ -951,6 +1055,14 @@ def generate_all_outputs(tl: pd.DataFrame, outdir: Path = OUTPUT_DIR):
     plot_pnl_distribution(tl, outdir)
     plot_monthly_heatmap(tl, outdir)
     export_results(tl, rpt, outdir)
+
+    # ── Daily MTM CSV (alimenta Close Rules no Trade Auditor) ─────────────
+    if daily_df is not None and not daily_df.empty:
+        start      = str(tl["trade_date"].min())
+        end        = str(tl["exp_date"].max())
+        daily_name = f"{STRATEGY_TAG}_daily_{start}_{end}.csv"
+        daily_df.to_csv(outdir / daily_name, index=False, float_format="%.4f")
+        log.info(f"  ✓ {outdir / daily_name}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -973,13 +1085,13 @@ def main():
         log.error(f"DATA_DIR not found: {DATA_DIR}")
         return
 
-    trade_log = run_backtest()
+    trade_log, daily_df = run_backtest()
 
     if trade_log.empty:
         log.error("Backtest produced no trades. Check data and parameters.")
         return
 
-    generate_all_outputs(trade_log)
+    generate_all_outputs(trade_log, daily_df)
 
 
 if __name__ == "__main__":
