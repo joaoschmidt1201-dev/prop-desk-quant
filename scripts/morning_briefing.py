@@ -88,15 +88,18 @@ def fetch_market_data() -> dict:
 
 
 def fetch_spx_technicals() -> dict:
-    """Fetches SPX history and computes W EMA20, D SMA50, D SMA200."""
+    """Fetches SPX history and computes daily/weekly EMA and SMA reference levels."""
     try:
         daily  = yf.Ticker("^GSPC").history(period="2y", auto_adjust=True)
         weekly = yf.Ticker("^GSPC").history(period="2y", interval="1wk", auto_adjust=True)
         if daily.empty or len(daily) < 200 or weekly.empty or len(weekly) < 20:
             return {}
         price    = round(float(daily["Close"].iloc[-1]), 2)
+        d_ema9   = round(float(daily["Close"].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
+        d_ema20  = round(float(daily["Close"].ewm(span=20, adjust=False).mean().iloc[-1]), 2)
         d_sma50  = round(float(daily["Close"].rolling(50).mean().iloc[-1]), 2)
         d_sma200 = round(float(daily["Close"].rolling(200).mean().iloc[-1]), 2)
+        w_ema9   = round(float(weekly["Close"].ewm(span=9, adjust=False).mean().iloc[-1]), 2)
         w_ema20  = round(float(weekly["Close"].ewm(span=20, adjust=False).mean().iloc[-1]), 2)
 
         def ma_info(val):
@@ -106,6 +109,9 @@ def fetch_spx_technicals() -> dict:
         return {
             "price": price,
             "mas": {
+                "D EMA9":   ma_info(d_ema9),
+                "D EMA20":  ma_info(d_ema20),
+                "W EMA9":   ma_info(w_ema9),
                 "W EMA20":  ma_info(w_ema20),
                 "D SMA50":  ma_info(d_sma50),
                 "D SMA200": ma_info(d_sma200),
@@ -790,7 +796,7 @@ From the ECONOMIC CALENDAR or web search, pick 1-2 genuine macro catalysts only:
 FORMAT: Each item on its own line starting with a dash (-). Include ET timing when known. Maximum 5-6 items total. Only include items that could genuinely move SPX.
 
 §3§
-3-4 sentences using the moving averages in the data above. State where SPX is relative to W EMA20, D SMA50, and D SMA200. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
+3-4 sentences using the moving averages in the data above. State where SPX is relative to D EMA9, D EMA20, W EMA9, W EMA20, D SMA50, and D SMA200. You do NOT need to mention every level every day, but you should explicitly use the ones that are most relevant for trend, support/resistance, or compression. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
 
 §5§
 One direct sentence: the desk's tactical bias for today and the single most important reason.
