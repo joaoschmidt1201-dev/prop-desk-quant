@@ -4,7 +4,14 @@ cz_dashboard_app.py
 -------------------
 Interactive Options Portfolio Dashboard — Prop Desk
 Two tabs: CZ Live Trading | JS Forward Testing
-AI Chat powered by Claude Sonnet with full portfolio context.
+
+AI Chat: dual-provider — Anthropic (Claude) OR OpenAI (ChatGPT).
+CZ escolhe o provider no sidebar e cola sua API key. API keys vivem em
+session_state apenas (nao persistem em disco).
+
+Env vars (opcionais — se presentes, sao usadas como default):
+  ANTHROPIC_API_KEY  — Claude 4.6
+  OPENAI_API_KEY     — GPT-4o / GPT-4-turbo
 """
 
 import json
@@ -25,7 +32,7 @@ st.set_page_config(
     page_title="Prop Desk | Options Dashboard",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ─── CSS ─────────────────────────────────────────────────────────────────────
@@ -510,24 +517,133 @@ def build_ai_system_prompt(trades: list[dict], kpis: dict, env_label: str) -> st
 
 # ─── AI streaming ─────────────────────────────────────────────────────────────
 
-def stream_ai_response(messages: list[dict], system_prompt: str):
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+AI_PROVIDERS = {
+    "Anthropic (Claude)": {
+        "env_var":    "ANTHROPIC_API_KEY",
+        "models":     ["claude-sonnet-4-6", "claude-opus-4-7", "claude-haiku-4-5-20251001"],
+        "default":    "claude-sonnet-4-6",
+        "key_prefix": "sk-ant-",
+        "signup_url": "https://console.anthropic.com/settings/keys",
+    },
+    "OpenAI (ChatGPT)": {
+        "env_var":    "OPENAI_API_KEY",
+        "models":     ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-5", "gpt-5-mini"],
+        "default":    "gpt-4o",
+        "key_prefix": "sk-",
+        "signup_url": "https://platform.openai.com/api-keys",
+    },
+}
+
+
+def _stream_anthropic(messages: list[dict], system_prompt: str, api_key: str, model: str):
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+    with client.messages.stream(
+        model=model,
+        max_tokens=2000,
+        system=system_prompt,
+        messages=messages,
+    ) as stream:
+        yield from stream.text_stream
+
+
+def _stream_openai(messages: list[dict], system_prompt: str, api_key: str, model: str):
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    # OpenAI espera system como primeira mensagem do array
+    oai_msgs = [{"role": "system", "content": system_prompt}] + messages
+    stream = client.chat.completions.create(
+        model=model,
+        messages=oai_msgs,
+        max_tokens=2000,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
+def stream_ai_response(messages: list[dict], system_prompt: str,
+                       provider: str, api_key: str, model: str):
+    """Dispatcher — roteia para Anthropic ou OpenAI conforme escolha do usuario."""
     if not api_key:
-        yield "Configure `ANTHROPIC_API_KEY` to enable AI analysis."
+        env_var = AI_PROVIDERS[provider]["env_var"]
+        yield f"Configure sua API key de **{provider}** no sidebar (ou var `{env_var}`)."
         return
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=2000,
-            system=system_prompt,
-            messages=messages,
-        ) as stream:
-            for text in stream.text_stream:
-                yield text
+        if provider == "Anthropic (Claude)":
+            yield from _stream_anthropic(messages, system_prompt, api_key, model)
+        elif provider == "OpenAI (ChatGPT)":
+            yield from _stream_openai(messages, system_prompt, api_key, model)
+        else:
+            yield f"Provider desconhecido: {provider}"
     except Exception as e:
-        yield f"Error: {e}"
+        yield f"**Erro ({provider}):** {e}"
+
+
+def render_ai_sidebar() -> tuple[str, str, str]:
+    """Sidebar de configuracao AI. Retorna (provider, api_key, model).
+
+    API key vive em st.session_state — nao persiste em disco. Se usuario
+    configurou env var, e usada como default mas pode ser sobrescrita.
+    """
+    with st.sidebar:
+        st.markdown("### 🤖 AI Assistant")
+
+        provider = st.selectbox(
+            "Provider",
+            options=list(AI_PROVIDERS.keys()),
+            key="ai_provider",
+            help="Escolha quem vai analisar seu portfolio. Keys sao "
+                 "locais (session_state) e nao sao gravadas em disco."
+        )
+
+        cfg = AI_PROVIDERS[provider]
+        key_state = f"api_key_{cfg['env_var']}"
+
+        # Default: env var se existir, senao vazio
+        if key_state not in st.session_state:
+            st.session_state[key_state] = os.environ.get(cfg["env_var"], "")
+
+        env_configured = bool(os.environ.get(cfg["env_var"]))
+        env_note = "✓ encontrada em env" if env_configured else "cole aqui"
+
+        api_key = st.text_input(
+            f"API Key ({env_note})",
+            value=st.session_state[key_state],
+            type="password",
+            key=f"input_{key_state}",
+            placeholder=f"{cfg['key_prefix']}...",
+            help=f"Obter em: {cfg['signup_url']}",
+        )
+        # Persist in session_state (still not on disk)
+        st.session_state[key_state] = api_key
+
+        model = st.selectbox(
+            "Modelo",
+            options=cfg["models"],
+            index=cfg["models"].index(cfg["default"]),
+            key=f"model_{provider}",
+        )
+
+        if not api_key:
+            st.warning(f"Sem key → AI desativado. [Obter key]({cfg['signup_url']})")
+        elif not api_key.startswith(cfg["key_prefix"]):
+            st.error(f"Formato invalido — key de {provider} comeca com `{cfg['key_prefix']}`")
+        else:
+            st.success(f"✓ {provider} pronto — {model}")
+
+        if provider == "OpenAI (ChatGPT)":
+            st.caption(
+                "💡 Esta key usa a **API OpenAI** (billing separado do ChatGPT Plus). "
+                "Custo tipico: ~$0.01–0.05 por pergunta no gpt-4o."
+            )
+
+        st.markdown("---")
+        st.caption("Context: portfolio, trades ativos/fechados, alertas de risco")
+
+        return provider, api_key, model
 
 
 # ─── Tab renderer ─────────────────────────────────────────────────────────────
@@ -535,7 +651,10 @@ def stream_ai_response(messages: list[dict], system_prompt: str):
 def render_tab(trades_env: list[dict], history: pd.DataFrame,
                env_norm: str, env_label: str, gen_dt: str,
                monthly_summaries: list[dict],
-               individual_trade_pnls: dict | None = None):
+               individual_trade_pnls: dict | None = None,
+               ai_provider: str = "Anthropic (Claude)",
+               ai_api_key: str = "",
+               ai_model: str = "claude-sonnet-4-6"):
 
     k = compute_kpis(trades_env, history, monthly_summaries)
     active = k["active_list"]
@@ -748,13 +867,21 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
         st.dataframe(pd.DataFrame(rows_c), use_container_width=True, hide_index=True)
 
     # ── AI Chat ──
-    st.markdown('<div class="section-title">AI Portfolio Analyst</div>', unsafe_allow_html=True)
+    provider_short = "Claude" if ai_provider.startswith("Anthropic") else "ChatGPT"
+    st.markdown(
+        f'<div class="section-title">AI Portfolio Analyst — {provider_short} '
+        f'<span style="color:#8892a4;font-size:10px;">({ai_model})</span></div>',
+        unsafe_allow_html=True,
+    )
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        st.warning("Set `ANTHROPIC_API_KEY` environment variable to enable AI analysis.")
+    if not ai_api_key:
+        st.warning(
+            f"AI desativado. Configure sua API key de **{ai_provider}** no sidebar ← "
+            "(ou defina a variavel de ambiente correspondente)."
+        )
     else:
-        chat_key = f"chat_{env_norm}"
+        # Chave de estado inclui provider para manter conversas separadas por modelo
+        chat_key = f"chat_{env_norm}_{ai_provider.split()[0].lower()}"
         if chat_key not in st.session_state:
             st.session_state[chat_key] = []
 
@@ -780,7 +907,7 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
 
         # Chat input
         if prompt := st.chat_input(
-            f"Ask anything about the {env_label} portfolio...",
+            f"Ask {provider_short} anything about the {env_label} portfolio...",
             key=f"chat_input_{env_norm}"
         ):
             st.session_state[chat_key].append({"role": "user", "content": prompt})
@@ -795,14 +922,19 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
             api_messages = [{"role": m["role"], "content": m["content"]}
                             for m in history_msgs[-10:]]
             with st.chat_message("assistant", avatar="🤖"):
-                response = st.write_stream(stream_ai_response(api_messages, system_prompt))
+                response = st.write_stream(
+                    stream_ai_response(api_messages, system_prompt,
+                                       ai_provider, ai_api_key, ai_model)
+                )
             st.session_state[chat_key].append({"role": "assistant", "content": response})
 
-        # Clear chat button
+        # Clear chat + switch provider hints
+        col_a, col_b = st.columns([1, 1])
         if st.session_state[chat_key]:
-            if st.button("Clear conversation", key=f"clear_{env_norm}"):
+            if col_a.button("Clear conversation", key=f"clear_{env_norm}"):
                 st.session_state[chat_key] = []
                 st.rerun()
+        col_b.caption(f"💬 Troque provider/modelo no sidebar — cada combo mantem historia propria.")
 
     # ── Downloads ──
     st.markdown('<div class="section-title">Export</div>', unsafe_allow_html=True)
@@ -853,6 +985,9 @@ def main():
     cz_monthly = sheet_summaries.get("CZ_Live",    [])
     js_monthly = sheet_summaries.get("JS_Forward", [])
 
+    # ── AI Sidebar (renderiza uma vez, compartilhado pelos tabs) ──
+    ai_provider, ai_api_key, ai_model = render_ai_sidebar()
+
     # ── Header ──
     col_h, col_r = st.columns([3, 1])
     col_h.markdown("## Prop Desk — Options Control Panel")
@@ -878,20 +1013,23 @@ def main():
             st.info("No CZ Live trades found in snapshot.")
         else:
             render_tab(cz_live, history, "CZ_Live", "CZ Live Trading", gen_dt, cz_monthly,
-                       individual_trade_pnls=individual_trade_pnls)
+                       individual_trade_pnls=individual_trade_pnls,
+                       ai_provider=ai_provider, ai_api_key=ai_api_key, ai_model=ai_model)
 
     with tab_js:
         if not js_fwd and not js_monthly:
             st.info("No JS Forward trades found in snapshot.")
         else:
-            render_tab(js_fwd, history, "JS_Forward", "JS Forward Test", gen_dt, js_monthly)
+            render_tab(js_fwd, history, "JS_Forward", "JS Forward Test", gen_dt, js_monthly,
+                       ai_provider=ai_provider, ai_api_key=ai_api_key, ai_model=ai_model)
 
     # ── Footer ──
     st.markdown("---")
+    ai_label = "Claude" if ai_provider.startswith("Anthropic") else "ChatGPT"
     st.markdown(
-        "<center><small style='color:#8892a4'>"
-        "Prop Desk Quant &nbsp;|&nbsp; Data: OptionStrat via Make "
-        "&nbsp;|&nbsp; AI: Claude Sonnet 4.6</small></center>",
+        f"<center><small style='color:#8892a4'>"
+        f"Prop Desk Quant &nbsp;|&nbsp; Data: OptionStrat via Make "
+        f"&nbsp;|&nbsp; AI: {ai_label} ({ai_model})</small></center>",
         unsafe_allow_html=True
     )
 
