@@ -52,5 +52,11 @@ desktop.ini
 # ── Infra / Cloud ────────────────────────────────────────────────────────────
 infra/rclone.conf
 
-# ── Claude Code (interno) ────────────────────────────────────────────────────
-.claude/
+# ── Claude Code (interno pessoal; skills/agents do projeto SAO tracked) ─────
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/project/
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/project/
