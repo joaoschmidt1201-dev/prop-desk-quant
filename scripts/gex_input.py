@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-import io
-import sys
-
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-
 """
 gex_input.py
 ------------
@@ -466,4 +461,8 @@ def main():
     print()
 
 if __name__ == "__main__":
+    # Windows console encoding hack — only on direct CLI execution.
+    import io
+    import sys
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     main()
