@@ -1,0 +1,38 @@
+# ============================================================
+# GEX WEEKLY LEVELS -- Week of 2026-04-07
+# Source: TradingLitt Weekly Outlook (YouTube, every Monday)
+# ============================================================
+#
+# HOW TO FILL IN:
+#   Each line: label:price
+#   Use the label exactly as shown in the TradingLitt video.
+#   Examples: g-flip:660  |  p1+ag2+col:665  |  n+col:650
+#
+# ACCEPTED CATEGORIES:
+#   g-flip      -> white dashed line  (zero GEX -- most important)
+#   p, p1, p2   -> green lines        (call walls / positive GEX)
+#   n, n1, n2   -> red lines          (put walls / negative GEX)
+#   r, r1       -> red lines          (also negative GEX)
+#   ag, ag3...  -> purple lines       (aggregate / confluence)
+#   pos_zone    -> light green dashed (positive GEX zone start)
+#   neg_zone    -> light red dashed   (negative GEX zone start)
+#   low gex     -> red line           (low GEX area)
+#
+# Lines starting with # are comments (ignored by the script).
+# ============================================================
+
+g-flip:662
+
+p:670
+p:665
+p3:661
+p1+coi+ag2:660
+p2:657
+
+ag3:656
+ag+neg gex starts:655
+ag4:654
+
+low gex:651
+n+ag spike:650
+n+ag spike:645

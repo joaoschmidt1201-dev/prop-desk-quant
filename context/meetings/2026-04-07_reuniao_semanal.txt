@@ -1,0 +1,132 @@
+Data: 2026-04-07 (Reunião de Segunda-feira)
+Participantes: João (Speaker 1 / The Architect) e Cristiano/CZ (Speaker 2 / Head Trader)
+Fonte: TurboScribe (pode conter erros de transcrição)
+================================================================================
+
+Speaker 1
+(0:00) Ah, ok. (0:03) Tudo bem por aí? (0:05) Tudo certo.
+(0:06) Novinho agora, começou. (0:07) Essa semana deu uma amenizada no clima. (0:11) Ok, ok.
+(0:13) Começou o outono então, um pouquinho atrasado. (0:15) Agora começou, de fato. (0:18) Passou o Páscoa no Sul?
+(0:21) Sim, sim. (0:22) Fui lá para ficar perto da minha família, sei lá, engaropar com eles. (0:26) Vocês estão morando lá, né, João?
+(0:28) Morando lá. (0:29) Depois da pandemia eles foram para lá e não quiseram mais a cidade. (0:35) Quem mora lá não precisa de emigrar, né, para Flórida ou para Portugal, né?
+Speaker 2
+(0:40) É.
+Speaker 1
+(0:43) Vocês já já já estão em Portugal? (0:45) Sim, chegamos sábado, sábado bem tarde, assim, chegamos sábado 11 da noite. (0:51) Passamos ontem aqui, fomos para Valência, né, nove horas de carro, assim, é só atravessar a Espanha praticamente na mesma linha de Lisboa, foi para o outro lado da Península Ibérica.
+(1:06) Sim. (1:07) João, você está a fazer mais rápido hoje? (1:10) Certo.
+(1:11) O almoço daqui a pouco está na mesa, né? (1:13) Carol gosta de almoçar cedo. (1:15) Claro.
+(1:16) Então vamos lá. (1:17) Começar com o João, eu confesso que eu não consegui abrir o link ainda, vou tentar fazer isso agora, inclusive, porque ontem, quando eu quis dar uma espiadinha, eu não consegui. (1:30) Deixa eu dar uma entradinha, depois você já comanda aí, já projeta.
+(1:35) Isso, vê se você consegue entrar agora. (1:37) É, só para eu entrar para ver um pouquinho o feel, assim, o look and feel.
+Speaker 2
+(1:44) Certo. (1:48) Essa ferramenta original, João, o que que era?
+Speaker 1
+(1:53) Desculpa, não entendi. (1:55) O que que era originalmente esse app? (1:57) Ele já vinha nesse formato, só faltava o...
+(2:01) Não, esse app, na verdade, foi esse site que foi tudo eu que criei usando o Cloud Code, o Streamlit.app é só o lugar onde eu estou colocando o site que foi criado, mas toda essa interface visual, as ferramentas e os números aí, tudo isso foi criado, eu criei via Cloud Code para apresentar o resultado do backtest, dos outros backtests que eu vou fazer. (2:28) A ideia é... (2:30) É muito trabalho.
+(2:34) Pois é, mas isso foi muito rápido de fazer, eu fiquei, realmente, a ferramenta é muito poderosa, assim. (2:41) Quer dizer, para você é uma experiência também de trabalhar com um programador que é muito melhor e eficiente que qualquer outro. (2:50) Sim, sem sombra de dúvidas, assim.
+(2:53) Como eu comentei para você, uma coisa que demoraria dias, semanas para fazer, em um dia faz milhares de códigos e eu consigo... (3:02) Eu montei um backtest, montei um site onde ali você consegue ver... (3:07) Porque um backtest feito em Python, uma das coisas que acontecem é ficar muito escuro, você não sabe exatamente se a regra foi seguida, se está ali...
+(3:16) Nesse site você consegue ver trade a trade, o perfil que foi montado, qual o max loss, o max profit, onde encerrou ali a operação. (3:25) Então fica muito mais claro, muito mais visível. (3:27) E a parte de layout, ele vai definindo ele próprio também?
+(3:30) Ele próprio, eu fui otimizando depois o que eu queria, pedi algumas alterações, mas ele que definiu, eu pedi algo parecido com options thread para que a gente conseguisse ficar em uma mesma interface, mas aí fui melhorando depois pedindo melhorias para ele. (3:48) Você interagindo com ele como num prompt, digamos, um prompt sem... (3:56) Não obrigatoriamente racional, você vai dizendo realmente quais são suas ambições, seus objetivos, resultados esperados e vai colocando isso em linguagem de programação?
+(4:10) Isso, sem linguagem de programação. (4:13) Não é via o próprio site do Cloud, é via um terminal, uso o VS Code para fazer isso, e ali tem todo um repositório onde eu salvo o nosso contexto, todos os projetos... (4:25) Deixa eu até te mostrar rapidinho.
+(4:27) Projeto, então. (4:28) Sim, muito legal, cara. (4:31) Ah, o look and feel está muito bom, tem todas as informações aqui.
+(4:36) Claro, mas você apresentando eu vou entender melhor. (4:39) Então, aqui, esse é o VS Code que eu utilizo para os códigos e para utilizar o Cloud, aí aqui são todos os projetos que ele vai salvando, então eu comecei criando uma pasta para ele, dando o nosso contexto, o que a gente faz aqui no nosso trabalho, e aqui são todos os códigos que ele vai criando, por exemplo, o código do backtest aqui, que eu criei junto com a ferramenta, tem mais de mil linhas de código aqui para rodar o backtest. (5:08) E aí, basicamente, para eu chamar, para eu fazer algum prompt ali, eu digito aqui para chamar no terminal o Cloud, e aí ele já fica pronto aqui, eu seleciono o modelo que eu quero utilizar e etc, e aqui mesmo eu digito o prompt, linguagem natural, não precisa ser em código, pedindo para ele o que eu desejo, ele já consegue acessar todos os documentos que estão aqui, os dados, tudo isso eu vou subindo aqui.
+(5:32) Ele tem acesso a tudo isso, nosso histórico, e aí com isso ele vai montando um novo código, vai me ajudando com aquela minha próxima tarefa. (5:42) Incrível, incrível. (5:45) Bom, a parte que certamente, mesmo com toda essa facilitação aí de AI e do Cloud Code, certamente é uma coisa que vai requer alguma especialização, quem mais vai fazendo, mais vai aprendendo, vai fazendo as coisas mais...
+(6:04) Não vale a pena um generalista querer aprender, não é? (6:08) Muito legal, muito legal. (6:09) Você está acumulando uma experiência com AI também que é muito já de ponta, não é, João?
+(6:19) Construindo ferramentas e questionando o uso de ferramentas já estabelecidas, não é? (6:26) É, então assim, realmente é um novo para mim, eu acho que eu tinha ouvido falar na aula do Akita, né, sobre essa ferramenta e ele mesmo também comentou o quão disruptivo estava sendo, (6:39) e eu mandei um áudio para você, eu conversei comigo mesmo, que é especialista nessa área e está fazendo um trabalho super legal ali utilizando também o Cloud Code, (6:47) e é realmente diferente, assim, de tudo que eu já mexi, do que eu posso fazer para a programação e AI utilizando isso. (6:56) E, claro, precisa ter uma visão um pouco mais técnica, porque tem muitas coisas que, o próprio Akita fala no vídeo, né, uma pessoa que não sabe programar, ela consegue vir aqui e montar projetos bacanas, mas uma outra coisa vai ficar faltando, assim, vai ter que você ir ali otimizando e direcionando o prompt para que ele monte um projeto, um trabalho bacana. (7:17) É, o que me parece é, assim, que a parte que está ficando extremamente frustrante é aprender a linguagem de programação, né?
+(7:25) Exato. (7:26) Isso está ficando frustrante, porque você revisar o código, etc., é muito frustrante, eu acho. (7:33) E o que vai sobressair realmente é quem é um bom project manager, né?
+(7:35) É o cara que já pensa na frente, que já está... (7:39) Como eu falei para você, nós vamos daqui a Valência, e são nove horas, certo? (7:44) O cara que sabe, vai parar para fazer xixi, vai parar para comer um sanduíche, que vai ter um congestionamento.
+(7:53) Quando chegar na cidade, vai ter os faróis. (7:56) O cara que já prevê tudo isso, ele está na frente do que o cara que, né, usou uma ferramenta, no meu caso, o GPS, para fazer uma projeção, né? (8:04) Exato, esse eu acho que é o maior ponto, assim.
+(8:07) O próprio Akita deu de exemplo naquele vídeo, né? (8:11) Igual, por exemplo, hoje eu consigo subir um site, eu consigo subir um aplicativo utilizando o CloudForge e faço isso em poucos dias. (8:17) Só que, e a segurança desse aplicativo?
+(8:19) As pessoas vão conseguir entrar e puxar os dados? (8:22) Ou então, por exemplo, eu vou rodar um backtest aqui, eu tenho que direcionar para saber que ele não vai utilizar dados do futuro para montar o backtest, fazer um backtest não realista. (8:30) Então, todos esses detalhes, eu preciso passar.
+(8:34) Mas agora, o código em si, qual biblioteca vai ser utilizada, documentação Python, isso aí, realmente já precisa mais introduzir. (8:43) É, eu acho assim, como eu tive a experiência muitas vezes de passar uma ideia para uma pessoa mais experiente, e até uma diferença de perfil, mais experiente alemão e menos experiente brasileiro. (8:59) Pode ser no passado.
+(9:01) E as perguntas que um alemão experiente faz, que é totalmente diferente das perguntas que um brasileiro pouco experiente faz, totalmente diferente. (9:08) Em termos de segurança, desempenho, o resultado que você quer no final, você quer ver o gráfico numa dimensão, duas dimensões, você quer fazer visual, não visual, o cara já está pensando em tanta coisa, e aí vem essa diferença realmente do ser humano, né? (9:29) Claro que tudo isso vai ficando cada vez mais, cada vez mais na prura de prateleira, o checklist, né?
+(9:38) Mas espero que ainda tenha alguma capacidade do bom project manager fazer diferença, né? (9:44) Sim, eu acho que isso, sem dúvidas. (9:47) Eu acho que tem muita coisa que é automatizada, mas tem coisa que sempre vai precisar ser feita, sim.
+(9:55) Legal, João. (9:56) Muito bacana. (9:57) E temos resultados, bom, agora dá uma geral funcional para a gente.
+(10:02) Mas então, Cristiano, só para, antes de eu comentar exatamente o que está aqui no view que eu montei, (10:07) o objetivo disso é justamente porque hoje em dia tem ferramentas de mercado para backtest, (10:12) até eu utilizava, por exemplo, o FinCore Stream On Demand para montar os backtests, mas era muito demorado e muito mais trabalhoso, (10:19) então a ideia é como que eu consigo facilitar isso, e tem outros sites também que já são mais rápidos, que disponibilizam isso, (10:26) mas não tem as regras que a gente utiliza, então eu preciso montar uma estratégia baseada somente em delta, (10:31) então eu não consigo mexer muito nisso, então a minha ideia era ter mais flexibilidade, mas ao mesmo tempo ter um processo muito mais rápido e automatizado.
+(10:38) E aí eu acho que o backtest em Python, utilizando o código dele, ele entra perfeitamente nisso, (10:44) e aí justamente a ideia de ter um view como esse aqui, e isso aqui pode ser melhorado e aprimorado, (10:50) mas aqui está todo o resultado, trade a trade, que a gente consegue analisar, (10:54) então aqui está nesse canto esquerdo, você tem ali o resultado da estratégia, (11:01) então foram 33 trades, um enrage de 75%, aqui está o P&L total de 396 dólares, (11:09) e o IV utilizado, o médio utilizado nas estratégias, e aqui você consegue selecionar cada um dos trades, (11:16) então para aquela semana específica eu quero ver o que aconteceu, se realmente o robô seguiu a regra para montar o trade, (11:24) aí você vem aqui e ele já muda, você consegue ver quais foram os contratos selecionados, (11:29) então a gente já criou uma distância de 50 width na parte do downside e 100, isso que foi respeitado.
+(11:37) Aí você vê o P&L profile aqui, a linha pontilhada em branco, talvez seja um pouco pequeno, é o standard deviation, e amarelo é o nosso breakeven, então você vê que o amarelo está fora do standard deviation, ou seja, ele foi respeitado. (11:50) Então aqui você consegue ver qual foi o net credit, o max profit ali, e o max loss de cada uma das downside e upside, e onde encerrou a operação, então essa operação encerrou o conto.
+
+[CONEXÃO CAIU VÁRIAS VEZES — TRECHO PERDIDO]
+
+Speaker 1
+(18:10) Foi, caiu três vezes, caiu três vezes a força aqui, três vezes para reconectar o modem.
+(18:41) Então, Cristiano, só acho que o principal aqui é a gente conseguir visualizar cada um dos três, eu acho que esse é o ponto. (18:46) Se você descer aqui embaixo, você consegue ver também a estrutura montada, muito o que a gente anota hoje no nosso control panel, né, que é qual é o nosso target para a website, aqui os contratos, cada uma, a estrutura utilizada, né, e os créditos recebidos em cada um deles, então todas as informações estão aqui.
+(19:09) Então aqui eu coloquei alguns gráficos que mostram alguns detalhes importantes, para a gente entender como a estratégia se comportou, e basicamente é isso.
+(19:22) A primeira tela aqui é para você ter uma visão trade a trade, para você analisar como é que foi o comportamento, etc. (19:28) E aqui, performance analysis, que é o que você consegue ver ali toda a estratégia, como se comportou no geral.
+
+[NOVA PARTE DA REUNIÃO — APÓS RECONEXÃO]
+
+Speaker 1 (CZ falando)
+(0:15) Eu acho que está muito boa, eu acho que a gente está aprendendo muita coisa, tem sido um caminho,
+(0:31) se pensar nos primeiros back-tests que a gente fez, começou lá com o flagonal (diagonal),
+(0:43) foi uma troca pelo iron condors, começou com flagonal, depois iron condors,
+(1:00) para tentar absorver, cobrir um pouco mais de um at the money, até realmente um standard deviation,
+(1:08) e ter só o upside livre, após o standard deviation, ou seja, nós queríamos ficar com todo, vamos chamar de 80%,
+(1:17) que é a nossa linguagem, garantido, e foi um cenário de mercado não parava de subir,
+(1:24) nasceu lá por novembro aproximadamente, quando o mercado, ao contrário, começou a cair,
+(1:29) e a gente, vários trades não conseguiu resultado, ou baixo resultado.
+(1:54) O mercado começou a mudar completamente, não tem nada a ver com esse mercado, esse atual, com o do ano passado.
+(2:38) Depois a gente convergiu, então, para essas novas ideias, 42, 28, 21, 7,
+(2:43) aí o backtest foi muito importante, nos disse que o 7 é o que está nos dando mais P&L,
+(2:49) porque ele é feito, não é por acaso, porque ele é feito com o NDX,
+(2:54) a gente tem feito mais o NDX, que é muito mais turbinado do que o SPX e o RUT.
+(3:16) Mas, basicamente, a gente agora veio para um universo onde o all-time high,
+(3:22) um ATR para cima, dois ATRs para cima não tem nenhuma importância,
+(3:41) a gente está na semana 15 do ano, das últimas 20 semanas, e o all-time high,
+(3:49) mas eu, particularmente, achando que o mercado está muito mais para cair,
+(3:58) a gente está ainda muito tempo embaixo do weekly 20 MNA, sem conseguir resgatá-lo,
+(4:15) porque a regra é que ele tem que estar menos 20% para caracterizar bearish.
+(4:21) Mas o mercado não sobe mais esse ano.
+(4:55) Esse é até o objetivo de buscar uma ferramenta que seja mais fácil, porque eu acredito que com essas mudanças de mercado a gente vai querer testar novas estratégias.
+
+[FECHAMENTO DO MÊS DE MARÇO]
+(5:36) Vamos pensar assim, a gente encerrou o mês, chamamos o mês, na semana passada, dia 31. Na verdade foi dia 2.
+(5:51) E os números foram muito positivos.
+(6:41) Esse 30 mil é um número fantástico, né?
+(6:45) Eu tinha um objetivo secreto: fechar até fevereiro com 8, março com 10.
+(6:54) Fevereiro não cumpriu, março extrapolou. (30k no mês)
+(7:00) De que o mercado de lado, sem caminhar só uma direção, ele é interessante.
+(7:13) O buy and hold parece... se nós mantivéssemos esse número, qualquer coisa entre 10 e 30, buy and hold não faz mais sentido.
+(7:41) Nós somos short sellers, Iron condor, iron fly, bear call spread, bull put spread. Sempre net credit.
+
+[TRADE ABERTO COM PROBLEMA — CZ]
+(8:19) Se você pegar o T40, eu tive aqui um devaneio clássico de quem está em uma sequência de sucesso.
+(8:38) Basicamente é um cenário de queda. Não uma aposta no crash, mas uma aposta que continuaria caindo.
+(11:19) Eu entrei na segunda-feira, dia 30. Foi um fechamento dia 10. Ou seja, muito mais que sete dias.
+(11:44) Eu botei 2.506 — foi muito apertado.
+(12:31) Cheguei a estar a menos 10 negativo (menos $10k).
+(12:49) Vendi o put a 6. Eu comprei ele a 23. Agora ele está 0,95.
+(13:46) Aí aconteceu uma besteira — salvei com novos preços. Está me dando agora menos $1.200 mas acho que está errado.
+
+[FILOSOFIA DE ADJUSTMENT]
+(6:17) Muita gente fala que tem que fazer adjustment, fazer o rollout.
+(6:20) Quando você faz um rollout, você fecha uma posição com os calls super ricos, super caros. E tem que abrir uma nova. Então, você fez um stop loss.
+(7:02) A gente está aqui a boas distâncias. Lógico que, talvez, faltando agora 4 dias, eu consigo fazer.
+(7:19) A gente trabalha com o range. A partir do momento que a gente monta um bom range, caso haja algum rompimento, acabou a nossa convicção.
+(7:44) Então, eu acho que o segredo mesmo é montar um bom range e precisar o menos possível de adjustment.
+(9:22) O MDX, sete dias, não dá para você fazer adjustment. Ele é muito louco. O gamma é muito potente.
+(9:40) Aí fugir do adjustment. A tua perda nos dois lados tem que ser uma perda que você aceita pré-definida.
+
+[ESTRATÉGIA BATMAN / FILOSOFIA DE PREMIUM SELLING]
+(3:22) A ideia original é sempre vender um call e um put para ganhar o máximo de dinheiro.
+(3:32) Se você consegue fazer, em termos de margem, um short call e um put e ainda colocar a trava (wings) para longe — é a melhor maneira de fazer um super net credit.
+(4:03) Às vezes, a gente pensa que o call e o put seco é sempre melhor. Se você acertar a direção, você sempre está melhor do que comprar alguma coisa no formato de premium selling.
+(4:18) O naked é sempre melhor. Mas já que tem que travar, por N razões, a gente faz a trava longe e o mais barato possível.
+(4:55) O batman fica interessante depois para fazer fechamento, mas não para abertura.
+
+[ANÁLISE TÉCNICA vs GAMMA — 7 DTE]
+(27:03) Eu estou começando a achar que quem trabalha com 7 DTE, cara, tem que ficar no seu feijãozinho com arroz. As MAs. Análise técnica.
+(27:39) Como o próprio AI falou, né, dois dias para frente, isso ali não tem nenhuma validade.
+(27:45) Para outras, tem algumas coisas interessantes ali naqueles modelos do MenthorQ, que é o Options Metric.
+(28:06) Para mim, ainda para o 7DTE, análise técnica está muito mais forte.
+(28:26) Eu acho que pode ser uma tarefa para você, João — incorporar mais o gamma e o MenthorQ.
+
+[MORNING BRIEF]
+(19:13) Eu pausei o morning brief, eu tinha colocado ele aí um exemplo para você ver os dados.
+(19:29) Para a gente definir os dados que a gente quer que estejam no morning brief.
+(19:42) CZ vai dar feedback à tarde sobre quais informações quer no morning briefing, principalmente agora com o novo contato com o MenthorQ.
+
+[TRADES DO JOÃO]
+(21:00) Fechei três operações da semana passada: Ouro, META e NVIDIA.
+(21:04) O ouro teve super reversão chegando próximo da SMA200.
+(21:14) A META foi o único trade que eu fechei com loss — teve news, grande queda, achei que não ia recuperar.
+(21:44) Ouro em termos percentuais foi elevado, 78%.

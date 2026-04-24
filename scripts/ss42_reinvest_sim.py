@@ -341,12 +341,9 @@ def main() -> None:
         n_orig    = len(df_orig)
         n_sim     = len(df_sim)
         n_reentry = n_sim - n_orig
-        pnl_orig  = df_orig["pnl_usd"].sum()
-        pnl_sim   = df_sim["pnl_usd"].sum()
 
         log.info(f"  Trades: {n_orig} → {n_sim}  ({n_reentry:+d} re-entradas)")
-        log.info(f"  P&L base (hold to exp): ${pnl_orig:>10,.0f}")
-        log.info(f"  P&L com re-entradas:    ${pnl_sim:>10,.0f}")
+        log.info(f"  (P&L real calculado pelo viewer via apply_close_rule no daily MTM)")
 
         # Salvar CSVs
         out_trades = OUTPUT_DIR / f"SS42_{UNDERLYING}_reinvest_{rule_key}_trades.csv"

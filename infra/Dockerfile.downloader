@@ -1,0 +1,33 @@
+FROM python:3.12-slim
+
+# Dependências do sistema + rclone
+RUN apt-get update && apt-get install -y \
+    gcc \
+    curl \
+    unzip \
+    netcat-openbsd \
+    && curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip \
+    && unzip rclone-current-linux-amd64.zip \
+    && cp rclone-*-linux-amd64/rclone /usr/local/bin/ \
+    && chmod +x /usr/local/bin/rclone \
+    && rm -rf rclone-* \
+    && apt-get remove -y unzip curl \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Instala dependências Python
+COPY infra/requirements-ibkr.txt .
+RUN pip install --no-cache-dir -r requirements-ibkr.txt
+
+# Copia scripts do pipeline
+COPY scripts/ibkr_step1_contract_gen.py .
+COPY scripts/ibkr_step2_bulk_downloader.py .
+COPY scripts/ibkr_step3_daily_assembler.py .
+
+# Entrypoint
+COPY infra/entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]

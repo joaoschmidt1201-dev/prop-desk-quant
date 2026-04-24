@@ -1,0 +1,71 @@
+version: '3.8'
+
+# =============================================================================
+# IBKR Backfill Pipeline — Docker Compose
+#
+# Serviços:
+#   ib-gateway   IB Gateway headless (ghcr.io/gnzsnz/ib-gateway)
+#   downloader   Pipeline Python (Step 1 → 2 → 3 → rclone)
+#
+# Uso local (teste antes do GCP):
+#   cp .env infra/.env
+#   docker-compose -f infra/docker-compose.yml up --abort-on-container-exit
+#
+# O downloader aguarda o gateway passar no healthcheck antes de iniciar.
+# A VM GCP se desliga automaticamente quando o entrypoint.sh termina.
+# =============================================================================
+
+services:
+
+  ib-gateway:
+    image: ghcr.io/gnzsnz/ib-gateway:stable
+    restart: unless-stopped
+    environment:
+      TWS_USERID:             ${IBKR_USERNAME}
+      TWS_PASSWORD:           ${IBKR_PASSWORD}
+      TRADING_MODE:           ${IBKR_TRADING_MODE:-paper}
+      # Reinicia o gateway se o timeout de 2FA expirar (ao invés de travar)
+      TWOFA_TIMEOUT_ACTION:   restart
+      # Read-only: bloqueia ordens acidentais (segurança)
+      READ_ONLY_API:          yes
+      # Senha para proteger o acesso ao noVNC (mude para algo pessoal)
+      VNC_SERVER_PASSWORD:    ${VNC_PASSWORD:-ibkr1234}
+    ports:
+      - "4002:4002"   # paper API
+      - "4001:4001"   # live API
+      - "6080:6080"   # noVNC — interface web para aprovar IB Key no browser
+    healthcheck:
+      # Verifica a porta correta conforme o modo (live=4001, paper=4002)
+      test: ["CMD", "sh", "-c",
+             "nc -z localhost ${IBKR_PORT:-4002}"]
+      interval: 10s
+      timeout:  5s
+      retries:  30        # Até 5 minutos de espera pelo login + IB Key
+      start_period: 60s   # Tempo extra para o gateway iniciar e exibir tela de login
+    networks:
+      - ibkr_net
+
+  downloader:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.downloader
+    depends_on:
+      ib-gateway:
+        condition: service_healthy
+    environment:
+      IBKR_HOST:         ib-gateway
+      IBKR_PORT:         ${IBKR_PORT:-4002}
+      IBKR_TRADING_MODE: ${IBKR_TRADING_MODE:-paper}
+    volumes:
+      # Dados raw + assembled (persistidos no disco da VM)
+      - ../data:/app/data
+      # rclone auth para Google Drive (copiado manualmente antes do deploy)
+      - ./rclone.conf:/rclone/rclone.conf:ro
+    networks:
+      - ibkr_net
+    # Não reinicia automaticamente — pipeline é one-shot
+    restart: "no"
+
+networks:
+  ibkr_net:
+    driver: bridge

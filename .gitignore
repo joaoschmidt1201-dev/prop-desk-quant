@@ -1,6 +1,8 @@
 # ── Credenciais e segredos ────────────────────────────────────────────────────
 .env
 *.key
+.credentials/gdrive_token.json
+.credentials/gdrive_credentials.json
 
 # ── Dados de mercado (Google Drive / local — nunca no repo) ──────────────────
 *.parquet
@@ -29,6 +31,9 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ── Infra / Cloud ────────────────────────────────────────────────────────────
+infra/rclone.conf
 
 # ── Claude Code (interno) ────────────────────────────────────────────────────
 .claude/
