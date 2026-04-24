@@ -21,7 +21,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTPUT = ROOT / "data" / "OP_Control_Panel_Ideal_Template.xlsx"
+OUTPUT = ROOT / "data" / "control_panel" / "OP_Control_Panel_Ideal_Template.xlsx"
 
 
 COLORS = {

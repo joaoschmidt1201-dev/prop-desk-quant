@@ -21,8 +21,8 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "data" / "OP Control Panel.xlsx"
-OUTPUT = ROOT / "data" / "OP Control Panel - Dashboard Pack.xlsx"
+SOURCE = ROOT / "data" / "control_panel" / "OP Control Panel.xlsx"
+OUTPUT = ROOT / "data" / "control_panel" / "OP Control Panel - Dashboard Pack.xlsx"
 
 ADDON_SHEETS = ["Dashboard", "AI Export", "AI Workflow", "db_dashboard_helper"]
 

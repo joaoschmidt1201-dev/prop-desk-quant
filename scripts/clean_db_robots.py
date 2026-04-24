@@ -23,8 +23,8 @@ import openpyxl
 from openpyxl import load_workbook
 
 ROOT      = Path(__file__).parent.parent
-ORIG      = ROOT / "Data" / "OP Control Panel.xlsx"
-CLEAN_OUT = ROOT / "Data" / "OP Control Panel - Clean.xlsx"
+ORIG      = ROOT / "data" / "control_panel" / "OP Control Panel.xlsx"
+CLEAN_OUT = ROOT / "data" / "control_panel" / "OP Control Panel - Clean.xlsx"
 
 
 def clean_db_robots(xlsx_path: Path, output_path: Path) -> dict:

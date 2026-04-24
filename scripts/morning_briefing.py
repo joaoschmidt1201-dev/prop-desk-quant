@@ -38,9 +38,10 @@ except ImportError:
     sys.exit(1)
 
 ROOT         = Path(__file__).parent.parent
-HISTORY_FILE = ROOT / "gex_history.json"       # legacy (kept for backward compat)
-HISTORY_SPX  = ROOT / "gex_history_spx.json"   # new pipeline
-HISTORY_NDX  = ROOT / "gex_history_ndx.json"   # new pipeline
+STATE_GEX    = ROOT / "state" / "gex"
+HISTORY_FILE = STATE_GEX / "gex_history.json"       # legacy (kept for backward compat)
+HISTORY_SPX  = STATE_GEX / "gex_history_spx.json"   # new pipeline
+HISTORY_NDX  = STATE_GEX / "gex_history_ndx.json"   # new pipeline
 
 # Top S&P 500 tickers by market cap — used to filter earnings calendar
 _SP500_MAJORS = {

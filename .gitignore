@@ -1,27 +1,43 @@
 # ── Credenciais e segredos ────────────────────────────────────────────────────
 .env
+.env.local
 *.key
-.credentials/gdrive_token.json
-.credentials/gdrive_credentials.json
+*.pem
+.credentials/
+!.credentials/.gitkeep
 
 # ── Dados de mercado (Google Drive / local — nunca no repo) ──────────────────
 *.parquet
 data/
+!data/.gitkeep
+!data/**/.gitkeep
 
-# ── Relatórios gerados (imagens e logs) ──────────────────────────────────────
-# O trade_log.csv É commitado — é o que alimenta o viewer no Streamlit Cloud
-reports/ic7_backtest/*.log
-reports/ic7_backtest/*.png
-reports/ic7_backtest/performance_report.txt
-reports/ic7_backtest/backtest.log
+# ── State (histórico GEX é tracked; caches locais não) ──────────────────────
+state/**/*.cache.json
+state/**/*.tmp
+
+# ── Relatórios gerados (logs e imagens — CSVs são commitados p/ viewer) ─────
+reports/**/*.log
+reports/**/*.png
+reports/**/performance_report.txt
+reports/**/*.parquet
+
+# ── Artefatos de sessão (Claude Code, Codex, etc) ───────────────────────────
+*-this-session-is-being-continued-*.txt
+.archive/
 
 # ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
 
-# ── Ambiente virtual ──────────────────────────────────────────────────────────
+# ── Ambiente virtual ─────────────────────────────────────────────────────────
 .venv/
 venv/
 env/
@@ -31,6 +47,7 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # ── Infra / Cloud ────────────────────────────────────────────────────────────
 infra/rclone.conf

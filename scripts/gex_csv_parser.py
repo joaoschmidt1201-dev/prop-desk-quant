@@ -9,10 +9,10 @@ Reads a Barchart GEX CSV (SPX, NDX, SPY, or QQQ) and:
   4. Prints terminal summary with distances to spot
 
 Usage:
-  python scripts/gex_csv_parser.py "data/$SPX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
-  python scripts/gex_csv_parser.py "data/$IUXX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
-  python scripts/gex_csv_parser.py "data/SPY-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
-  python scripts/gex_csv_parser.py "data/QQQ-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/raw/gex/$SPX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/raw/gex/$IUXX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/raw/gex/SPY-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/raw/gex/QQQ-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
 """
 
 import argparse
@@ -51,7 +51,7 @@ TICKER_CONFIG = {
         "yf_symbol":       "^GSPC",
         "strike_min":      4000,
         "strike_max":      10000,
-        "history_file":    ROOT / "gex_history_spx.json",
+        "history_file":    ROOT / "state" / "gex" / "gex_history_spx.json",
         "conf_tol":        5,
         "pine_aliases":    ["SPX"],
         "pine_contains":   ["ES1"],
@@ -61,7 +61,7 @@ TICKER_CONFIG = {
         "yf_symbol":       "^NDX",
         "strike_min":      15000,
         "strike_max":      30000,
-        "history_file":    ROOT / "gex_history_ndx.json",
+        "history_file":    ROOT / "state" / "gex" / "gex_history_ndx.json",
         "conf_tol":        25,
         "pine_aliases":    ["NDX"],
         "pine_contains":   ["NQ1"],
@@ -71,7 +71,7 @@ TICKER_CONFIG = {
         "yf_symbol":       "SPY",
         "strike_min":      200,
         "strike_max":      800,
-        "history_file":    ROOT / "gex_history_spy.json",
+        "history_file":    ROOT / "state" / "gex" / "gex_history_spy.json",
         "conf_tol":        2,
         "pine_aliases":    ["SPY"],
         "pine_contains":   [],
@@ -81,7 +81,7 @@ TICKER_CONFIG = {
         "yf_symbol":       "QQQ",
         "strike_min":      150,
         "strike_max":      700,
-        "history_file":    ROOT / "gex_history_qqq.json",
+        "history_file":    ROOT / "state" / "gex" / "gex_history_qqq.json",
         "conf_tol":        2,
         "pine_aliases":    ["QQQ"],
         "pine_contains":   [],
@@ -676,9 +676,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            '  python scripts/gex_csv_parser.py "data/$SPX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14\n'
-            '  python scripts/gex_csv_parser.py "data/SPY-gamma-levels-exp-20260421-weekly.csv"  --week 2026-04-14\n'
-            '  python scripts/gex_csv_parser.py "data/QQQ-gamma-levels-exp-20260421-weekly.csv"  --week 2026-04-14'
+            '  python scripts/gex_csv_parser.py "data/raw/gex/$SPX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14\n'
+            '  python scripts/gex_csv_parser.py "data/raw/gex/SPY-gamma-levels-exp-20260421-weekly.csv"  --week 2026-04-14\n'
+            '  python scripts/gex_csv_parser.py "data/raw/gex/QQQ-gamma-levels-exp-20260421-weekly.csv"  --week 2026-04-14'
         ),
     )
     parser.add_argument("csv",      help="Path to the Barchart CSV file")

@@ -29,7 +29,7 @@ import numpy as np
 import openpyxl
 
 ROOT = Path(__file__).parent.parent
-DEFAULT_XLSX = ROOT / "Data" / "OP Control Panel.xlsx"
+DEFAULT_XLSX = ROOT / "data" / "control_panel" / "OP Control Panel.xlsx"
 REPORTS_DIR  = ROOT / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 

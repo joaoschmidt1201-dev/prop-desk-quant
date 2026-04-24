@@ -58,7 +58,7 @@ COMPRESSION    = "zstd"
 API_LIMIT      = 95_000         # hard stop do watchdog (5% de margem antes do 429)
 RATE_SLEEP     = 0.10           # ~10 req/s — cortesia com o endpoint
 
-CLOSES_CACHE   = Path(__file__).parent.parent / "data" / "ndx_closes_cache.csv"
+CLOSES_CACHE   = Path(__file__).parent.parent / "data" / "cache" / "ndx_closes_cache.csv"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -53,8 +53,8 @@ TRADINGLIT_SCRIPT = ""
 
 # ─── CAMINHOS DOS JSON LOCAIS ─────────────────────────────────────────────────
 ROOT        = Path(__file__).parent.parent
-HISTORY_SPX = ROOT / "gex_history_spx.json"
-HISTORY_NDX = ROOT / "gex_history_ndx.json"
+HISTORY_SPX = ROOT / "state" / "gex" / "gex_history_spx.json"
+HISTORY_NDX = ROOT / "state" / "gex" / "gex_history_ndx.json"
 
 
 # ─── PARSER TRADINGLIT ────────────────────────────────────────────────────────

@@ -35,8 +35,8 @@ except ImportError:
 
 # --- PATHS -------------------------------------------------------------------
 ROOT         = Path(__file__).parent.parent
-LEVELS_FILE  = ROOT / "gex_levels.txt"
-HISTORY_FILE      = ROOT / "gex_history.json"
+LEVELS_FILE       = ROOT / "state" / "gex" / "levels_input.txt"
+HISTORY_FILE      = ROOT / "state" / "gex" / "gex_history.json"
 PINE_FILE         = ROOT / "tradingview" / "gex_weekly_levels.pine"
 PINE_CURRENT_FILE = ROOT / "tradingview" / "gex_current_levels.pine"
 

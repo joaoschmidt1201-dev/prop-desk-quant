@@ -44,7 +44,7 @@ DATE_END         = date.today()
 TICKER           = "spx"
 IS_INTRADAY      = "true"
 
-OUTPUT_CSV       = Path(__file__).parent.parent / "data" / "menthorq_levels.csv"
+OUTPUT_CSV       = Path(__file__).parent.parent / "data" / "scraped" / "menthorq_levels.csv"
 
 MAX_HOPS_PER_DAY = 15     # segurança: nunca mais de 15 snapshots por dia
 
