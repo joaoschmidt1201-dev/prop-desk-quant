@@ -1,0 +1,421 @@
+[
+  {
+    "week": "2025-12-08",
+    "ticker": "SPY",
+    "expiry": "2025-12-12",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEMANA 8 DEC25 - 12DEC25\nlinhas verders\np - $695\np2 - 689\np1 + ag2 (687\np3 + ag - 686\ncoi + ag3 - 685\n\ng flip - 683\n\nlinhas vermelhas\nn2 - 677\nn - 675\npoi - 670",
+    "manual_levels": [
+      {"label": "p", "price": 695, "bucket": "green"},
+      {"label": "p2", "price": 689, "bucket": "green"},
+      {"label": "p1 + ag2", "price": 687, "bucket": "green"},
+      {"label": "p3 + ag", "price": 686, "bucket": "green"},
+      {"label": "coi + ag3", "price": 685, "bucket": "green"},
+      {"label": "g flip", "price": 683, "bucket": "gray"},
+      {"label": "n2", "price": 677, "bucket": "red"},
+      {"label": "n", "price": 675, "bucket": "red"},
+      {"label": "poi", "price": 670, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2025-12-15",
+    "ticker": "SPY",
+    "expiry": "2025-12-19",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 15DEC25 - 19DEC25\np + coi - 700\np - 695\np3 + ag 690\np3 - 688\np2 + ag - 685\ng flip - 681\nn2 - 675\nn1 + poi - 670\nn + hoi - 660",
+    "manual_levels": [
+      {"label": "p + coi", "price": 700, "bucket": "green"},
+      {"label": "p", "price": 695, "bucket": "green"},
+      {"label": "p3 + ag", "price": 690, "bucket": "green"},
+      {"label": "p3", "price": 688, "bucket": "green"},
+      {"label": "p2 + ag", "price": 685, "bucket": "green"},
+      {"label": "g flip", "price": 681, "bucket": "gray"},
+      {"label": "n2", "price": 675, "bucket": "red"},
+      {"label": "n1 + poi", "price": 670, "bucket": "red"},
+      {"label": "n + hoi", "price": 660, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2025-12-22",
+    "ticker": "SPY",
+    "expiry": "2025-12-26",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 22DEC25 - 26DEC25\np1 + coi - 690\np - 685\np2 - 683\ng flip - 681\nn1 + ag1 + hoi + poi - 680\nn2 - 679\nn3 - 678\nn4 - 675\nn- 670",
+    "manual_levels": [
+      {"label": "p1 + coi", "price": 690, "bucket": "green"},
+      {"label": "p", "price": 685, "bucket": "green"},
+      {"label": "p2", "price": 683, "bucket": "green"},
+      {"label": "g flip", "price": 681, "bucket": "gray"},
+      {"label": "n1 + ag1 + hoi + poi", "price": 680, "bucket": "red"},
+      {"label": "n2", "price": 679, "bucket": "red"},
+      {"label": "n3", "price": 678, "bucket": "red"},
+      {"label": "n4", "price": 675, "bucket": "red"},
+      {"label": "n", "price": 670, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2025-12-29",
+    "ticker": "SPY",
+    "expiry": "2026-01-02",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 29DEC25 - 02JAN\np4 + hoi + coi - 700\np3 - 695\np1 - 692\np2 + ag - 690\nn1 + ag2 - 689\ng flop + n2 + ag3 - 688\nn3 - 683\nn - 680\nn - 675",
+    "manual_levels": [
+      {"label": "p4 + hoi + coi", "price": 700, "bucket": "green"},
+      {"label": "p3", "price": 695, "bucket": "green"},
+      {"label": "p1", "price": 692, "bucket": "green"},
+      {"label": "p2 + ag", "price": 690, "bucket": "green"},
+      {"label": "n1 + ag2", "price": 689, "bucket": "red"},
+      {"label": "g flip + n2 + ag3", "price": 688, "bucket": "gray"},
+      {"label": "n3", "price": 683, "bucket": "red"},
+      {"label": "n", "price": 680, "bucket": "red"},
+      {"label": "n", "price": 675, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-01-05",
+    "ticker": "SPY",
+    "expiry": "2026-01-09",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 05JAN - 09JAN\np - 701\np3 + hoi + coi - 693\np1 + ag1 - 690\np4 - 689\np2 + ag3 - 688\nag2 - 685\ng flip - 684\nn - 682\nn1 - 680\nn2 + poi - 675\nn3 - 670",
+    "manual_levels": [
+      {"label": "p", "price": 701, "bucket": "green"},
+      {"label": "p3 + hoi + coi", "price": 693, "bucket": "green"},
+      {"label": "p1 + ag1", "price": 690, "bucket": "green"},
+      {"label": "p4", "price": 689, "bucket": "green"},
+      {"label": "p2 + ag3", "price": 688, "bucket": "green"},
+      {"label": "ag2", "price": 685, "bucket": "purple"},
+      {"label": "g flip", "price": 684, "bucket": "gray"},
+      {"label": "n", "price": 682, "bucket": "red"},
+      {"label": "n1", "price": 680, "bucket": "red"},
+      {"label": "n2 + poi", "price": 675, "bucket": "red"},
+      {"label": "n3", "price": 670, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-01-12",
+    "ticker": "SPY",
+    "expiry": "2026-01-16",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 12JAN - 16JAN\np - 705\np1 + coi - 700\np3 - 699\np4 - 696\np2 + ag2 - 695\ng flip + n2 - 694\nag - 693\nag - 690\nn2 - 689\nn - 684\nn1 + hoi + poi - 680",
+    "manual_levels": [
+      {"label": "p", "price": 705, "bucket": "green"},
+      {"label": "p1 + coi", "price": 700, "bucket": "green"},
+      {"label": "p3", "price": 699, "bucket": "green"},
+      {"label": "p4", "price": 696, "bucket": "green"},
+      {"label": "p2 + ag2", "price": 695, "bucket": "green"},
+      {"label": "g flip + n2", "price": 694, "bucket": "gray"},
+      {"label": "ag", "price": 693, "bucket": "purple"},
+      {"label": "ag", "price": 690, "bucket": "purple"},
+      {"label": "n2", "price": 689, "bucket": "red"},
+      {"label": "n", "price": 684, "bucket": "red"},
+      {"label": "n1 + hoi + poi", "price": 680, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-01-19",
+    "ticker": "SPY",
+    "expiry": "2026-01-23",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 19JAN - 23JAN\np -700\np2 - 697\np1 + coi - 695\ng flip - 694\nn4 - 690\nn3 - 685\nn2 - 683\nn1 + ag + hi + poi - 680\nn - 675\nn - 670\nn - 677",
+    "manual_levels": [
+      {"label": "p", "price": 700, "bucket": "green"},
+      {"label": "p2", "price": 697, "bucket": "green"},
+      {"label": "p1 + coi", "price": 695, "bucket": "green"},
+      {"label": "g flip", "price": 694, "bucket": "gray"},
+      {"label": "n4", "price": 690, "bucket": "red"},
+      {"label": "n3", "price": 685, "bucket": "red"},
+      {"label": "n2", "price": 683, "bucket": "red"},
+      {"label": "n1 + ag + hoi + poi", "price": 680, "bucket": "red"},
+      {"label": "n", "price": 675, "bucket": "red"},
+      {"label": "n", "price": 670, "bucket": "red"},
+      {"label": "n", "price": 677, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-01-26",
+    "ticker": "SPY",
+    "expiry": "2026-01-30",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 26JAN - 30 JAN\np - 705\np3 - 692\ng flip + p1 + ag2 - 691\np1 + ag - 690\nag + n4 - 689\nn2 - 680\nn1 - 677\nn + hoi + poi - 665",
+    "manual_levels": [
+      {"label": "p", "price": 705, "bucket": "green"},
+      {"label": "p3", "price": 692, "bucket": "green"},
+      {"label": "g flip + p1 + ag2", "price": 691, "bucket": "gray"},
+      {"label": "p1 + ag", "price": 690, "bucket": "green"},
+      {"label": "ag + n4", "price": 689, "bucket": "purple"},
+      {"label": "n2", "price": 680, "bucket": "red"},
+      {"label": "n1", "price": 677, "bucket": "red"},
+      {"label": "n + hoi + poi", "price": 665, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-02-02",
+    "ticker": "SPY",
+    "expiry": "2026-02-06",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 02FEV - 06FEV\np - 705\np3 - 700\np2 - 699\np4 - 696\ng flip - 693\nag - 692\nn3 + ag3 - 690\nag - 688\nn - 685\nn1 + hoi + poi - 680\nn2 - 675\nn4 - 670",
+    "manual_levels": [
+      {"label": "p", "price": 705, "bucket": "green"},
+      {"label": "p3", "price": 700, "bucket": "green"},
+      {"label": "p2", "price": 699, "bucket": "green"},
+      {"label": "p4", "price": 696, "bucket": "green"},
+      {"label": "g flip", "price": 693, "bucket": "gray"},
+      {"label": "ag", "price": 692, "bucket": "purple"},
+      {"label": "n3 + ag3", "price": 690, "bucket": "red"},
+      {"label": "ag", "price": 688, "bucket": "purple"},
+      {"label": "n", "price": 685, "bucket": "red"},
+      {"label": "n1 + hoi + poi", "price": 680, "bucket": "red"},
+      {"label": "n2", "price": 675, "bucket": "red"},
+      {"label": "n4", "price": 670, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-02-09",
+    "ticker": "SPY",
+    "expiry": "2026-02-13",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 09FEV - 13FEV\np - 705\np3 + coi - 700\np2 - 696\np1 - 695\ng flip + ag - 690\nn - 688\nn2 - 686\nn1 + poi + ag2 - 685\nn3 - 680 \nn - 675 \nn - 670\nn - 669",
+    "manual_levels": [
+      {"label": "p", "price": 705, "bucket": "green"},
+      {"label": "p3 + coi", "price": 700, "bucket": "green"},
+      {"label": "p2", "price": 696, "bucket": "green"},
+      {"label": "p1", "price": 695, "bucket": "green"},
+      {"label": "g flip + ag", "price": 690, "bucket": "gray"},
+      {"label": "n", "price": 688, "bucket": "red"},
+      {"label": "n2", "price": 686, "bucket": "red"},
+      {"label": "n1 + poi + ag2", "price": 685, "bucket": "red"},
+      {"label": "n3", "price": 680, "bucket": "red"},
+      {"label": "n", "price": 675, "bucket": "red"},
+      {"label": "n", "price": 670, "bucket": "red"},
+      {"label": "n", "price": 669, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-02-16",
+    "ticker": "SPY",
+    "expiry": "2026-02-20",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 16FEV - 20 FEV\np4 + coi - 700\np  - 691\np1 - 688\ng flip - 687\nag2 - 685\nag + n3 - 680\nn + ag3 + hoi - 675\nn1 + poi + ag4 - 670\nn - 665\nn- 660",
+    "manual_levels": [
+      {"label": "p4 + coi", "price": 700, "bucket": "green"},
+      {"label": "p", "price": 691, "bucket": "green"},
+      {"label": "p1", "price": 688, "bucket": "green"},
+      {"label": "g flip", "price": 687, "bucket": "gray"},
+      {"label": "ag2", "price": 685, "bucket": "purple"},
+      {"label": "ag + n3", "price": 680, "bucket": "purple"},
+      {"label": "n + ag3 + hoi", "price": 675, "bucket": "red"},
+      {"label": "n1 + poi + ag4", "price": 670, "bucket": "red"},
+      {"label": "n", "price": 665, "bucket": "red"},
+      {"label": "n", "price": 660, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-02-23",
+    "ticker": "SPY",
+    "expiry": "2026-02-27",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 23FEV - 27FEV\np - 705\np1 + coi - 700\np2 - 695\np3 - 6692\nag - 690\ng flip - 689\nag3 - 688\nn1 + ag2 - 685\nn - 682\nn2 - ag4 - 680\nn - 675\nn- 670\nn3 + hoi + poi - 650",
+    "manual_levels": [
+      {"label": "p", "price": 705, "bucket": "green"},
+      {"label": "p1 + coi", "price": 700, "bucket": "green"},
+      {"label": "p2", "price": 695, "bucket": "green"},
+      {"label": "p3", "price": 692, "bucket": "green"},
+      {"label": "ag", "price": 690, "bucket": "purple"},
+      {"label": "g flip", "price": 689, "bucket": "gray"},
+      {"label": "ag3", "price": 688, "bucket": "purple"},
+      {"label": "n1 + ag2", "price": 685, "bucket": "red"},
+      {"label": "n", "price": 682, "bucket": "red"},
+      {"label": "n2 + ag4", "price": 680, "bucket": "red"},
+      {"label": "n", "price": 675, "bucket": "red"},
+      {"label": "n", "price": 670, "bucket": "red"},
+      {"label": "n3 + hoi + poi", "price": 650, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-03-02",
+    "ticker": "SPY",
+    "expiry": "2026-03-06",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 02MAR - 06MAR\np1 + coi - 700\np2 - 696\np3 - 694\ng flip - 689\nag2 - 685\nn2 + ag3 - 680\nn1 + ag + hoi + poi - 675\nn4 - 670\nn- 665 \nn3 - 660",
+    "manual_levels": [
+      {"label": "p1 + coi", "price": 700, "bucket": "green"},
+      {"label": "p2", "price": 696, "bucket": "green"},
+      {"label": "p3", "price": 694, "bucket": "green"},
+      {"label": "g flip", "price": 689, "bucket": "gray"},
+      {"label": "ag2", "price": 685, "bucket": "purple"},
+      {"label": "n2 + ag3", "price": 680, "bucket": "red"},
+      {"label": "n1 + ag + hoi + poi", "price": 675, "bucket": "red"},
+      {"label": "n4", "price": 670, "bucket": "red"},
+      {"label": "n", "price": 665, "bucket": "red"},
+      {"label": "n3", "price": 660, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-03-09",
+    "ticker": "SPY",
+    "expiry": "2026-03-13",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 09MAR - 13MAR\ncoi - 700\np1 - 690\np2 - 689\np - 685\ng flip - 683\np - 681\nn -679\np3 - 676\nn + ag2 + hoi - 675\nn + ag2 - 670\nn + ag4 - 665\nn4 + poi + ag5 - 660\nn - 657\nn - 655\nn- 654\nn - 650",
+    "manual_levels": [
+      {"label": "coi", "price": 700, "bucket": "green"},
+      {"label": "p1", "price": 690, "bucket": "green"},
+      {"label": "p2", "price": 689, "bucket": "green"},
+      {"label": "p", "price": 685, "bucket": "green"},
+      {"label": "g flip", "price": 683, "bucket": "gray"},
+      {"label": "p", "price": 681, "bucket": "green"},
+      {"label": "n", "price": 679, "bucket": "red"},
+      {"label": "p3", "price": 676, "bucket": "green"},
+      {"label": "n + ag2 + hoi", "price": 675, "bucket": "red"},
+      {"label": "n + ag2", "price": 670, "bucket": "red"},
+      {"label": "n + ag4", "price": 665, "bucket": "red"},
+      {"label": "n4 + poi + ag5", "price": 660, "bucket": "red"},
+      {"label": "n", "price": 657, "bucket": "red"},
+      {"label": "n", "price": 655, "bucket": "red"},
+      {"label": "n", "price": 654, "bucket": "red"},
+      {"label": "n", "price": 650, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-03-16",
+    "ticker": "SPY",
+    "expiry": "2026-03-20",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 16MAR - 20MAR\np - 695\np - 694\np- 690\ng flip - 678\np - 373\np3 - 672\np2 - 674\np1 + ag - 670\nag3 - 665\nn1 + ag2 - 660\nn4 - 655\nn3 - 650\nn2 - 645",
+    "manual_levels": [
+      {"label": "p", "price": 695, "bucket": "green"},
+      {"label": "p", "price": 694, "bucket": "green"},
+      {"label": "p", "price": 690, "bucket": "green"},
+      {"label": "g flip", "price": 678, "bucket": "gray"},
+      {"label": "p", "price": 673, "bucket": "green"},
+      {"label": "p3", "price": 672, "bucket": "green"},
+      {"label": "p2", "price": 674, "bucket": "green"},
+      {"label": "p1 + ag", "price": 670, "bucket": "green"},
+      {"label": "ag3", "price": 665, "bucket": "purple"},
+      {"label": "n1 + ag2", "price": 660, "bucket": "red"},
+      {"label": "n4", "price": 655, "bucket": "red"},
+      {"label": "n3", "price": 650, "bucket": "red"},
+      {"label": "n2", "price": 645, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-03-23",
+    "ticker": "SPY",
+    "expiry": "2026-03-27",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 23MAR - 27MAR\np - 679\ng flip + p3 - 670\np + ag2 - 665\np1 + ag + coi - 660\nn4 + ag4 - 50\nn2 - 645\nn1 + hoi + poi + ag3 - 640\nn - 635\nn- 6630\nn3 - 625",
+    "manual_levels": [
+      {"label": "p", "price": 679, "bucket": "green"},
+      {"label": "g flip + p3", "price": 670, "bucket": "gray"},
+      {"label": "p + ag2", "price": 665, "bucket": "green"},
+      {"label": "p1 + ag + coi", "price": 660, "bucket": "green"},
+      {"label": "n4 + ag4", "price": 650, "bucket": "red"},
+      {"label": "n2", "price": 645, "bucket": "red"},
+      {"label": "n1 + hoi + poi + ag3", "price": 640, "bucket": "red"},
+      {"label": "n", "price": 635, "bucket": "red"},
+      {"label": "n", "price": 630, "bucket": "red"},
+      {"label": "n3", "price": 625, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-03-30",
+    "ticker": "SPY",
+    "expiry": "2026-04-02",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 30MAR - 02APR\np1 - 670 \nn - 665\np2 - 663\ng flip - 660\nn - 655\nn + coi - 650\nn - 646\nag4 - 645\nag2 - 640\nn2 + ag3 - 635\nn1 + ag + hoi + poi - 630\nn4 -625",
+    "manual_levels": [
+      {"label": "p1", "price": 670, "bucket": "green"},
+      {"label": "n", "price": 665, "bucket": "red"},
+      {"label": "p2", "price": 663, "bucket": "green"},
+      {"label": "g flip", "price": 660, "bucket": "gray"},
+      {"label": "n", "price": 655, "bucket": "red"},
+      {"label": "n + coi", "price": 650, "bucket": "red"},
+      {"label": "n", "price": 646, "bucket": "red"},
+      {"label": "ag4", "price": 645, "bucket": "purple"},
+      {"label": "ag2", "price": 640, "bucket": "purple"},
+      {"label": "n2 + ag3", "price": 635, "bucket": "red"},
+      {"label": "n1 + ag + hoi + poi", "price": 630, "bucket": "red"},
+      {"label": "n4", "price": 625, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-04-06",
+    "ticker": "SPY",
+    "expiry": "2026-04-10",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 06 APR - 10APR \np - 675\np - 670 \np - 665\ng flip - 662\np3 - 661\np1 + coi + ag2 - 660\np2 - 657\nag3 - 656\nag - 655\nag4 - 6554\nn - 650\nn - 645\nn1 - 640\nn2 + hoi + poi - 630",
+    "manual_levels": [
+      {"label": "p", "price": 675, "bucket": "green"},
+      {"label": "p", "price": 670, "bucket": "green"},
+      {"label": "p", "price": 665, "bucket": "green"},
+      {"label": "g flip", "price": 662, "bucket": "gray"},
+      {"label": "p3", "price": 661, "bucket": "green"},
+      {"label": "p1 + coi + ag2", "price": 660, "bucket": "green"},
+      {"label": "p2", "price": 657, "bucket": "green"},
+      {"label": "ag3", "price": 656, "bucket": "purple"},
+      {"label": "ag", "price": 655, "bucket": "purple"},
+      {"label": "ag4", "price": 654, "bucket": "purple"},
+      {"label": "n", "price": 650, "bucket": "red"},
+      {"label": "n", "price": 645, "bucket": "red"},
+      {"label": "n1", "price": 640, "bucket": "red"},
+      {"label": "n2 + hoi + poi", "price": 630, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-04-13",
+    "ticker": "SPY",
+    "expiry": "2026-04-17",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 13APR - 17APR\np - 695\np3 - 690\ncoi + ag3 - 685\nag3 - 680\ng flip - 678\np1 + ag - 677\nn1 + ag2 - 675\nn3 + ag5 - 670\nn2 + ag4 - 665\nhoi + poi - 650",
+    "manual_levels": [
+      {"label": "p", "price": 695, "bucket": "green"},
+      {"label": "p3", "price": 690, "bucket": "green"},
+      {"label": "coi + ag3", "price": 685, "bucket": "green"},
+      {"label": "ag3", "price": 680, "bucket": "purple"},
+      {"label": "g flip", "price": 678, "bucket": "gray"},
+      {"label": "p1 + ag", "price": 677, "bucket": "green"},
+      {"label": "n1 + ag2", "price": 675, "bucket": "red"},
+      {"label": "n3 + ag5", "price": 670, "bucket": "red"},
+      {"label": "n2 + ag4", "price": 665, "bucket": "red"},
+      {"label": "hoi + poi", "price": 650, "bucket": "red"}
+    ]
+  },
+  {
+    "week": "2026-04-20",
+    "ticker": "SPY",
+    "expiry": "2026-04-24",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM ATUAL\np2 + coi - 715\np1 - 711\nn2 + ag - 710\nn3 + ag3 - 709\nag2 - 708\ng flip - 706\nn4 - 705\nn1 + hoi + poi - 700\np - 697\nn - 695",
+    "manual_levels": [
+      {"label": "p2 + coi", "price": 715, "bucket": "green"},
+      {"label": "p1", "price": 711, "bucket": "green"},
+      {"label": "n2 + ag", "price": 710, "bucket": "red"},
+      {"label": "n3 + ag3", "price": 709, "bucket": "red"},
+      {"label": "ag2", "price": 708, "bucket": "purple"},
+      {"label": "g flip", "price": 706, "bucket": "gray"},
+      {"label": "n4", "price": 705, "bucket": "red"},
+      {"label": "n1 + hoi + poi", "price": 700, "bucket": "red"},
+      {"label": "p", "price": 697, "bucket": "green"},
+      {"label": "n", "price": 695, "bucket": "red"}
+    ]
+  }
+]

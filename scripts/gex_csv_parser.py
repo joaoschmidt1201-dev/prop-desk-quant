@@ -114,7 +114,7 @@ LBL_SIZE   = input.string("Small", "Labels Text Size",  group=_GI, options=["Tin
 
 // --- INPUTS (Level Settings) — cor + estilo + largura por linha -----
 var string _GLS = "Level Settings"
-C_GFLIP   = input.color( color.rgb(128, 0, 200),     "Gamma Flip  ", group=_GLS, inline="gflip",  display=display.none)
+C_GFLIP   = input.color( color.rgb(158, 158, 158),   "Gamma Flip  ", group=_GLS, inline="gflip",  display=display.none)
 STY_GFLIP = input.string("Dashed", "",                group=_GLS, inline="gflip",  options=["Solid","Dashed","Dotted"], display=display.none)
 LW_GFLIP  = input.int(2,  "",      minval=1, maxval=4, group=_GLS, inline="gflip",  display=display.none)
 
@@ -166,18 +166,21 @@ SH_N3    = input.bool(true, "Neg GEX n3", group=_GSL)
 SH_AGG   = input.bool(true, "Aggregate",  group=_GSL)
 
 // --- CONSTANTS ------------------------------------------------------
-// D = bars per trading day; W = bars per week — auto-adapted to any timeframe
+// D = bars per trading day; W = Monday open -> Friday close span — auto-adapted to any timeframe
 // US equity session: 9:30-16:00 = 390 minutes
 int D = timeframe.isintraday ? math.max(1, math.round(390.0 / (timeframe.in_seconds() / 60.0))) : 1
-int W = D * 5
+int W = D * 5 - 1
 string _update_date = "{generated_date}"
+
+f_week_x2(int bi, int next_bi) =>
+    na(bi) ? na : na(next_bi) ? bi + W : math.max(bi, next_bi - 1)
 
 // --- HELPERS --------------------------------------------------------
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
 
-f_lbl_x(bi, lpos, loff) =>
-    lpos == "Left" ? bi + loff : lpos == "Center" ? bi + W / 2 + loff : bi + W + loff
+f_lbl_x(x1, x2, lpos, loff) =>
+    lpos == "Left" ? x1 + loff : lpos == "Center" ? x1 + math.floor((x2 - x1) / 2) + loff : x2 + loff
 
 f_lbl_size(s) =>
     s == "Tiny" ? size.tiny : s == "Large" ? size.large : s == "Normal" ? size.normal : size.small
@@ -194,15 +197,31 @@ is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
 var line[]  _lines  = array.new_line()
 var label[] _labels = array.new_label()
 
+f_draw_sep(x, clr, sty, lw) =>
+    array.push(_lines, line.new(x, 0.0, x, 1.0, xloc=xloc.bar_index, color=clr, style=f_style(sty), width=lw, extend=extend.both))
+
+f_draw_sep_clamped(x, x2, clr, sty, lw) =>
+    if not na(x2) and x <= x2
+        f_draw_sep(x, clr, sty, lw)
+
+f_draw_level(x1, x2, price, clr, sty, lw, show, lbl) =>
+    if show and not na(price) and not na(x2) and x2 >= x1
+        array.push(_lines, line.new(x1, price, x2, price, color=clr, style=f_style(sty), width=lw))
+        array.push(_labels, label.new(f_lbl_x(x1, x2, LBL_POS, LBL_OFFSET), price, lbl, color=color.new(color.black, 100), textcolor=clr, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+
 // --- REDRAW ON LAST BAR (delete all → redraw with current inputs) ---
-if barstate.islast and _valid
+f_redraw_all() =>
     for l in _lines
         line.delete(l)
     array.clear(_lines)
     for lb in _labels
         label.delete(lb)
     array.clear(_labels)
-{draw_weeks_block}
+{draw_week_functions}
+
+if barstate.islast and _valid
+    f_redraw_all()
+{draw_week_calls}
 """
 
 # ─── CSV LOADING ──────────────────────────────────────────────────────────────
@@ -430,6 +449,15 @@ def _pf(val) -> str:
     return f"{float(val):.1f}" if val is not None else "float(na)"
 
 
+def _pine_str(val: str) -> str:
+    return val.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _indent_block(text: str, spaces: int = 4) -> str:
+    prefix = " " * spaces
+    return "\n".join(f"{prefix}{line}" if line else "" for line in text.splitlines())
+
+
 def _is_conf(price: int | None, conf_list: list[int], tol: int) -> bool:
     if price is None:
         return False
@@ -474,6 +502,17 @@ def _get_price(entry: dict | None, key: str, rank: int | None) -> int | None:
     return val
 
 
+def _manual_level_draw_spec(level: dict) -> tuple[str, str, str, str]:
+    bucket = (level.get("bucket") or "").lower()
+    if bucket == "green":
+        return "C_P1", "STY_P1", "LW_P1", "(SH_P1 or SH_P2 or SH_P3)"
+    if bucket == "red":
+        return "C_N1", "STY_N1", "LW_N1", "(SH_N1 or SH_N2 or SH_N3)"
+    if bucket == "purple":
+        return "C_AGG", "STY_AGG", "LW_AGG", "SH_AGG"
+    return "C_GFLIP", "STY_GFLIP", "LW_GFLIP", "SH_GFLIP"
+
+
 def generate_pine_combined(histories: dict[str, list]) -> str:
     """
     histories: {ticker: [week_entries, ...]}
@@ -487,11 +526,11 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
 
     bi_vars_lines       = []
     bi_detections_lines = []
-    draw_blocks         = []
+    draw_functions      = []
+    draw_calls          = []
 
     for i, week_date in enumerate(all_weeks):
         mon_ts     = monday_ts_ms(week_date)
-        is_current = (i == len(all_weeks) - 1)
         entries    = {t: by_week[t].get(week_date) for t in tickers}
         confs      = {t: (entries[t].get("conf", []) if entries[t] else []) for t in tickers}
 
@@ -500,28 +539,51 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
             f"if is_week_start({mon_ts}) and _valid\n    _bi{i} := bar_index"
         )
 
+        next_bi = f"_bi{i + 1}" if i + 1 < len(all_weeks) else "int(na)"
+        x2_expr = f"f_week_x2(_bi{i}, {next_bi})"
+
         block = [
             f"    // --- Week {i}: {week_date} ---",
             f"    if not na(_bi{i})",
+            f"        int _x2 = {x2_expr}",
         ]
-
-        # Vertical separators — shared, drawn for any valid ticker
-        for offset, clr, sty, lw in [
-            (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
-            (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-            (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-            (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-        ]:
-            block.append(
-                f"        array.push(_lines, line.new({offset}, close, {offset}, close + 1, "
-                f"color={clr}, style=f_style({sty}), width={lw}, extend=extend.both))"
-            )
 
         # Per-ticker GEX levels — merged independently per ticker
         for t in tickers:
             tl    = t.lower()
             entry = entries[t]
             conf  = confs[t]
+
+            manual_levels = entry.get("manual_levels", []) if entry else []
+            if manual_levels:
+                block.append(f"        if _is_{tl}")
+                for offset, clr, sty, lw in [
+                    (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
+                    (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    (f"_bi{i} + D * 4", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                ]:
+                    block.append(f"            f_draw_sep_clamped({offset}, _x2, {clr}, {sty}, {lw})")
+
+                for j, level in enumerate(manual_levels):
+                    price = level.get("price")
+                    label = level.get("label", "")
+                    if price is None or not label:
+                        continue
+
+                    clr, sty, lw, show_expr = _manual_level_draw_spec(level)
+                    pval = _pf(price)
+                    label_text = _pine_str(label)
+                    lbl_expr = (
+                        f'"{label_text} ($" + str.tostring(math.round({pval})) + ")" + '
+                        f'(SHOW_TS ? " [" + _update_date + "]" : "")'
+                    )
+
+                    block.append(
+                        f"            f_draw_level(_bi{i}, _x2, {pval}, {clr}, {sty}, {lw}, {show_expr}, {lbl_expr})"
+                    )
+                continue
 
             # Collect all LEVEL_SPEC entries that have a price for this ticker
             raw: list[tuple] = []
@@ -550,35 +612,32 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
                     merged[idx][6].append(show_var)
 
             block.append(f"        if _is_{tl}")
+            for offset, clr, sty, lw in [
+                (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
+                (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                (f"_bi{i} + D * 4", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+            ]:
+                block.append(f"            f_draw_sep_clamped({offset}, _x2, {clr}, {sty}, {lw})")
 
             for j, (price, short_lbl, full_lbl, clr, sty, lw, show_vars) in enumerate(merged):
-                var       = f"_p{i}_{tl}_{j}"
                 pval      = _pf(price)
                 star      = '" ★"' if _is_conf(price, conf, TICKER_CONFIG[t]["conf_tol"]) else '""'
                 show_expr = " or ".join(show_vars)
 
                 lbl_expr = (
                     f'(SHORT_NAME ? "{short_lbl}" : "{full_lbl}") + " " + '
-                    f'str.tostring(math.round({var})) + {star} + '
+                    f'str.tostring(math.round({pval})) + {star} + '
                     f'(SHOW_TS ? " [" + _update_date + "]" : "")'
                 )
 
-                block += [
-                    f"            float {var} = {pval}",
-                    f"            if ({show_expr}) and not na({var})",
-                    f"                array.push(_lines, line.new(_bi{i}, {var}, _bi{i} + W, {var}, "
-                    f"color={clr}, style=f_style({sty}), width={lw}))",
-                ]
-                if is_current:
-                    block.append(
-                        f"                array.push(_labels, label.new("
-                        f"f_lbl_x(_bi{i}, LBL_POS, LBL_OFFSET), {var}, "
-                        f"{lbl_expr}, "
-                        f"color=color.new(color.black, 100), textcolor={clr}, "
-                        f"style=label.style_none, size=f_lbl_size(LBL_SIZE)))"
-                    )
+                block.append(
+                    f"            f_draw_level(_bi{i}, _x2, {pval}, {clr}, {sty}, {lw}, ({show_expr}), {lbl_expr})"
+                )
 
-        draw_blocks.append("\n".join(block))
+        draw_functions.append(f"f_draw_week_{i}() =>\n" + "\n".join(block))
+        draw_calls.append(f"    f_draw_week_{i}()")
 
     return PINE_TEMPLATE.format(
         generated_date   = date.today().strftime("%Y-%m-%d"),
@@ -586,7 +645,8 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
         ticker_detection = _build_ticker_detection(),
         bi_vars          = "\n".join(bi_vars_lines),
         bi_detections    = "\n".join(bi_detections_lines),
-        draw_weeks_block = "\n\n".join(draw_blocks),
+        draw_week_functions = "\n\n".join(draw_functions),
+        draw_week_calls     = "\n".join(draw_calls),
     )
 
 # ─── UTILS ───────────────────────────────────────────────────────────────────
