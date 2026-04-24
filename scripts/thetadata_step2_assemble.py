@@ -164,7 +164,7 @@ def load_spot_cache(underlying: str) -> dict:
             print(f"  [{underlying}] Spot cache salvo: {cache_path}")
         except ImportError:
             sys.exit(
-                f"[ERRO] yfinance não instalado. Execute: pip install yfinance"
+                "[ERRO] yfinance não instalado. Execute: pip install yfinance"
             )
         except Exception as e:
             sys.exit(f"[ERRO] Não foi possível criar spot cache para {underlying}: {e}")
@@ -507,7 +507,7 @@ def main() -> None:
     print(f"|{'THETADATA STEP 2 — CONCLUÍDO':^{w}}|")
     print(f"+{border}+")
     print(f"|  Total parquets escritos : {total_files:>6}{' ' * (w - 33)}|")
-    print(f"|  Output dir : {str(args.output_dir):<{w - 15}}|")
+    print(f"|  Output dir : {args.output_dir!s:<{w - 15}}|")
     print(f"+{border}+\n")
 
     # ── Validação ────────────────────────────────────────────────────────────

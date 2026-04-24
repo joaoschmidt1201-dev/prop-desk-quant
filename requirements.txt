@@ -1,12 +1,22 @@
-streamlit>=1.40.0
-plotly>=5.20.0
-pandas>=2.0.0
-numpy>=1.26.0
-openpyxl>=3.1.0
-anthropic>=0.90.0
-pyarrow>=14.0.0
-yfinance>=0.2.0
-pytz>=2024.1
-requests>=2.31.0
-google-auth-oauthlib>=1.2.0
-google-api-python-client>=2.100.0
+# ─────────────────────────────────────────────────────────────────────────────
+# Runtime deps — usado por:
+#   - Streamlit Cloud (ic7_viewer, cz_dashboard_app)
+#   - GitHub Actions (morning_briefing)
+#   - Scripts operacionais (gex_csv_parser, morning_briefing, export_control_panel)
+# Pinagem exata para builds reproduziveis. Dev e research em requirements-*.txt
+# ─────────────────────────────────────────────────────────────────────────────
+streamlit==1.56.0
+plotly==6.6.0
+pandas==3.0.0
+numpy==2.4.2
+openpyxl==3.1.5
+anthropic==0.96.0
+pyarrow==23.0.1
+yfinance==0.2.57
+pytz==2026.1
+requests==2.33.1
+python-dotenv==1.2.2
+
+# Google Drive export (export_control_panel, cz_dashboard_app)
+google-auth-oauthlib==1.3.1
+google-api-python-client==2.194.0

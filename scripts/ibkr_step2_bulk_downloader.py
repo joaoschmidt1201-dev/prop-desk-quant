@@ -47,7 +47,8 @@ from dotenv import load_dotenv
 
 # ib_insync importado aqui para facilitar mocks em teste
 try:
-    from ib_insync import IB, Option, util as ib_util
+    from ib_insync import IB, Option
+    from ib_insync import util as ib_util
 except ImportError:
     sys.exit(
         "[ERRO] ib_insync não instalado.\n"
@@ -280,7 +281,7 @@ async def download_contract(
                 keepUpToDate=False,
                 timeout=30,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             cp["errors"][key] = "timeout"
             return key
         except Exception as e:

@@ -556,7 +556,8 @@ def _load_vix_cache(entry_dates: list) -> dict:
 
     # Fallback: direct Yahoo Finance API (no yfinance wrapper)
     try:
-        import urllib.request, json
+        import json
+        import urllib.request
         url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=2y"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as r:

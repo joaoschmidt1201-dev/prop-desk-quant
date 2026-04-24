@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import math
-from datetime import date as _date, timedelta
+from datetime import date as _date
+from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
@@ -29,15 +30,29 @@ import streamlit as st
 try:
     import sys as _sys
     _sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from ss42_backtest import (  # noqa: F401
-        load_chain             as _ss42_load_chain,
+    from ss42_backtest import (
+        DATA_DIR as _SS42_DATA_DIR,
+    )
+    from ss42_backtest import (
+        calc_iv_atm as _ss42_iv_atm,
+    )
+    from ss42_backtest import (
+        calc_pnl_expiration as _ss42_pnl_exp,
+    )
+    from ss42_backtest import (
+        compute_daily_mtm as _ss42_daily_mtm,
+    )
+    from ss42_backtest import (
         find_target_expiration as _ss42_find_exp,
+    )
+    from ss42_backtest import (
+        get_available_dates as _ss42_available,
+    )
+    from ss42_backtest import (
+        load_chain as _ss42_load_chain,
+    )
+    from ss42_backtest import (
         select_16delta_strikes as _ss42_select_strikes,
-        calc_iv_atm            as _ss42_iv_atm,
-        get_available_dates    as _ss42_available,
-        compute_daily_mtm      as _ss42_daily_mtm,
-        calc_pnl_expiration    as _ss42_pnl_exp,
-        DATA_DIR               as _SS42_DATA_DIR,
     )
     _REINVEST_OK = _SS42_DATA_DIR.exists()
 except Exception:
@@ -390,7 +405,7 @@ def _get_close_date_for_trade(
     rule: str,
     daily_df: pd.DataFrame,
     multiplier: int,
-) -> "_date":
+) -> _date:
     """Returns the calendar_date when the close rule fires for a trade.
     Returns exp_date if no early-close trigger is found."""
     trade_date_str = str(trade["trade_date"])
@@ -440,7 +455,7 @@ def _get_close_date_for_trade(
     return exp_date
 
 
-def _next_friday_on_or_after(d: "_date") -> "_date":
+def _next_friday_on_or_after(d: _date) -> _date:
     """Returns d if already Friday, otherwise the next Friday after d."""
     days_ahead = 4 - d.weekday()   # 4 = Friday
     if days_ahead < 0:
@@ -450,7 +465,7 @@ def _next_friday_on_or_after(d: "_date") -> "_date":
 
 @st.cache_data(show_spinner=False)
 def _simulate_single_trade(
-    entry_date: "_date",
+    entry_date: _date,
     underlying: str,
 ) -> tuple[dict | None, list[dict]]:
     """
@@ -1448,7 +1463,7 @@ with st.sidebar:
 
     # Seletor de backtest (aparece só se houver mais de um resultado)
     if len(csv_files) > 1:
-        st.markdown(f"<p class='section-title'>Select Backtest</p>", unsafe_allow_html=True)
+        st.markdown("<p class='section-title'>Select Backtest</p>", unsafe_allow_html=True)
         selected_csv = st.selectbox(
             "Backtest:",
             options=csv_files,
@@ -1488,7 +1503,7 @@ with st.sidebar:
     daily_df_eff: pd.DataFrame | None = daily_df_raw  # default; may be augmented
     close_rule = "Hold to Expiration"
     if strategy == "SS42":
-        st.markdown(f"<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
+        st.markdown("<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
         close_rule = st.selectbox(
             "Close Rule:",
             options=[
@@ -1561,7 +1576,7 @@ with st.sidebar:
 
     elif strategy == "IC7":
         if daily_df_raw is not None and not daily_df_raw.empty:
-            st.markdown(f"<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
+            st.markdown("<p class='section-title'>Close Rule</p>", unsafe_allow_html=True)
             close_rule = st.selectbox(
                 "Close Rule:",
                 options=[
@@ -1604,7 +1619,7 @@ with st.sidebar:
     wr        = wins / total * 100 if total else 0
     total_pnl = df_closed["effective_pnl_usd"].sum()
 
-    st.markdown(f"<p class='section-title'>Portfolio Summary</p>", unsafe_allow_html=True)
+    st.markdown("<p class='section-title'>Portfolio Summary</p>", unsafe_allow_html=True)
 
     n_open = df["is_open"].sum()
     col1, col2 = st.columns(2)
@@ -1631,7 +1646,7 @@ with st.sidebar:
     st.divider()
 
     # ── Seletor de trade ──────────────────────────────────────────────────
-    st.markdown(f"<p class='section-title'>Select Trade</p>", unsafe_allow_html=True)
+    st.markdown("<p class='section-title'>Select Trade</p>", unsafe_allow_html=True)
 
     _icons = {"WIN": "✅", "LOSS": "🔴", "MAX_LOSS": "💀", "OPEN": "🟡"}
     def _trade_label(row) -> str:
@@ -1649,7 +1664,7 @@ with st.sidebar:
     st.divider()
 
     # ── Mini-tabela de todos os trades ────────────────────────────────────
-    st.markdown(f"<p class='section-title'>All Trades</p>", unsafe_allow_html=True)
+    st.markdown("<p class='section-title'>All Trades</p>", unsafe_allow_html=True)
 
     mini = df[["trade_date", "effective_result", "effective_pnl_usd"]].copy()
     mini.columns = ["Date", "Result", "P&L ($)"]
@@ -1772,7 +1787,7 @@ with tab1:
         col_strikes, col_decomp = st.columns([2, 3])
 
         with col_strikes:
-            st.markdown(f"<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
+            st.markdown("<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
             mp = row.get("mid_put_entry",  0)
             mc = row.get("mid_call_entry", 0)
             mp21 = row.get("mid_put_21dte",  float("nan"))
@@ -1801,7 +1816,7 @@ with tab1:
             )
 
         with col_decomp:
-            st.markdown(f"<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
+            st.markdown("<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
             put_cost  = row.get("put_cost_exp",  0)
             call_cost = row.get("call_cost_exp", 0)
             st.markdown(
@@ -1925,7 +1940,7 @@ with tab1:
         col_strikes, col_beps, col_decomp = st.columns([2, 2, 3])
 
         with col_strikes:
-            st.markdown(f"<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
+            st.markdown("<p class='section-title'>Strike Structure</p>", unsafe_allow_html=True)
             st.markdown(
                 f"""
             <div style='font-family:monospace; font-size:13px; line-height:2.2'>
@@ -1945,7 +1960,7 @@ with tab1:
             )
 
         with col_beps:
-            st.markdown(f"<p class='section-title'>Breakevens vs 1SD Target</p>", unsafe_allow_html=True)
+            st.markdown("<p class='section-title'>Breakevens vs 1SD Target</p>", unsafe_allow_html=True)
             bep_delta_lo = row["bep_lower"] - row["lower_target"]
             bep_delta_hi = row["bep_upper"] - row["upper_target"]
             bep_color_lo = C["green"] if abs(bep_delta_lo) < 50 else C["yellow"]
@@ -1974,7 +1989,7 @@ with tab1:
             )
 
         with col_decomp:
-            st.markdown(f"<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
+            st.markdown("<p class='section-title'>P&L Breakdown</p>", unsafe_allow_html=True)
             max_profit    = row["total_credit"] * NDX_MULTIPLIER
             max_loss      = row["max_risk_usd"]
             put_cost_usd  = row["put_cost"]  * NDX_MULTIPLIER
@@ -2160,7 +2175,7 @@ with tab2:
     if "min_bid_used" in df_perf.columns:
         st.markdown("---")
         st.markdown(
-            f"<p class='section-title'>Liquidity Tier Breakdown</p>",
+            "<p class='section-title'>Liquidity Tier Breakdown</p>",
             unsafe_allow_html=True,
         )
         tier_counts = df_perf["min_bid_used"].value_counts().sort_index()

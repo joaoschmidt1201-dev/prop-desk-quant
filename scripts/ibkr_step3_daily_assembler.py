@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import argparse
 import gc
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -103,7 +102,6 @@ def load_spot_cache(underlying: str) -> dict:
 
 def get_spot(cache: dict, trade_date, lookback: int = 5) -> float | None:
     """Retorna spot do dia ou do último dia útil anterior (até lookback dias)."""
-    from datetime import timedelta
     d = pd.Timestamp(trade_date).date()
     for i in range(lookback + 1):
         candidate = d - pd.Timedelta(days=i)
@@ -304,7 +302,7 @@ def upload_to_gdrive(assembled_dir: Path) -> None:
         "--transfers", "4",
     ]
 
-    print(f"\n[UPLOAD] Sincronizando para Google Drive...")
+    print("\n[UPLOAD] Sincronizando para Google Drive...")
     print(f"  Origem:  {assembled_dir}")
     print(f"  Destino: {GDRIVE_REMOTE}\n")
 
@@ -422,7 +420,7 @@ def main() -> None:
     print(f"|{'IBKR STEP 3 — CONCLUÍDO':^{w}}|")
     print(f"+{border}+")
     print(f"|  Total parquets escritos: {total_files:>6}{' ' * (w - 32)}|")
-    print(f"|  Output dir: {str(args.output_dir):<{w - 14}}|")
+    print(f"|  Output dir: {args.output_dir!s:<{w - 14}}|")
     print(f"+{border}+\n")
 
     # ── Validação ────────────────────────────────────────────────────────────
@@ -435,7 +433,7 @@ def main() -> None:
         upload_to_gdrive(args.output_dir)
     else:
         print("  Para fazer upload ao Google Drive:")
-        print(f"  python scripts/ibkr_step3_daily_assembler.py --upload\n")
+        print("  python scripts/ibkr_step3_daily_assembler.py --upload\n")
 
 
 if __name__ == "__main__":

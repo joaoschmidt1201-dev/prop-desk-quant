@@ -18,12 +18,12 @@ DEPENDÊNCIAS:
   + Instalar Tesseract OCR: winget install UB-Mannheim.TesseractOCR
 """
 
-import sys
-import re
 import argparse
-from collections import defaultdict, Counter
-from pathlib import Path
+import re
+import sys
+from collections import defaultdict
 from datetime import date
+from pathlib import Path
 
 try:
     import cv2
@@ -318,7 +318,7 @@ def format_output(grouped: dict, today: str, factor: float = 1.0) -> str:
     lines = [
         sep,
         f"  GEX WEEKLY LEVELS — {today}   {header_spx}",
-        f"  Copie cada linha para o campo correspondente no TradingView:",
+        "  Copie cada linha para o campo correspondente no TradingView:",
         sep,
     ]
 
@@ -361,7 +361,7 @@ def format_output(grouped: dict, today: str, factor: float = 1.0) -> str:
     if grouped.get("unknown"):
         unknown = grouped["unknown"]
         unknown_str = ", ".join(f"{normalize_label(lbl)}:{round(p)}" for lbl, p in unknown)
-        lines.append(f"\n  (Não classificados — revisar manualmente):")
+        lines.append("\n  (Não classificados — revisar manualmente):")
         lines.append(f"  {unknown_str}")
 
     lines.append(sep)

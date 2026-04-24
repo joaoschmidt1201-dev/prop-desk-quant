@@ -30,7 +30,6 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURACAO
 # ─────────────────────────────────────────────────────────────────────────────
@@ -428,11 +427,11 @@ def verify_parquet(path: Path) -> None:
         d = df_check["delta"].dropna()
         print(f"  Delta range  : {d.min():.3f}  ->  {d.max():.3f}")
 
-    print(f"\n  dtypes:")
+    print("\n  dtypes:")
     for col, dtype in df_check.dtypes.items():
-        print(f"    {col:<25} {str(dtype)}")
+        print(f"    {col:<25} {dtype!s}")
 
-    print(f"\n  Amostra (head 3):")
+    print("\n  Amostra (head 3):")
     display_cols = [c for c in ["option_symbol", "side", "strike", "bid", "ask", "iv", "delta"] if c in df_check.columns]
     print(df_check[display_cols].head(3).to_string(index=False))
 
@@ -466,8 +465,8 @@ def print_report(df: pd.DataFrame, path: Path, elapsed_sec: float) -> None:
     print(f"|  Expiration    : {EXPIRATION}  (7DTE){' ' * (w - 26)}|")
     print(f"+{border}+")
     print(f"|  Total cttos   : {len(df):,}{' ' * (w - 18 - len(f'{len(df):,}'))}|")
-    print(f"|  Calls         : {str(n_calls):<{w-18}}|")
-    print(f"|  Puts          : {str(n_puts):<{w-18}}|")
+    print(f"|  Calls         : {n_calls!s:<{w-18}}|")
+    print(f"|  Puts          : {n_puts!s:<{w-18}}|")
     print(f"|  Strikes       : {s_min} -> {s_max}{' ' * max(0, w-18-len(f'{s_min} -> {s_max}'))}|")
     print(f"|  IV range      : {iv_min} -> {iv_max}{' ' * max(0, w-18-len(f'{iv_min} -> {iv_max}'))}|")
     print(f"+{border}+")
@@ -495,7 +494,7 @@ def main():
     # ── 1. Session ────────────────────────────────────────────────────────────
     session = build_session()
     print(f"[INFO] API      : {BASE_URL}")
-    print(f"[INFO] Plano    : Trader (100.000 req/dia)")
+    print("[INFO] Plano    : Trader (100.000 req/dia)")
     print(f"[INFO] Output   : {OUTPUT_DIR}\n")
 
     # ── 2. Pre-flight: confirmar expiracao disponivel ─────────────────────────

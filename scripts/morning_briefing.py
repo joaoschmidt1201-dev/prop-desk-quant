@@ -15,14 +15,14 @@ Data sources:
   - Perplexity API : real-time news research + briefing generation
 """
 
+import json
 import os
 import re
 import sys
-import json
-import requests
-import pandas as pd
-from datetime import datetime, date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
+
+import requests
 
 try:
     import yfinance as yf
@@ -581,13 +581,13 @@ def _gex_ticker_block(
             neg_str = " | ".join(f"n{i+1} ${v:,}{star(v)}" for i, v in enumerate(neg))
             lines.append(f"• Neg GEX:     {neg_str}")
         if coi:
-            lines.append(f"• Call OI:     " + " / ".join(f"${v:,}{star(v)}" for v in coi))
+            lines.append("• Call OI:     " + " / ".join(f"${v:,}{star(v)}" for v in coi))
         if poi:
-            lines.append(f"• Put OI:      " + " / ".join(f"${v:,}{star(v)}" for v in poi))
+            lines.append("• Put OI:      " + " / ".join(f"${v:,}{star(v)}" for v in poi))
         if agg is not None:
             lines.append(f"• Agg GEX:     ${agg:,}{star(agg)}")
         if conf:
-            lines.append(f"• Confluences: " + " | ".join(f"${v:,}" for v in sorted(conf)))
+            lines.append("• Confluences: " + " | ".join(f"${v:,}" for v in sorted(conf)))
         if spot is not None and gflip is not None:
             analysis = _gex_ai_analysis(ticker_name, spot, gflip, pos, neg, agg, conf, today or date.today(), api_key)
             if analysis:
@@ -848,7 +848,7 @@ One direct sentence: the desk's tactical bias for today and the single most impo
                 # §5§ not found — append §4§ at the end
                 content = content.rstrip() + f'\n§4§\n{gex_section}'
 
-        print(f"  [DEBUG] Raw response (first 300 chars): {repr(content[:300])}")
+        print(f"  [DEBUG] Raw response (first 300 chars): {content[:300]!r}")
         return content
 
     except requests.exceptions.Timeout:

@@ -737,11 +737,11 @@ def main():
     print(f"  Pine Script regenerated -> {PINE_FILE.name}")
 
     ticker_lower = ticker.lower()
-    print(f"\n  Next steps:")
+    print("\n  Next steps:")
     print(f"    1. git add gex_history_{ticker_lower}.json tradingview/gex_weekly_levels.pine")
     print(f"    2. git commit -m 'chore: GEX levels {ticker} week {week_date}'")
-    print(f"    3. git push")
-    print(f"    4. In TradingView -> Pine Editor -> paste gex_weekly_levels.pine -> Save\n")
+    print("    3. git push")
+    print("    4. In TradingView -> Pine Editor -> paste gex_weekly_levels.pine -> Save\n")
 
 
 if __name__ == "__main__":

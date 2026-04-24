@@ -16,17 +16,17 @@ Google Drive (opcional):
   Ou passe o ID via --gdrive-id ou variável de ambiente GDRIVE_FILE_ID.
 """
 
+import argparse
+import json
 import os
 import re
-import json
-import argparse
 import sys
-from datetime import datetime, date, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
 import openpyxl
+import pandas as pd
 
 ROOT = Path(__file__).parent.parent
 DEFAULT_XLSX = ROOT / "data" / "control_panel" / "OP Control Panel.xlsx"
@@ -92,12 +92,12 @@ def download_from_gdrive(file_id: str, output_path: Path) -> bool:
     """
     if not GDRIVE_CREDS.exists():
         print(f"[!] Credenciais nao encontradas em: {GDRIVE_CREDS}")
-        print(f"    Baixe o OAuth JSON do GCP e salve nesse caminho.")
+        print("    Baixe o OAuth JSON do GCP e salve nesse caminho.")
         return False
     try:
+        from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
-        from google.auth.transport.requests import Request
         from googleapiclient.discovery import build
 
         creds = None
@@ -688,16 +688,16 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
 
     print(f"[export] db_robots: {len(db_robots)} registros | db_cria: {len(db_cria)} trades")
 
-    print(f"[export] Lendo TOTAL rows das abas visuais ...")
+    print("[export] Lendo TOTAL rows das abas visuais ...")
     sheet_summaries = read_sheet_summaries(xlsx_path)
     for env, months in sheet_summaries.items():
         for m in months:
             print(f"  {m['month']:15s} [{env:12s}]  OpenPnL={m['open_pnl']:+,.0f}  RLZD={m['rlzd']:+,.0f}  Delta={m['delta']:+.0f}")
 
-    print(f"[export] Lendo PnLs individuais das abas visuais ...")
+    print("[export] Lendo PnLs individuais das abas visuais ...")
     individual_trade_pnls = read_individual_trade_pnls(xlsx_path)
 
-    print(f"[export] Lendo status Closed das abas visuais ...")
+    print("[export] Lendo status Closed das abas visuais ...")
     closed_from_sheets = load_closed_trades_from_sheets(xlsx_path)
     print(f"[export] Trades fechados: {sorted(closed_from_sheets)}")
 

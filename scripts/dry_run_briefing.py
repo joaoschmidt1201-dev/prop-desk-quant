@@ -14,8 +14,8 @@ Requer as mesmas env vars do script principal:
   (DISCORD_WEBHOOK_URL não é necessário no dry-run)
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Adiciona a pasta scripts ao path para importar morning_briefing

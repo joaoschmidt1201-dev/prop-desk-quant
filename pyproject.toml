@@ -1,0 +1,86 @@
+[project]
+name = "prop-desk-quant"
+version = "0.1.0"
+description = "Infraestrutura quantitativa do Prop Desk — pipelines de dados, backtests, GEX, morning briefing, viewers"
+requires-python = ">=3.11"
+authors = [{ name = "João Smith", email = "joaoschmidt1201@gmail.com" }]
+readme = "README.md"
+license = { text = "Proprietary" }
+
+# A lista completa vive em requirements.txt para compatibilidade com
+# Streamlit Cloud e GitHub Actions. Mantido aqui em branco por design.
+dependencies = []
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RUFF — linter + formatter
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = [
+    "scripts/legacy_databento",
+    "data",
+    "state",
+    "reports",
+    "context",
+    "infra",
+    ".credentials",
+    ".archive",
+]
+
+[tool.ruff.lint]
+# Regras pragmaticas: pega erros reais sem fiscalizar estilo irrelevante
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes (unused imports, undefined names)
+    "W",    # warnings
+    "I",    # isort (import order)
+    "B",    # bugbear (common bugs)
+    "UP",   # pyupgrade
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",   # line length — formatter handles
+    "E741",   # ambiguous variable names (l, O, I) — desk usa l p/ line
+    "B008",   # function call in argument default (matplotlib/plotly idioms)
+    "SIM108", # use ternary — as vezes if/else e mais legivel
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.isort]
+known-first-party = ["prop_desk"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MYPY — type checking (gradual, nao bloqueante por enquanto)
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = false
+warn_unused_ignores = true
+ignore_missing_imports = true
+exclude = [
+    "scripts/legacy_databento",
+    "data",
+    "state",
+    "reports",
+    "context",
+    "infra",
+    ".archive",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PYTEST
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["scripts"]  # permite `import morning_briefing` em tests/
+markers = [
+    "slow: testes lentos (backtest end-to-end)",
+    "network: requer internet (yfinance, finnhub)",
+]

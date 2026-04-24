@@ -18,9 +18,10 @@
 ===============================================================================
 """
 
-import whisper
 import datetime
 from pathlib import Path
+
+import whisper
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO
@@ -72,7 +73,7 @@ def transcribe_inbox():
         processed_dir = INBOX_DIR / "processed"
         processed_dir.mkdir(exist_ok=True)
         audio_path.rename(processed_dir / audio_path.name)
-        print(f"Áudio movido para inbox/processed/")
+        print("Áudio movido para inbox/processed/")
 
     print(f"\nConcluído. {len(audio_files)} áudio(s) processado(s).")
 

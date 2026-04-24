@@ -19,7 +19,6 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.datavalidation import DataValidation
 
-
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "data" / "control_panel" / "OP Control Panel.xlsx"
 OUTPUT = ROOT / "data" / "control_panel" / "OP Control Panel - Dashboard Pack.xlsx"

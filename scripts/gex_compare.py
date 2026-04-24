@@ -22,11 +22,11 @@ NOTA METODOLÓGICA:
   com gamma baixo (far OTM / LEAPS) — menos relevante para o desk.
 """
 
-import re
 import json
+import re
 import sys
-from pathlib import Path
 from datetime import date
+from pathlib import Path
 
 # ─── CONFIGURAÇÃO MANUAL — MenthorQ ──────────────────────────────────────────
 # Preencha com os níveis que você vê no MenthorQ para esta semana.
@@ -146,7 +146,7 @@ def compare_ticker(
         if ticker == "SPX" and spy_to_spx:
             spy = tl_data  # já é SPX direto ou convertido
             # Também mostrar SPY convertido como referência
-            print(f"    SPX direto:")
+            print("    SPX direto:")
         elif ticker == "NDX" and qqq_to_ndx:
             calls = [round(v * qqq_to_ndx) for v in calls]
             puts  = [round(v * qqq_to_ndx) for v in puts]
@@ -160,7 +160,7 @@ def compare_ticker(
         print("    Dados não disponíveis no script fornecido.")
 
     # ── Barchart (GEX local) ───────────────────────────────────────────────
-    print(f"\n  [2] BARCHART  (GEX — delta-hedging exposure)")
+    print("\n  [2] BARCHART  (GEX — delta-hedging exposure)")
     if bc_data:
         flip = bc_data.get("gflip")
         pos  = bc_data.get("pos", [])
@@ -177,7 +177,7 @@ def compare_ticker(
         print("    JSON local não encontrado.")
 
     # ── MenthorQ (manual) ──────────────────────────────────────────────────
-    print(f"\n  [3] MENTHORQ  (entrada manual)")
+    print("\n  [3] MENTHORQ  (entrada manual)")
     if mq_data:
         flip = mq_data.get("gamma_flip")
         cw   = mq_data.get("call_walls", [])
@@ -192,7 +192,7 @@ def compare_ticker(
         print("    (não preenchido — edite MENTHORQ_DATA no topo do script)")
 
     # ── Análise de Convergência ────────────────────────────────────────────
-    print(f"\n  [CONVERGÊNCIA]")
+    print("\n  [CONVERGÊNCIA]")
     if tl_data and bc_data:
         tl_calls = set()
         if ticker == "SPX":
@@ -226,7 +226,7 @@ def compare_ticker(
             bc_put_min = min(bc_puts)
             if tl_put_max < bc_put_min - tol:
                 print(f"    ~ Put OI (TL max=${int(tl_put_max):,}) bem abaixo dos Put Walls GEX (min=${bc_put_min:,})")
-                print(f"      → OI concentrado em puts OTM/LEAPS (hedges distantes); GEX support é near-money")
+                print("      → OI concentrado em puts OTM/LEAPS (hedges distantes); GEX support é near-money")
 
         # Gamma flip como contexto
         if bc_flip:
@@ -297,7 +297,7 @@ def main():
     # ── IWM (só TradingLit, sem GEX local) ───────────────────────────────
     if "IWM" in tl:
         print(f"\n{'='*70}")
-        print(f"  IWM  —  TradingLit OI  (referência, sem GEX local)")
+        print("  IWM  —  TradingLit OI  (referência, sem GEX local)")
         print(f"{'='*70}")
         iwm = tl["IWM"]
         print(f"  Call OI:   {fmt_levels(iwm['calls'])}")

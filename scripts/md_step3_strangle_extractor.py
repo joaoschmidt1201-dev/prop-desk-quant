@@ -35,8 +35,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import requests
-import yfinance as yf
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO — EDITAR AQUI
@@ -400,7 +398,7 @@ def print_session_report(days_done: int, days_skipped: int, days_total: int, t_s
     print(f"|  Dias pulados   : {days_skipped} (já existiam){' ' * max(0, w-19-len(f'{days_skipped} (já existiam)'))}|")
     print(f"|  Dias restantes : {max(0, days_total - days_done - days_skipped):<{w-19}}|")
     print(f"|  {APICounter.status_line():<{w-2}}|")
-    print(f"|  Output dir     : {str(OUTPUT_DIR):<{w-19}}|")
+    print(f"|  Output dir     : {OUTPUT_DIR!s:<{w-19}}|")
     print(f"+{'=' * w}+")
     print()
 
@@ -456,7 +454,7 @@ def main() -> None:
 
         expirations = fetch_expirations(session, trade_date)
         if not expirations:
-            print(f"  [SKIP] Sem expirações disponíveis.")
+            print("  [SKIP] Sem expirações disponíveis.")
             continue
 
         valid_exps = get_valid_expirations(expirations, trade_date, MAX_DTE)

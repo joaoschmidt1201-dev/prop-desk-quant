@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import sys, io
+import io
+import sys
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 """
@@ -18,12 +20,12 @@ Usage:
   python scripts/gex_input.py --week 2026-04-14 --dry-run
 """
 
-import re
-import json
 import argparse
-from pathlib import Path
-from datetime import date, datetime, timedelta
+import json
+import re
 from collections import defaultdict
+from datetime import date, datetime, timedelta
+from pathlib import Path
 
 try:
     import pytz

@@ -30,15 +30,15 @@ import pandas as pd
 # ── Import backtest engine ─────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ss42_backtest import (
-    load_chain,
-    find_target_expiration,
-    select_16delta_strikes,
-    calc_iv_atm,
-    get_available_dates,
-    compute_daily_mtm,
-    calc_pnl_expiration,
     DATA_DIR,
     OUTPUT_DIR,
+    calc_iv_atm,
+    calc_pnl_expiration,
+    compute_daily_mtm,
+    find_target_expiration,
+    get_available_dates,
+    load_chain,
+    select_16delta_strikes,
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -343,7 +343,7 @@ def main() -> None:
         n_reentry = n_sim - n_orig
 
         log.info(f"  Trades: {n_orig} → {n_sim}  ({n_reentry:+d} re-entradas)")
-        log.info(f"  (P&L real calculado pelo viewer via apply_close_rule no daily MTM)")
+        log.info("  (P&L real calculado pelo viewer via apply_close_rule no daily MTM)")
 
         # Salvar CSVs
         out_trades = OUTPUT_DIR / f"SS42_{UNDERLYING}_reinvest_{rule_key}_trades.csv"

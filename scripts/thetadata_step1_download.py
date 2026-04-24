@@ -243,7 +243,7 @@ def run_root(
     pending   = [e for e in expirations if e not in completed]
 
     if not pending:
-        print(f"  Já concluído (checkpoint). Use --force para re-baixar.")
+        print("  Já concluído (checkpoint). Use --force para re-baixar.")
         return
 
     skipped = len(expirations) - len(pending)

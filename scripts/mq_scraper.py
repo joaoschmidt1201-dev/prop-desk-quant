@@ -26,10 +26,9 @@ import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
-from urllib.parse import urlencode, unquote_plus
+from urllib.parse import unquote_plus, urlencode
 
-from playwright.async_api import async_playwright, Page, Request
-
+from playwright.async_api import Page, Request, async_playwright
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURAÇÃO
@@ -507,9 +506,9 @@ async def main() -> None:
                 ts_short = str(snap["timestamp"] or "")[:19]
                 print(
                     f"    {ts_short}  "
-                    f"Call={str(levels['call_res'] or 'N/A'):>7}  "
-                    f"Put={str(levels['put_sup'] or 'N/A'):>7}  "
-                    f"HVL={str(levels['hvl'] or 'N/A'):>7}  "
+                    f"Call={levels['call_res'] or 'N/A'!s:>7}  "
+                    f"Put={levels['put_sup'] or 'N/A'!s:>7}  "
+                    f"HVL={levels['hvl'] or 'N/A'!s:>7}  "
                     f"GEX={fmt_gex(levels['net_gex']):>9}  "
                     f"({levels['gamma_condition'] or '?'})"
                 )

@@ -287,8 +287,8 @@ def print_report(df: pd.DataFrame, start: date, end: date) -> None:
     print(f"\n+{border}+")
     print(f"|{'IBKR STEP 1 — CONTRACT UNIVERSE':^{w}}|")
     print(f"+{border}+")
-    print(f"|  Período      : {str(start):<{w-17}}|")
-    print(f"|  Período fim  : {str(end):<{w-17}}|")
+    print(f"|  Período      : {start!s:<{w-17}}|")
+    print(f"|  Período fim  : {end!s:<{w-17}}|")
     print(f"|  Total linhas : {len(df):,}{' ' * (w - 17 - len(f'{len(df):,}'))}|")
     print(f"+{border}+")
 
@@ -304,7 +304,7 @@ def print_report(df: pd.DataFrame, start: date, end: date) -> None:
         print(f"|  {sym:<6}  {len(grp):>8,} contratos{' ' * (w - 28)}|")
 
     print(f"+{border}+")
-    print(f"|  Output: {str(OUTPUT):<{w-10}}|")
+    print(f"|  Output: {OUTPUT!s:<{w-10}}|")
     print(f"+{border}+\n")
 
 

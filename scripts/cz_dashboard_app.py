@@ -7,14 +7,12 @@ Two tabs: CZ Live Trading | JS Forward Testing
 AI Chat powered by Claude Sonnet with full portfolio context.
 """
 
-import os
 import json
+import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 

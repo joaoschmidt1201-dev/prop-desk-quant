@@ -1,0 +1,17 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Research / heavy deps — usado localmente pelo desk para backtests, scraping
+# e pipelines de dados. Nao necessario em Streamlit Cloud nem CI leve.
+# Instalar: pip install -r requirements-research.txt
+# ─────────────────────────────────────────────────────────────────────────────
+-r requirements.txt
+
+# Numeric stack
+scipy==1.17.1
+matplotlib==3.10.8
+
+# Data pipelines
+ib_insync==0.9.86       # IBKR backfill (ibkr_step1/2/3)
+playwright==1.58.0      # mq_scraper (MenthorQ)
+
+# OCR e audio (opcionais, transcricao e parsing visual)
+# pillow pytesseract openai-whisper

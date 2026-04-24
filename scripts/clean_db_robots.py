@@ -17,9 +17,7 @@ antes de substituir no Google Drive.
 
 import sys
 from pathlib import Path
-from datetime import datetime
 
-import openpyxl
 from openpyxl import load_workbook
 
 ROOT      = Path(__file__).parent.parent

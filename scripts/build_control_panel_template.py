@@ -15,10 +15,9 @@ from pathlib import Path
 
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, LineChart, Reference
-from openpyxl.formatting.rule import CellIsRule, FormulaRule
+from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.datavalidation import DataValidation
-
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "data" / "control_panel" / "OP_Control_Panel_Ideal_Template.xlsx"
