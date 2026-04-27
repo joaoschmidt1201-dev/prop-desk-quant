@@ -28,6 +28,16 @@ reports/**/*.parquet
 
 # ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/
+
+# ── Frontend (Next.js) ──────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+apps/**/.env
+apps/**/.env.local
+*.tsbuildinfo
+next-env.d.ts
 *.py[cod]
 *.pyo
 .pytest_cache/
