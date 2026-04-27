@@ -36,5 +36,42 @@
       660
     ],
     "source_file": "QQQ-gamma-levels-exp-20260424-weekly.csv"
+  },
+  {
+    "week": "2026-04-27",
+    "ticker": "QQQ",
+    "expiry": "2026-05-01",
+    "gflip": 643,
+    "pos": [
+      665,
+      645,
+      675
+    ],
+    "neg": [
+      643,
+      639,
+      640
+    ],
+    "coi": [
+      650,
+      645
+    ],
+    "poi": [
+      650,
+      640
+    ],
+    "agg": 650,
+    "pos_zone": 644,
+    "neg_zone": 642,
+    "conf": [
+      639,
+      640,
+      642,
+      643,
+      644,
+      645,
+      650
+    ],
+    "source_file": "QQQ-gamma-levels-exp-20260501-weekly.csv"
   }
 ]

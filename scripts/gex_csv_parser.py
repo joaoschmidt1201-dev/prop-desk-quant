@@ -2,7 +2,7 @@
 """
 gex_csv_parser.py
 ─────────────────
-Reads a Barchart GEX CSV (SPX, NDX, SPY, or QQQ) and:
+Reads a Barchart GEX CSV (SPX, NDX, SPY, QQQ or IWM) and:
   1. Calculates all GEX levels (Gamma Flip, p1/p2/p3, n1/n2/n3, coi, poi, agg, zones, confluences)
   2. Saves to the ticker's history JSON
   3. Regenerates tradingview/gex_weekly_levels.pine (single indicator — auto-switches ticker)
@@ -13,6 +13,7 @@ Usage:
   python scripts/gex_csv_parser.py "data/raw/gex/$IUXX-gamma-levels-exp-20260421-weekly.csv" --week 2026-04-14
   python scripts/gex_csv_parser.py "data/raw/gex/SPY-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
   python scripts/gex_csv_parser.py "data/raw/gex/QQQ-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
+  python scripts/gex_csv_parser.py "data/raw/gex/IWM-gamma-levels-exp-20260421-weekly.csv"   --week 2026-04-14
 """
 
 import argparse
@@ -86,6 +87,16 @@ TICKER_CONFIG = {
         "pine_aliases":    ["QQQ"],
         "pine_contains":   [],
     },
+    "IWM": {
+        "filename_prefix": ["IWM-", "$IWM-"],
+        "yf_symbol":       "IWM",
+        "strike_min":      150,
+        "strike_max":      400,
+        "history_file":    ROOT / "state" / "gex" / "gex_history_iwm.json",
+        "conf_tol":        2,
+        "pine_aliases":    ["IWM", "RUT"],
+        "pine_contains":   ["RTY"],
+    },
 }
 
 # ─── PINE TEMPLATE ────────────────────────────────────────────────────────────
@@ -93,7 +104,7 @@ TICKER_CONFIG = {
 PINE_TEMPLATE = """\
 //@version=5
 // =======================================================================
-// GEX Weekly Levels [TradingLitt Style] — SPX + NDX + SPY + QQQ — AUTO-GENERATED
+// GEX Weekly Levels [TradingLitt Style] — SPX + NDX + SPY + QQQ + IWM — AUTO-GENERATED
 // DO NOT EDIT MANUALLY. Regenerate via:
 //   python scripts/gex_csv_parser.py <csv_path> --week YYYY-MM-DD
 // Last updated : {generated_date}
