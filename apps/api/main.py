@@ -146,6 +146,16 @@ def trade_delta(trade: dict[str, Any]) -> float:
     return 0.0
 
 
+def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    summaries: dict[str, dict[str, Any]] = {}
+    for env_name, env_summaries in (snap.get("sheet_summaries") or {}).items():
+        for summary in env_summaries or []:
+            sheet = summary.get("month")
+            if isinstance(sheet, str):
+                summaries[sheet] = {**summary, "env": env_name}
+    return summaries
+
+
 # ─── Pydantic models ──────────────────────────────────────────────────────────
 
 
@@ -358,6 +368,18 @@ def get_kpis(
     win_rate = len(wins) / len(closed_pnls) if closed_pnls else None
     profit_factor = (sum(wins) / abs(sum(losses))) if losses and sum(losses) else None
     expectancy = (sum(closed_pnls) / len(closed_pnls)) if closed_pnls else None
+
+    sheet_summaries = sheet_summary_lookup(snap)
+    selected_summaries = [
+        sheet_summaries[m]
+        for m in months
+        if m in sheet_summaries and (env is None or sheet_summaries[m].get("env") == env)
+    ]
+    if selected_summaries:
+        open_pnl = sum(float(s.get("open_pnl") or 0) for s in selected_summaries)
+        rlzd = sum(float(s.get("rlzd") or 0) for s in selected_summaries)
+        delta_total = sum(float(s.get("delta") or 0) for s in selected_summaries)
+        net_credit_at_risk = sum(float(s.get("max_profit") or 0) for s in selected_summaries)
 
     return KpisResponse(
         filter=FilterEcho(months=months, env=env),

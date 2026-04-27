@@ -317,14 +317,22 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
         # For each block, find the DIT|DTE|PnL row (all three offsets numeric)
         for bc, trade_name in blocks:
             pnl = None
-            for r in range(name_r + 2, min(name_r + 22, 26)):
-                row_data = all_rows.get(r, ())
-                dit = row_data[bc + 1] if len(row_data) > bc + 1 else None
-                dte = row_data[bc + 2] if len(row_data) > bc + 2 else None
-                p   = row_data[bc + 3] if len(row_data) > bc + 3 else None
-                if is_num(dit) and is_num(dte) and is_num(p):
-                    pnl = float(p)
-                    break
+            if title_layout:
+                for r in range(name_r + 2, min(name_r + 22, 26)):
+                    row_data = all_rows.get(r, ())
+                    dit = row_data[bc + 1] if len(row_data) > bc + 1 else None
+                    dte = row_data[bc + 2] if len(row_data) > bc + 2 else None
+                    p   = row_data[bc + 3] if len(row_data) > bc + 3 else None
+                    if is_num(dit) and is_num(dte) and is_num(p):
+                        pnl = float(p)
+                        break
+            else:
+                # Legacy layout: row 16 labels the per-trade time-series columns.
+                # The final trade PnL is the last numeric value in the block's PnL column.
+                for row_data in ws.iter_rows(min_row=17, values_only=True):
+                    p = row_data[bc] if len(row_data) > bc else None
+                    if is_num(p):
+                        pnl = float(p)
 
             if pnl is not None:
                 result[trade_name] = pnl
@@ -762,11 +770,56 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
     trades   = build_trade_snapshot(db_robots, db_cria, closed_from_sheets)
     monthly  = build_monthly_summary(db_robots, db_cria)
     history  = build_trade_history(db_robots, db_cria)
-    kpis     = compute_portfolio_kpis(trades, monthly)
 
     # Attach `sheet` (visual month sheet, e.g. APR26) to each trade for filtering
     for t in trades:
         t["sheet"] = trade_to_sheet.get(t.get("name"))
+
+    # Some closed visual trades no longer have a db_robots current-state row.
+    # Keep them in the snapshot so month filters, AI context, and future charts
+    # reconcile to the visual sheet composition.
+    existing_names = {t.get("name") for t in trades}
+    for sheet_name, names in sheet_to_trades.items():
+        env_norm = SHEET_ENV_MAP.get(sheet_name, "JS_Forward" if sheet_name.startswith("JS ") else "CZ_Live")
+        for name in names:
+            if name in existing_names:
+                continue
+            pnl = individual_trade_pnls.get(name)
+            is_active = name not in closed_from_sheets
+            trades.append({
+                "name": name,
+                "environment_raw": sheet_name,
+                "environment": env_norm,
+                "underlying": _infer_underlying(name),
+                "is_active": is_active,
+                "last_update": None,
+                "open_date": None,
+                "exp_date": None,
+                "dte_open": None,
+                "dte_remaining": None,
+                "underlying_price_at_open": None,
+                "strikes": None,
+                "net_credit": None,
+                "max_loss": None,
+                "sd": None,
+                "lw_be": None,
+                "up_be": None,
+                "pct_to_lw_be": None,
+                "pct_to_up_be": None,
+                "pnl_current": pnl,
+                "pnl_pct_max": None,
+                "delta_current": 0.0,
+                "alert_dte": False,
+                "alert_profit_50": False,
+                "alert_stop": False,
+                "tent_status": "unknown",
+                "sheet": sheet_name,
+                "source": "visual_sheet",
+            })
+            existing_names.add(name)
+
+    trades = sorted(trades, key=lambda t: (not t["is_active"], t["name"]))
+    kpis = compute_portfolio_kpis(trades, monthly)
 
     # ── Snapshot JSON ──
     snapshot = {
