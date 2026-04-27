@@ -76,8 +76,15 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+async function post<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", cache: "no-store" });
+  if (!res.ok) throw new Error(`API ${res.status}: ${path}`);
+  return res.json();
+}
+
 export const api = {
   health: () => get<{ status: string; snapshot_age_seconds: number | null; snapshot_generated_at: string | null }>("/api/health"),
+  refreshSnapshot: () => post<{ status: "refresh_started" | "already_running" }>("/api/snapshot/refresh"),
   months: () => get<{ months: MonthInfo[] }>("/api/months"),
   trades: (filter: Partial<Filter> = {}) =>
     get<{ filter: Filter; trades: Trade[] }>(`/api/trades${qs(filter)}`),

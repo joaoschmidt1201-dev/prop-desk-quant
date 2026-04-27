@@ -1,16 +1,39 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { fmtRelativeAge } from "@/lib/format";
 
 export function DashboardHeader() {
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { data, refetch, isFetching } = useQuery({
     queryKey: ["health"],
     queryFn: () => api.health(),
     refetchInterval: 60_000,
   });
+  const spinning = isFetching || isRefreshing;
+
+  async function handleRefresh() {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await api.refreshSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 8_000));
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: ["months"] }),
+        queryClient.invalidateQueries({ queryKey: ["kpis"] }),
+        queryClient.invalidateQueries({ queryKey: ["trades"] }),
+      ]);
+    } catch (e) {
+      console.error("Snapshot refresh failed", e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-md">
@@ -35,12 +58,12 @@ export function DashboardHeader() {
             <span className="tabular text-foreground">{fmtRelativeAge(data?.snapshot_age_seconds)}</span>
           </div>
           <button
-            onClick={() => refetch()}
-            disabled={isFetching}
+            onClick={handleRefresh}
+            disabled={spinning}
             className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 bg-card/40 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:opacity-50"
             aria-label="Refresh"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${spinning ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>

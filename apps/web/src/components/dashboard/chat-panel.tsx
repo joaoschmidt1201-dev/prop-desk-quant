@@ -3,6 +3,13 @@
 import { Send, Sparkles, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, type ChatMessage, type Filter } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Props = { filter: Filter };
 
@@ -66,14 +73,15 @@ export function ChatPanel({ filter }: Props) {
             · {filter.months.length ? filter.months.join(", ") : "ALL"}
           </span>
         </div>
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value as "anthropic" | "openai")}
-          className="rounded-md border border-border/60 bg-card/40 px-2 py-1 text-[11px] text-muted-foreground focus:border-primary/60 focus:outline-none"
-        >
-          <option value="anthropic">Claude</option>
-          <option value="openai">GPT</option>
-        </select>
+        <Select value={provider} onValueChange={(v) => setProvider(v as "anthropic" | "openai")}>
+          <SelectTrigger className="h-7 w-[92px] border-border/60 bg-card/40 text-[11px] focus:border-primary/60">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="anthropic" className="text-xs">Claude</SelectItem>
+            <SelectItem value="openai" className="text-xs">GPT</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4">

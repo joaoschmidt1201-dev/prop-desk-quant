@@ -15,6 +15,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
+import sys
+import threading
 import time
 from collections.abc import Iterable
 from pathlib import Path
@@ -35,6 +39,22 @@ load_dotenv(REPO_ROOT / ".env", override=False)
 SNAPSHOT_PATH = REPO_ROOT / os.getenv("SNAPSHOT_PATH", "reports/trades_snapshot_latest.json")
 SNAPSHOT_CACHE_TTL = int(os.getenv("SNAPSHOT_CACHE_TTL", "300"))
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
+GDRIVE_ID = "1RIXpDUIq1692_6UwoPFYyrKtukYB2UArCTWvI6Y5Xbk"
+MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
+MONTH_NUM = {
+    "JAN": 1,
+    "FEB": 2,
+    "MAR": 3,
+    "APR": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUL": 7,
+    "AUG": 8,
+    "SEP": 9,
+    "OCT": 10,
+    "NOV": 11,
+    "DEC": 12,
+}
 
 # ─── App ──────────────────────────────────────────────────────────────────────
 
@@ -56,6 +76,8 @@ app.add_middleware(
 # ─── Snapshot cache ───────────────────────────────────────────────────────────
 
 _snapshot_cache: dict[str, Any] = {"data": None, "loaded_at": 0.0, "mtime": 0.0}
+_refresh_lock = threading.Lock()
+_refresh_running = {"state": False}
 
 
 def load_snapshot(force: bool = False) -> dict[str, Any]:
@@ -92,15 +114,15 @@ SHEET_TO_ENV: dict[str, str] = {
 def parse_months(months: str | None) -> list[str]:
     if not months:
         return []
-    return [m.strip().lower() for m in months.split(",") if m.strip()]
+    return [m.strip() for m in months.split(",") if m.strip()]
 
 
 def trade_in_filter(trade: dict[str, Any], months: list[str], env: str | None) -> bool:
-    raw = (trade.get("environment_raw") or "").strip().lower()
-    trade_env = trade.get("environment")
-    if months and raw not in months:
+    sheet = (trade.get("sheet") or "").strip()
+    valid_sheet = bool(sheet and MONTH_SHEET_REGEX.match(sheet))
+    if months and (not valid_sheet or sheet not in months):
         return False
-    if env and trade_env != env:
+    if env and trade.get("environment") != env:
         return False
     return True
 
@@ -200,17 +222,55 @@ def get_snapshot() -> JSONResponse:
     )
 
 
+@app.post("/api/snapshot/refresh")
+def refresh_snapshot() -> JSONResponse:
+    with _refresh_lock:
+        if _refresh_running["state"]:
+            return JSONResponse({"status": "already_running"}, status_code=409)
+        _refresh_running["state"] = True
+
+    def run() -> None:
+        try:
+            print("[snapshot refresh] running export_control_panel.py")
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO_ROOT / "scripts" / "export_control_panel.py"),
+                    "--gdrive-id",
+                    GDRIVE_ID,
+                ],
+                cwd=str(REPO_ROOT),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if proc.stdout:
+                print(proc.stdout, end="")
+            if proc.stderr:
+                print(proc.stderr, end="", file=sys.stderr)
+            print(f"[snapshot refresh] finished rc={proc.returncode}")
+        except subprocess.TimeoutExpired:
+            print("[snapshot refresh] exporter timed out after 300s", file=sys.stderr)
+        finally:
+            _snapshot_cache["data"] = None
+            with _refresh_lock:
+                _refresh_running["state"] = False
+
+    threading.Thread(target=run, daemon=True).start()
+    return JSONResponse({"status": "refresh_started"}, status_code=202)
+
+
 @app.get("/api/months", response_model=MonthsResponse)
 def get_months() -> MonthsResponse:
     snap = load_snapshot()
-    raw_months: dict[str, dict[str, Any]] = {}
+    sheet_months: dict[str, dict[str, Any]] = {}
     for trade in snap.get("trades", []):
-        raw = (trade.get("environment_raw") or "").strip()
-        if not raw:
+        sheet = (trade.get("sheet") or "").strip()
+        if not sheet or not MONTH_SHEET_REGEX.match(sheet):
             continue
-        key = raw.lower()
-        env = trade.get("environment") or SHEET_TO_ENV.get(raw.upper(), "Unknown")
-        info = raw_months.setdefault(key, {"sheet": raw, "env": env, "n_trades": 0, "active": False})
+        env = trade.get("environment") or SHEET_TO_ENV.get(sheet, "Unknown")
+        info = sheet_months.setdefault(sheet, {"sheet": sheet, "env": env, "n_trades": 0, "active": False})
         info["n_trades"] += 1
         if trade.get("is_active"):
             info["active"] = True
@@ -223,9 +283,17 @@ def get_months() -> MonthsResponse:
             n_trades=info["n_trades"],
             active=info["active"],
         )
-        for info in raw_months.values()
+        for info in sheet_months.values()
     ]
-    months.sort(key=lambda m: (not m.active, m.sheet))
+
+    def sort_key(month: MonthInfo) -> tuple[int, int, int, str]:
+        code = month.sheet.split()[-1]
+        mon = code[:3]
+        year = int(code[3:]) if len(code) == 5 and code[3:].isdigit() else -1
+        month_num = MONTH_NUM.get(mon, -1)
+        return (-int(month.active), -year, -month_num, month.sheet)
+
+    months.sort(key=sort_key)
     return MonthsResponse(months=months)
 
 

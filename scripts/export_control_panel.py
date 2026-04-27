@@ -81,6 +81,11 @@ def _parse_money(val) -> float | None:
 
 VISUAL_SHEETS = ["APR26", "MAR26", "JS APR26", "JS-FOR MAR26", "FOR Trades"]
 
+# Sheets matching this pattern are treated as month-trade sheets and exposed
+# as filterable months in the dashboard. Examples: APR26, MAR26, JS APR26.
+# Future months (MAY26, JUN26, JS MAY26, ...) are picked up automatically.
+MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
+
 
 # ─── Google Drive download ────────────────────────────────────────────────────
 
@@ -181,30 +186,49 @@ def read_sheet_summaries(xlsx_path: Path) -> dict[str, list[dict]]:
     return result
 
 
-def read_individual_trade_pnls(xlsx_path: Path) -> dict[str, float]:
+def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[str, list[str]]]:
     """
-    For sheets with the Status/Titel block layout (currently APR26), reads each
-    trade's last recorded PnL directly from the visual block.
+    For every sheet matching MONTH_SHEET_REGEX (APR26, MAR26, JS APR26, future
+    MAY26 etc.), reads each trade's last PnL directly from the visual block AND
+    records which trades live in which sheet.
 
     Block layout (0-indexed within the row tuple):
       name_row (row 4) : trade name at block_start col
       pnl_row          : first row where bc+1=DIT, bc+2=DTE, bc+3=PnL are ALL numeric
 
-    Returns {normalize_name(trade_name): pnl}
+    Returns (
+        {normalize_name(trade_name): pnl},
+        {sheet_name: [trade_names_in_that_sheet]},
+    )
     """
     result: dict[str, float] = {}
-    BLOCK_SHEETS = ["APR26"]
+    sheet_to_trades: dict[str, list[str]] = {}
 
     def is_num(v):
         return isinstance(v, (int, float)) and not isinstance(v, bool)
 
-    SKIP_LABELS = {"titel", "name", "trade", "strategy", "status", "url"}
+    SKIP_LABELS = {
+        "active",
+        "closed",
+        "live",
+        "name",
+        "new",
+        "open",
+        "options control panel",
+        "status",
+        "strategy",
+        "titel",
+        "trade",
+        "url",
+    }
+    VALID_STATUSES = {"active", "closed", "live", "new", "open"}
 
     wb = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
 
-    for sheet_name in BLOCK_SHEETS:
-        if sheet_name not in wb.sheetnames:
-            continue
+    block_sheets = [s for s in wb.sheetnames if MONTH_SHEET_REGEX.match(s)]
+    print(f"  [trade-sheets detected] {block_sheets}")
+
+    for sheet_name in block_sheets:
         ws = wb[sheet_name]
 
         # Read first 25 rows into dict keyed by 1-based row number
@@ -219,16 +243,42 @@ def read_individual_trade_pnls(xlsx_path: Path) -> dict[str, float]:
                 name_r = r
                 break
 
+        title_layout = name_r is not None
         if name_r is None:
-            print(f"  [{sheet_name}] no Titel row — skipping")
-            continue
+            # Legacy visual sheets place trade names on row 3 and statuses on row 2.
+            best_r = None
+            best_score = -1
+            for candidate_r in range(2, 7):
+                row_data = all_rows.get(candidate_r, ())
+                status_row = all_rows.get(candidate_r - 1, ())
+                score = 0
+                for ci, val in enumerate(row_data):
+                    if val is None or isinstance(val, (datetime, date)):
+                        continue
+                    s = str(val).strip()
+                    if not s or s.lower() in SKIP_LABELS or s.startswith("http"):
+                        continue
+                    try:
+                        float(s)
+                        continue
+                    except ValueError:
+                        pass
+                    st_val = status_row[ci] if len(status_row) > ci else None
+                    st_str = str(st_val).strip().lower() if st_val is not None else ""
+                    if st_str and st_str not in VALID_STATUSES:
+                        continue
+                    score += 1
+                if score > best_score:
+                    best_r = candidate_r
+                    best_score = score
+            name_r = best_r
 
         name_row = all_rows[name_r]
 
         # Status row is 2 rows above Titel row (row 2 when name_r = 4)
-        status_r   = name_r - 2
+        status_r   = name_r - (2 if title_layout else 1)
         status_row = all_rows.get(status_r, ())
-        VALID_STATUSES = {"active", "closed", "live", "open"}
+        VALID_STATUSES = {"active", "closed", "live", "new", "open"}
 
         # Collect block start columns: cols with trade names in name_row
         # Guard: same column in the status row must have a known status value —
@@ -261,6 +311,9 @@ def read_individual_trade_pnls(xlsx_path: Path) -> dict[str, float]:
             print(f"  [{sheet_name}] no trade blocks found")
             continue
 
+        # Record every detected trade name for this sheet (membership map)
+        sheet_to_trades.setdefault(sheet_name, []).extend(name for _, name in blocks)
+
         # For each block, find the DIT|DTE|PnL row (all three offsets numeric)
         for bc, trade_name in blocks:
             pnl = None
@@ -280,7 +333,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> dict[str, float]:
                 print(f"  [{sheet_name}] {trade_name:22s}: PnL row not found — db_robots ffill used")
 
     wb.close()
-    return result
+    return result, sheet_to_trades
 
 
 def load_closed_trades_from_sheets(xlsx_path: Path) -> set[str]:
@@ -695,7 +748,12 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
             print(f"  {m['month']:15s} [{env:12s}]  OpenPnL={m['open_pnl']:+,.0f}  RLZD={m['rlzd']:+,.0f}  Delta={m['delta']:+.0f}")
 
     print("[export] Lendo PnLs individuais das abas visuais ...")
-    individual_trade_pnls = read_individual_trade_pnls(xlsx_path)
+    individual_trade_pnls, sheet_to_trades = read_individual_trade_pnls(xlsx_path)
+    # Reverse map: trade_name -> sheet (first sheet wins if duplicated)
+    trade_to_sheet: dict[str, str] = {}
+    for sheet_name, names in sheet_to_trades.items():
+        for n in names:
+            trade_to_sheet.setdefault(n, sheet_name)
 
     print("[export] Lendo status Closed das abas visuais ...")
     closed_from_sheets = load_closed_trades_from_sheets(xlsx_path)
@@ -705,6 +763,10 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
     monthly  = build_monthly_summary(db_robots, db_cria)
     history  = build_trade_history(db_robots, db_cria)
     kpis     = compute_portfolio_kpis(trades, monthly)
+
+    # Attach `sheet` (visual month sheet, e.g. APR26) to each trade for filtering
+    for t in trades:
+        t["sheet"] = trade_to_sheet.get(t.get("name"))
 
     # ── Snapshot JSON ──
     snapshot = {
@@ -734,8 +796,11 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
     # -- Monthly summary CSV --
     if not monthly.empty:
         csv_path = REPORTS_DIR / "monthly_summary.csv"
-        monthly.to_csv(csv_path, index=False)
-        print(f"[export] Monthly  -> {csv_path.name} ({len(monthly)} trades)")
+        try:
+            monthly.to_csv(csv_path, index=False)
+            print(f"[export] Monthly  -> {csv_path.name} ({len(monthly)} trades)")
+        except PermissionError:
+            print(f"[!] Monthly CSV bloqueado; snapshot ja foi atualizado. Feche o arquivo e rode novamente: {csv_path}")
 
     # -- Alertas --
     if kpis["alerts"]:
