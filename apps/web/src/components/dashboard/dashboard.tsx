@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Filter } from "@/lib/api";
+import { AnalyticsPanel } from "./analytics-panel";
 import { ChatPanel } from "./chat-panel";
 import { DashboardHeader } from "./header";
 import { KpiGrid } from "./kpi-grid";
@@ -12,18 +13,18 @@ export function Dashboard() {
   const [filter, setFilter] = useState<Filter>({ months: [], env: null });
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col">
       <DashboardHeader />
-      <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-6">
-        <div className="mb-6">
+      <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
+        <div className="mb-7">
           <MonthFilter
             selectedMonths={filter.months}
             onChange={(months) => setFilter((f) => ({ ...f, months }))}
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="space-y-6 lg:col-span-8">
+        <div className="grid grid-cols-1 gap-7 lg:grid-cols-12">
+          <div className="space-y-7 lg:col-span-8">
             <KpiGrid filter={filter} />
             <TradesTable filter={filter} />
           </div>
@@ -33,9 +34,13 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+
+        <div className="mt-7">
+          <AnalyticsPanel filter={filter} />
+        </div>
       </main>
-      <footer className="mx-auto w-full max-w-[1600px] px-6 pb-6 pt-4 text-center text-[11px] text-muted-foreground">
-        CZ Dashboard · Proprietary trading desk · Data via Google Sheets · No execution
+      <footer className="mx-auto w-full max-w-[1600px] px-8 pb-8 pt-6 text-center text-[10px] text-muted-foreground/60">
+        ST Quant Desk · Proprietary trading · Data via Google Sheets · No execution
       </footer>
     </div>
   );

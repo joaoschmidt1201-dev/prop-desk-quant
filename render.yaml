@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: prop-desk-dashboard-api
+    runtime: python
+    plan: starter
+    region: ohio
+    buildCommand: pip install -r apps/api/requirements.txt
+    startCommand: python -m uvicorn apps.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: SNAPSHOT_PATH
+        value: reports/trades_snapshot_latest.json
+      - key: SNAPSHOT_CACHE_TTL
+        value: "300"
+      - key: SCHEDULER_ENABLED
+        value: "1"
+      - key: SCHEDULER_INTERVAL_MIN
+        value: "10"
+      - key: SCHEDULER_HOURS
+        value: "9-16"
+      - key: SCHEDULER_DAYS
+        value: mon-fri
+      - key: SCHEDULER_TZ
+        value: America/New_York
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GDRIVE_FILE_ID
+        value: 1RIXpDUIq1692_6UwoPFYyrKtukYB2UArCTWvI6Y5Xbk
+      - key: GDRIVE_CREDENTIALS_JSON
+        sync: false
+      - key: GDRIVE_TOKEN_JSON
+        sync: false

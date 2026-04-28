@@ -1,33 +1,73 @@
 "use client";
 
+import type { QueryClient } from "@tanstack/react-query";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { fmtRelativeAge } from "@/lib/format";
+import { DASHBOARD_REFETCH_INTERVAL_MS } from "@/lib/refresh";
+
+const DASHBOARD_DATA_QUERY_KEYS = ["months", "kpis", "trades", "analytics"] as const;
+
+function invalidateDashboardData(queryClient: QueryClient) {
+  return Promise.all(
+    DASHBOARD_DATA_QUERY_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] })),
+  );
+}
 
 export function DashboardHeader() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const lastSnapshotGeneratedAt = useRef<string | null | undefined>(undefined);
   const { data, refetch, isFetching } = useQuery({
     queryKey: ["health"],
     queryFn: () => api.health(),
-    refetchInterval: 60_000,
+    refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
   });
   const spinning = isFetching || isRefreshing;
+
+  useEffect(() => {
+    const currentGeneratedAt = data?.snapshot_generated_at ?? null;
+    if (lastSnapshotGeneratedAt.current === undefined) {
+      lastSnapshotGeneratedAt.current = currentGeneratedAt;
+      return;
+    }
+    if (currentGeneratedAt && currentGeneratedAt !== lastSnapshotGeneratedAt.current) {
+      lastSnapshotGeneratedAt.current = currentGeneratedAt;
+      void invalidateDashboardData(queryClient);
+      return;
+    }
+    lastSnapshotGeneratedAt.current = currentGeneratedAt;
+  }, [data?.snapshot_generated_at, queryClient]);
 
   async function handleRefresh() {
     if (isRefreshing) return;
     setIsRefreshing(true);
+    const initialGeneratedAt = data?.snapshot_generated_at ?? null;
     try {
       await api.refreshSnapshot();
-      await new Promise((resolve) => setTimeout(resolve, 8_000));
+      // Poll /api/health for up to 60s until snapshot_generated_at advances.
+      const deadline = Date.now() + 60_000;
+      let advanced = false;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1_500));
+        try {
+          const fresh = await api.health();
+          if (fresh.snapshot_generated_at && fresh.snapshot_generated_at !== initialGeneratedAt) {
+            advanced = true;
+            break;
+          }
+        } catch {
+          // transient — keep polling
+        }
+      }
       await Promise.all([
         refetch(),
-        queryClient.invalidateQueries({ queryKey: ["months"] }),
-        queryClient.invalidateQueries({ queryKey: ["kpis"] }),
-        queryClient.invalidateQueries({ queryKey: ["trades"] }),
+        invalidateDashboardData(queryClient),
       ]);
+      if (!advanced) console.warn("Snapshot refresh did not advance within 60s");
     } catch (e) {
       console.error("Snapshot refresh failed", e);
     } finally {
@@ -36,34 +76,26 @@ export function DashboardHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 ring-1 ring-primary/40">
-            <Activity className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold tracking-tight">CZ Dashboard</h1>
-            <p className="text-xs text-muted-foreground">Options Control Panel · Prop Desk</p>
-          </div>
+    <header className="sticky top-0 z-30 border-b border-border/40 bg-background/60 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between px-8 py-5">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Options Control Panel</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">Live positions reconciled with the visual sheet · zero execution</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 rounded-md border border-border/60 bg-card/40 px-3 py-1.5 text-xs">
-            <span className="relative inline-flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--gain)] opacity-60 animate-ping" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--gain)]" />
-            </span>
-            <span className="text-muted-foreground">snapshot</span>
-            <span className="tabular text-foreground">{fmtRelativeAge(data?.snapshot_age_seconds)}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-full border border-border/40 bg-card/30 px-3 py-1 text-[11px]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[var(--gain)]" />
+            <span className="tabular text-muted-foreground">{fmtRelativeAge(data?.snapshot_age_seconds)}</span>
           </div>
           <button
             onClick={handleRefresh}
             disabled={spinning}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border/60 bg-card/40 text-muted-foreground transition hover:bg-card hover:text-foreground disabled:opacity-50"
+            className="flex h-8 items-center gap-1.5 rounded-full border border-border/40 bg-card/30 px-3.5 text-[11px] font-medium text-muted-foreground transition hover:border-border hover:bg-card/60 hover:text-foreground disabled:opacity-50"
             aria-label="Refresh"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${spinning ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3 w-3 ${spinning ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>

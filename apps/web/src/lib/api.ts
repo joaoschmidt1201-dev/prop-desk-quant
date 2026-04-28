@@ -1,5 +1,5 @@
 /**
- * API client for the CZ Dashboard backend.
+ * API client for the ST | Dashboard backend.
  *
  * The base URL is read from NEXT_PUBLIC_API_URL (set in .env.local).
  * In production this points to the Render-hosted FastAPI; in dev it's
@@ -57,9 +57,124 @@ export type Kpis = {
   };
 };
 
+export type AnalyticsGroup = {
+  key: string;
+  label?: string;
+  pnl: number;
+  n_trades: number;
+  wins?: number;
+  losses?: number;
+  active?: number | boolean;
+  win_rate?: number | null;
+  avg_pnl?: number | null;
+  open_pnl?: number;
+  rlzd?: number;
+};
+
+export type AnalyticsTrade = {
+  name: string;
+  sheet: string;
+  underlying: string;
+  strategy: string;
+  dte_bucket: string;
+  open_weekday: string;
+  close_weekday?: string;
+  days_held?: number | null;
+  pnl: number;
+  is_active: boolean;
+};
+
+export type Analytics = {
+  filter: Filter;
+  summary: {
+    total_pnl: number;
+    n_trades: number;
+    n_active: number;
+    win_rate: number | null;
+    avg_win: number | null;
+    avg_loss: number | null;
+    profit_factor: number | null;
+    avg_days_held?: number | null;
+  };
+  by_month: AnalyticsGroup[];
+  by_strategy: AnalyticsGroup[];
+  by_underlying: AnalyticsGroup[];
+  by_dte_bucket: AnalyticsGroup[];
+  by_weekday: AnalyticsGroup[];
+  by_close_weekday?: AnalyticsGroup[];
+  top_winners: AnalyticsTrade[];
+  top_losers: AnalyticsTrade[];
+  insights: { label: string; value: string; detail: number | string }[];
+};
+
 export type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
+};
+
+export type BacktestSummary = {
+  id: string;
+  name: string;
+  underlying: string;
+  strategy: string;
+  horizon: string;
+  period: string | null;
+  kpis: {
+    n_trades: number;
+    n_open: number;
+    total_pnl: number;
+    win_rate: number | null;
+    profit_factor: number | null;
+    max_drawdown: number;
+    sharpe: number | null;
+  };
+};
+
+export type BacktestEquityPoint = {
+  trade_date: string;
+  exp_date: string;
+  pnl_usd: number;
+  cumulative_pnl: number;
+  drawdown: number;
+};
+
+export type BacktestKpis = {
+  n_trades: number;
+  n_open: number;
+  wins: number;
+  losses: number;
+  total_pnl: number;
+  best_trade: number | null;
+  worst_trade: number | null;
+  win_rate: number | null;
+  profit_factor: number | null;
+  avg_win: number | null;
+  avg_loss: number | null;
+  payoff: number | null;
+  expectancy: number | null;
+  in_range_rate: number | null;
+  max_drawdown: number;
+  sharpe: number | null;
+  max_consecutive_losses: number;
+  equity: BacktestEquityPoint[];
+};
+
+export type BacktestDetail = {
+  meta: {
+    id: string;
+    name: string;
+    underlying: string;
+    strategy: string;
+    horizon: string;
+    kind: "ss42" | "ic7";
+    period: string | null;
+    multiplier: number;
+    rule: string;
+    available_rules: string[];
+  };
+  kpis: BacktestKpis;
+  trades: Record<string, unknown>[];
+  daily: Record<string, unknown>[];
 };
 
 function qs(filter: Partial<Filter>): string {
@@ -89,6 +204,12 @@ export const api = {
   trades: (filter: Partial<Filter> = {}) =>
     get<{ filter: Filter; trades: Trade[] }>(`/api/trades${qs(filter)}`),
   kpis: (filter: Partial<Filter> = {}) => get<Kpis>(`/api/kpis${qs(filter)}`),
+  analytics: (filter: Partial<Filter> = {}) => get<Analytics>(`/api/analytics${qs(filter)}`),
+  backtests: () => get<{ backtests: BacktestSummary[] }>("/api/backtests"),
+  backtest: (id: string, rule?: string) => {
+    const q = rule && rule !== "Hold to Expiration" ? `?rule=${encodeURIComponent(rule)}` : "";
+    return get<BacktestDetail>(`/api/backtests/${id}${q}`);
+  },
 
   /**
    * Streams chat tokens via SSE. Calls onDelta for each text chunk.

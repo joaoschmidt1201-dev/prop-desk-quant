@@ -87,7 +87,37 @@ VISUAL_SHEETS = ["APR26", "MAR26", "JS APR26", "JS-FOR MAR26", "FOR Trades"]
 MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
 
 
+def infer_visual_sheet_env(sheet_name: str) -> str:
+    return SHEET_ENV_MAP.get(
+        sheet_name,
+        "JS_Forward" if sheet_name.startswith("JS ") else "CZ_Live",
+    )
+
+
+def iter_visual_sheet_names(wb) -> list[str]:
+    return [
+        sheet_name
+        for sheet_name in wb.sheetnames
+        if MONTH_SHEET_REGEX.match(sheet_name) or sheet_name in VISUAL_SHEETS
+    ]
+
+
 # ─── Google Drive download ────────────────────────────────────────────────────
+
+def _write_json_env_to_file(env_name: str, path: Path) -> None:
+    raw = os.environ.get(env_name, "").strip()
+    if not raw or path.exists():
+        return
+    parsed = json.loads(raw)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(parsed), encoding="utf-8")
+
+
+def materialize_gdrive_env_files() -> None:
+    """Allows cloud deployments to provide OAuth files as secret env vars."""
+    _write_json_env_to_file("GDRIVE_CREDENTIALS_JSON", GDRIVE_CREDS)
+    _write_json_env_to_file("GDRIVE_TOKEN_JSON", GDRIVE_TOKEN)
+
 
 def download_from_gdrive(file_id: str, output_path: Path) -> bool:
     """
@@ -95,6 +125,11 @@ def download_from_gdrive(file_id: str, output_path: Path) -> bool:
     Primeira execução: abre browser para consentimento.
     Execuções seguintes: usa token cached (auto-refresh).
     """
+    try:
+        materialize_gdrive_env_files()
+    except Exception as e:
+        print(f"[!] Falha ao materializar credenciais Google Drive via env: {e}")
+
     if not GDRIVE_CREDS.exists():
         print(f"[!] Credenciais nao encontradas em: {GDRIVE_CREDS}")
         print("    Baixe o OAuth JSON do GCP e salve nesse caminho.")
@@ -148,9 +183,8 @@ def read_sheet_summaries(xlsx_path: Path) -> dict[str, list[dict]]:
     result: dict[str, list[dict]] = {}
     wb = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
 
-    for sheet_name, env_norm in SHEET_ENV_MAP.items():
-        if sheet_name not in wb.sheetnames:
-            continue
+    for sheet_name in iter_visual_sheet_names(wb):
+        env_norm = infer_visual_sheet_env(sheet_name)
         ws = wb[sheet_name]
 
         total_row = None
@@ -186,7 +220,7 @@ def read_sheet_summaries(xlsx_path: Path) -> dict[str, list[dict]]:
     return result
 
 
-def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[str, list[str]]]:
+def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[str, list[str]], dict[str, dict]]:
     """
     For every sheet matching MONTH_SHEET_REGEX (APR26, MAR26, JS APR26, future
     MAY26 etc.), reads each trade's last PnL directly from the visual block AND
@@ -199,13 +233,74 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
     Returns (
         {normalize_name(trade_name): pnl},
         {sheet_name: [trade_names_in_that_sheet]},
+        {normalize_name(trade_name): visual_metadata},
     )
     """
     result: dict[str, float] = {}
     sheet_to_trades: dict[str, list[str]] = {}
+    trade_visual_details: dict[str, dict] = {}
 
     def is_num(v):
         return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+    def as_date(v) -> date | None:
+        if isinstance(v, datetime):
+            return v.date()
+        if isinstance(v, date):
+            return v
+        return None
+
+    def as_date_str(v) -> str | None:
+        d = as_date(v)
+        return d.isoformat() if d else None
+
+    def weekday_str(d: date | None) -> str | None:
+        return d.strftime("%a") if d else None
+
+    def calendar_days(start: date | None, end: date | None) -> int | None:
+        if not start or not end or end < start:
+            return None
+        return (end - start).days
+
+    def date_header_location(rows: dict[int, tuple]) -> tuple[int | None, int | None]:
+        for r, row_data in rows.items():
+            for ci, val in enumerate(row_data):
+                if val is not None and str(val).strip().lower() == "date":
+                    return r, ci
+        return None, None
+
+    def last_pnl_mark(ws, start_row: int | None, date_col: int | None, pnl_col: int) -> dict | None:
+        if start_row is None or date_col is None:
+            return None
+        last = None
+        for r_idx, row_data in enumerate(ws.iter_rows(min_row=start_row, values_only=True), start=start_row):
+            row_date = as_date(row_data[date_col] if len(row_data) > date_col else None)
+            pnl_val = row_data[pnl_col] if len(row_data) > pnl_col else None
+            if row_date and is_num(pnl_val):
+                last = {
+                    "row": r_idx,
+                    "date": row_date,
+                    "pnl": float(pnl_val),
+                }
+        if not last:
+            return None
+        return {
+            "row": last["row"],
+            "date_obj": last["date"],
+            "date": last["date"].isoformat(),
+            "weekday": weekday_str(last["date"]),
+            "pnl": last["pnl"],
+        }
+
+    def last_dte_bucket(row: tuple, block_col: int) -> str | None:
+        bucket = None
+        for val in row[: block_col + 1]:
+            if val is None:
+                continue
+            s = str(val).strip()
+            if "DTE" in s.upper():
+                bucket = s
+        return bucket
 
     SKIP_LABELS = {
         "active",
@@ -235,6 +330,8 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
         all_rows: dict[int, tuple] = {}
         for r_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=25, values_only=True), start=1):
             all_rows[r_idx] = row
+        date_header_r, date_col = date_header_location(all_rows)
+        pnl_series_start_r = date_header_r + 1 if date_header_r is not None else None
 
         # Locate the row containing "Titel" — this is the trade-name row
         name_r = None
@@ -316,6 +413,23 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
 
         # For each block, find the DIT|DTE|PnL row (all three offsets numeric)
         for bc, trade_name in blocks:
+            status_val = status_row[bc] if len(status_row) > bc else None
+            status = str(status_val).strip() if status_val is not None and str(status_val).strip() else "Active"
+            info_r = 6 if title_layout else 5
+            strikes_r = 7 if title_layout else 6
+            info_row = all_rows.get(info_r, ())
+            strikes_row = all_rows.get(strikes_r, ())
+            open_price = info_row[bc] if len(info_row) > bc else None
+            open_dt = info_row[bc + 1] if len(info_row) > bc + 1 else None
+            exp_dt = info_row[bc + 2] if len(info_row) > bc + 2 else None
+            dte_open = info_row[bc + 3] if len(info_row) > bc + 3 else None
+            strikes = strikes_row[bc] if len(strikes_row) > bc else None
+            open_date_obj = as_date(open_dt)
+            last_mark = last_pnl_mark(ws, pnl_series_start_r, date_col, bc)
+            last_mark_date = last_mark.get("date_obj") if last_mark else None
+            status_is_closed = "closed" in status.lower()
+            days_open_as_of_last_pnl = calendar_days(open_date_obj, last_mark_date)
+            days_held = days_open_as_of_last_pnl if status_is_closed else None
             pnl = None
             if title_layout:
                 for r in range(name_r + 2, min(name_r + 22, 26)):
@@ -329,19 +443,38 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             else:
                 # Legacy layout: row 16 labels the per-trade time-series columns.
                 # The final trade PnL is the last numeric value in the block's PnL column.
-                for row_data in ws.iter_rows(min_row=17, values_only=True):
-                    p = row_data[bc] if len(row_data) > bc else None
-                    if is_num(p):
-                        pnl = float(p)
+                if last_mark:
+                    pnl = float(last_mark["pnl"])
+            if pnl is None and last_mark:
+                pnl = float(last_mark["pnl"])
 
             if pnl is not None:
                 result[trade_name] = pnl
+                trade_visual_details[trade_name] = {
+                    "sheet": sheet_name,
+                    "status": status,
+                    "dte_bucket": last_dte_bucket(all_rows.get(1, ()), bc),
+                    "open_price": float(open_price) if is_num(open_price) else None,
+                    "open_date": as_date_str(open_dt),
+                    "exp_date": as_date_str(exp_dt),
+                    "dte_open": int(dte_open) if is_num(dte_open) else None,
+                    "strikes": str(strikes).strip() if strikes is not None and str(strikes).strip() else None,
+                    "pnl": pnl,
+                    "last_pnl": float(last_mark["pnl"]) if last_mark else None,
+                    "last_pnl_date": last_mark.get("date") if last_mark else None,
+                    "last_pnl_weekday": last_mark.get("weekday") if last_mark else None,
+                    "last_pnl_row": last_mark.get("row") if last_mark else None,
+                    "inferred_close_date": last_mark.get("date") if status_is_closed and last_mark else None,
+                    "inferred_close_weekday": last_mark.get("weekday") if status_is_closed and last_mark else None,
+                    "days_held": days_held,
+                    "days_open_as_of_last_pnl": days_open_as_of_last_pnl,
+                }
                 print(f"  [{sheet_name}] {trade_name:22s}: ${pnl:+,.2f}")
             else:
                 print(f"  [{sheet_name}] {trade_name:22s}: PnL row not found — db_robots ffill used")
 
     wb.close()
-    return result, sheet_to_trades
+    return result, sheet_to_trades, trade_visual_details
 
 
 def load_closed_trades_from_sheets(xlsx_path: Path) -> set[str]:
@@ -352,9 +485,7 @@ def load_closed_trades_from_sheets(xlsx_path: Path) -> set[str]:
     closed = set()
     wb = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
 
-    for sheet_name in VISUAL_SHEETS:
-        if sheet_name not in wb.sheetnames:
-            continue
+    for sheet_name in iter_visual_sheet_names(wb):
         ws = wb[sheet_name]
         # Ler rows 2-6 de uma vez (templates diferem entre abas:
         # APR26 tem nome em row4, MAR26 tem nome em row3)
@@ -611,6 +742,21 @@ def _infer_underlying(name: str) -> str:
     return "?"
 
 
+def _infer_underlying_from_visual(name: str, open_price: float | None) -> str:
+    underlying = _infer_underlying(name)
+    if underlying != "?":
+        return underlying
+    if open_price is None:
+        return underlying
+    if open_price > 15000:
+        return "NDX"
+    if open_price > 4000:
+        return "SPX"
+    if open_price > 1000:
+        return "RUT"
+    return underlying
+
+
 def _tent_status(pnl_pct: float | None) -> str:
     if pnl_pct is None:
         return "unknown"
@@ -756,7 +902,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
             print(f"  {m['month']:15s} [{env:12s}]  OpenPnL={m['open_pnl']:+,.0f}  RLZD={m['rlzd']:+,.0f}  Delta={m['delta']:+.0f}")
 
     print("[export] Lendo PnLs individuais das abas visuais ...")
-    individual_trade_pnls, sheet_to_trades = read_individual_trade_pnls(xlsx_path)
+    individual_trade_pnls, sheet_to_trades, trade_visual_details = read_individual_trade_pnls(xlsx_path)
     # Reverse map: trade_name -> sheet (first sheet wins if duplicated)
     trade_to_sheet: dict[str, str] = {}
     for sheet_name, names in sheet_to_trades.items():
@@ -764,7 +910,11 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
             trade_to_sheet.setdefault(n, sheet_name)
 
     print("[export] Lendo status Closed das abas visuais ...")
-    closed_from_sheets = load_closed_trades_from_sheets(xlsx_path)
+    closed_from_sheets = {
+        name
+        for name, details in trade_visual_details.items()
+        if "closed" in str(details.get("status") or "").lower()
+    }
     print(f"[export] Trades fechados: {sorted(closed_from_sheets)}")
 
     trades   = build_trade_snapshot(db_robots, db_cria, closed_from_sheets)
@@ -774,31 +924,53 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
     # Attach `sheet` (visual month sheet, e.g. APR26) to each trade for filtering
     for t in trades:
         t["sheet"] = trade_to_sheet.get(t.get("name"))
+        details = trade_visual_details.get(t.get("name"))
+        if details:
+            t["visual_pnl"] = details.get("pnl")
+            t["dte_bucket"] = details.get("dte_bucket")
+            t["visual_status"] = details.get("status")
+            t["visual_open_date"] = details.get("open_date")
+            t["visual_exp_date"] = details.get("exp_date")
+            t["visual_dte_open"] = details.get("dte_open")
+            t["visual_open_price"] = details.get("open_price")
+            t["visual_last_pnl"] = details.get("last_pnl")
+            t["visual_last_pnl_date"] = details.get("last_pnl_date")
+            t["visual_last_pnl_weekday"] = details.get("last_pnl_weekday")
+            t["visual_last_pnl_row"] = details.get("last_pnl_row")
+            t["inferred_close_date"] = details.get("inferred_close_date")
+            t["inferred_close_weekday"] = details.get("inferred_close_weekday")
+            t["days_held"] = details.get("days_held")
+            t["days_open_as_of_last_pnl"] = details.get("days_open_as_of_last_pnl")
+            if not t.get("strikes"):
+                t["strikes"] = details.get("strikes")
+            if t.get("underlying") == "?":
+                t["underlying"] = _infer_underlying_from_visual(t["name"], details.get("open_price"))
 
     # Some closed visual trades no longer have a db_robots current-state row.
     # Keep them in the snapshot so month filters, AI context, and future charts
     # reconcile to the visual sheet composition.
     existing_names = {t.get("name") for t in trades}
     for sheet_name, names in sheet_to_trades.items():
-        env_norm = SHEET_ENV_MAP.get(sheet_name, "JS_Forward" if sheet_name.startswith("JS ") else "CZ_Live")
+        env_norm = infer_visual_sheet_env(sheet_name)
         for name in names:
             if name in existing_names:
                 continue
             pnl = individual_trade_pnls.get(name)
+            details = trade_visual_details.get(name, {})
             is_active = name not in closed_from_sheets
             trades.append({
                 "name": name,
                 "environment_raw": sheet_name,
                 "environment": env_norm,
-                "underlying": _infer_underlying(name),
+                "underlying": _infer_underlying_from_visual(name, details.get("open_price")),
                 "is_active": is_active,
                 "last_update": None,
-                "open_date": None,
-                "exp_date": None,
-                "dte_open": None,
+                "open_date": details.get("open_date"),
+                "exp_date": details.get("exp_date"),
+                "dte_open": details.get("dte_open"),
                 "dte_remaining": None,
-                "underlying_price_at_open": None,
-                "strikes": None,
+                "underlying_price_at_open": details.get("open_price"),
+                "strikes": details.get("strikes"),
                 "net_credit": None,
                 "max_loss": None,
                 "sd": None,
@@ -815,6 +987,21 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
                 "tent_status": "unknown",
                 "sheet": sheet_name,
                 "source": "visual_sheet",
+                "visual_pnl": pnl,
+                "dte_bucket": details.get("dte_bucket"),
+                "visual_status": details.get("status"),
+                "visual_open_date": details.get("open_date"),
+                "visual_exp_date": details.get("exp_date"),
+                "visual_dte_open": details.get("dte_open"),
+                "visual_open_price": details.get("open_price"),
+                "visual_last_pnl": details.get("last_pnl"),
+                "visual_last_pnl_date": details.get("last_pnl_date"),
+                "visual_last_pnl_weekday": details.get("last_pnl_weekday"),
+                "visual_last_pnl_row": details.get("last_pnl_row"),
+                "inferred_close_date": details.get("inferred_close_date"),
+                "inferred_close_weekday": details.get("inferred_close_weekday"),
+                "days_held": details.get("days_held"),
+                "days_open_as_of_last_pnl": details.get("days_open_as_of_last_pnl"),
             })
             existing_names.add(name)
 

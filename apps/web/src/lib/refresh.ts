@@ -1,0 +1,1 @@
+export const DASHBOARD_REFETCH_INTERVAL_MS = 60_000;
