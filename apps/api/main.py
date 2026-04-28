@@ -29,7 +29,7 @@ from typing import Any, Literal
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 # ─── Paths & env ──────────────────────────────────────────────────────────────
@@ -340,6 +340,11 @@ def health() -> HealthResponse:
         snapshot_age_seconds=time.time() - SNAPSHOT_PATH.stat().st_mtime,
         snapshot_generated_at=snap.get("generated_at"),
     )
+
+
+@app.head("/api/health")
+def health_head() -> Response:
+    return Response(status_code=200)
 
 
 @app.get("/api/snapshot")
