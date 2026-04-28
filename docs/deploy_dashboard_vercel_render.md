@@ -1,30 +1,33 @@
 # Deploy Dashboard: Vercel + Render/Railway
 
-Objetivo: publicar o dashboard para Cristiano com frontend em Vercel e API em Render.
-Railway fica preparado como plano B para a API.
+Objetivo: publicar o dashboard para Cristiano com frontend em Vercel e API em Render,
+sem dominio proprio e com custo inicial zero. Railway fica preparado como plano B barato.
 
 ## Arquitetura recomendada
 
 - Frontend: Vercel, root directory `apps/web`
 - Backend: Render Web Service, blueprint `render.yaml`
-- API publica: `https://api.<dominio>`
-- Dashboard: `https://dashboard.<dominio>`
+- API publica gratuita: `https://prop-desk-dashboard-api.onrender.com`
+- Dashboard gratuito: `https://<nome-do-projeto>.vercel.app`
 - Dados: snapshot inicial versionado em `reports/`; scheduler da API atualiza via Google Drive.
 
-## Custos esperados
+## Modo economico recomendado
 
-Conferir valores oficiais antes de pagar, porque planos mudam.
+- Vercel Hobby: gratuito para projeto pessoal/pequeno.
+- Render Free Web Service: gratuito, mas dorme apos 15 minutos sem trafego.
+- UptimeRobot Free: ping HTTPS em `/api/health` a cada 5 minutos para manter a API ativa.
+- Dominio proprio: nao usar agora. Compartilhar a URL `.vercel.app` com Cristiano.
+- Railway: usar apenas se o Render Free falhar; Hobby custa pouco, mas nao e necessario de inicio.
 
-- Vercel: Hobby pode servir para teste; Pro e o caminho profissional.
-- Render: usar Web Service pago `Starter` para evitar sleep e manter scheduler vivo.
-- Railway: alternativa ao Render; usar Hobby/Pro conforme billing e limites.
-- Dominio: comprar ou usar um dominio existente. Normalmente fica fora de Vercel/Render/Railway.
+Tradeoff importante: o UptimeRobot normalmente evita o sleep porque gera trafego antes dos
+15 minutos de idle do Render Free, mas isso nao e SLA. Se o Render reiniciar, redeployar,
+esgotar horas free ou suspender o servico, ainda pode haver atraso no primeiro acesso.
 
 ## O que Joao precisa fornecer
 
 - Conta Vercel conectada ao GitHub.
 - Conta Render conectada ao GitHub ou, se Render falhar, conta Railway.
-- Dominio desejado e acesso DNS.
+- Nao precisa de dominio agora.
 - Usuario e senha para Basic Auth do Cristiano.
 - Permissao para transformar `.credentials/gdrive_credentials.json` e `.credentials/gdrive_token.json` em secrets de producao.
 - `ANTHROPIC_API_KEY` e/ou `OPENAI_API_KEY` se o chat do dashboard precisar funcionar em producao.
@@ -45,31 +48,47 @@ npx tsc --noEmit --incremental false
 ## Render API
 
 1. No Render, criar servico via Blueprint usando o `render.yaml` da raiz.
-2. Selecionar plano pago `Starter` para evitar sleep. O scheduler precisa do processo vivo.
-3. Configurar secrets:
+2. Se o Render perguntar o plano do workspace, escolher `Hobby` (`$0/mo + compute`).
+3. No servico da API, usar instância/compute gratuito. O `render.yaml` ja esta com `plan: free`.
+4. Configurar secrets:
 
 ```text
-CORS_ORIGINS=https://dashboard.<dominio>
+CORS_ORIGINS=https://<nome-do-projeto>.vercel.app
 ANTHROPIC_API_KEY=<opcional para Claude chat>
 OPENAI_API_KEY=<opcional para OpenAI chat>
 GDRIVE_CREDENTIALS_JSON=<json compacto>
 GDRIVE_TOKEN_JSON=<json compacto>
 ```
 
-4. Gerar os JSON compactos localmente:
+5. Gerar os JSON compactos localmente:
 
 ```powershell
 python scripts\print_gdrive_env_vars.py
 ```
 
-5. Depois do deploy, testar:
+6. Depois do deploy, testar:
 
 ```text
-https://api.<dominio>/api/health
-https://api.<dominio>/api/months
+https://prop-desk-dashboard-api.onrender.com/api/health
+https://prop-desk-dashboard-api.onrender.com/api/months
 ```
 
-6. Em custom domain do Render, apontar `api.<dominio>` para o target indicado pelo Render.
+7. Sem dominio proprio: usar a URL `.onrender.com` gerada pelo Render.
+
+## UptimeRobot keep-alive
+
+1. Criar conta gratuita em UptimeRobot.
+2. Criar monitor:
+
+```text
+Monitor Type: HTTP(s)
+Friendly Name: Prop Desk API
+URL: https://prop-desk-dashboard-api.onrender.com/api/health
+Monitoring Interval: 5 minutes
+```
+
+3. Quando o deploy da Vercel mudar o nome/URL da API, ajustar a URL do monitor.
+4. Para a apresentacao, abrir o dashboard 5-10 minutos antes e clicar no refresh manual se o snapshot estiver antigo.
 
 ## Railway API, plano B
 
@@ -79,7 +98,7 @@ O arquivo `railway.json` ja define build, start command, healthcheck e restart p
 2. Selecionar este repo.
 3. Usar a raiz do repo como deploy path.
 4. Configurar as mesmas variaveis de ambiente usadas no Render.
-5. Gerar dominio publico no Railway ou configurar `api.<dominio>`.
+5. Gerar dominio publico no Railway se usar esse fallback.
 6. Testar `/api/health` e `/api/months`.
 
 ## Vercel Frontend
@@ -98,17 +117,17 @@ Output Directory: .next
 3. Configurar env vars de producao:
 
 ```text
-NEXT_PUBLIC_API_URL=https://api.<dominio>
+NEXT_PUBLIC_API_URL=https://prop-desk-dashboard-api.onrender.com
 DASHBOARD_BASIC_AUTH_USER=<usuario>
 DASHBOARD_BASIC_AUTH_PASSWORD=<senha forte>
 ```
 
 4. Deployar.
-5. Em custom domain do Vercel, apontar `dashboard.<dominio>` para o target indicado pela Vercel.
+5. Sem dominio proprio: compartilhar a URL `.vercel.app` gerada pela Vercel.
 
 ## Smoke test
 
-1. Abrir `https://dashboard.<dominio>`.
+1. Abrir `https://<nome-do-projeto>.vercel.app`.
 2. Validar Basic Auth.
 3. Validar filtros: `APR26`, `MAR26`, depois `JS`.
 4. Validar KPIs, tabela, analytics e chat.
@@ -131,5 +150,5 @@ DASHBOARD_BASIC_AUTH_PASSWORD=<senha forte>
 
 - Nao commitar `.env`, `.env.local`, `.credentials/` nem saida do `print_gdrive_env_vars.py`.
 - Basic Auth protege o frontend.
-- A API deve ficar com `CORS_ORIGINS` restrito ao dominio do dashboard.
-- Para protecao mais forte tambem da API, usar Cloudflare Access na frente de `dashboard.<dominio>` e `api.<dominio>`.
+- A API deve ficar com `CORS_ORIGINS` restrito a URL `.vercel.app` do dashboard.
+- Para protecao mais forte no futuro, usar dominio proprio + Cloudflare Access.
