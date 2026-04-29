@@ -164,7 +164,8 @@ def snapshot_age_seconds(snap: dict[str, Any]) -> float | None:
         generated_dt = datetime.fromisoformat(str(generated_at))
     except ValueError:
         return time.time() - SNAPSHOT_PATH.stat().st_mtime
-    return max(0.0, (datetime.now() - generated_dt).total_seconds())
+    now_dt = datetime.now(generated_dt.tzinfo) if generated_dt.tzinfo else datetime.now()
+    return max(0.0, (now_dt - generated_dt).total_seconds())
 
 
 # ─── Filter helpers ───────────────────────────────────────────────────────────

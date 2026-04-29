@@ -21,7 +21,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -1120,7 +1120,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only
 
     # ── Snapshot JSON ──
     snapshot = {
-        "generated_at":        datetime.now().isoformat(timespec="seconds"),
+        "generated_at":        datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source_file":         xlsx_path.name,
         "portfolio":           kpis,
         "sheet_summaries":     sheet_summaries,
