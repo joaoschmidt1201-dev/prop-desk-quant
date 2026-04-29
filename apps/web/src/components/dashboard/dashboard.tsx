@@ -8,6 +8,7 @@ import { DashboardHeader } from "./header";
 import { KpiGrid } from "./kpi-grid";
 import { MonthFilter } from "./month-filter";
 import { TradesTable } from "./trades-table";
+import { TradesDownload } from "./trades-download";
 
 export function Dashboard() {
   const [filter, setFilter] = useState<Filter>({ months: [], env: null });
@@ -38,6 +39,7 @@ export function Dashboard() {
         <div className="mt-7">
           <AnalyticsPanel filter={filter} />
         </div>
+        <TradesDownload filter={filter} />
       </main>
       <footer className="mx-auto w-full max-w-[1600px] px-8 pb-8 pt-6 text-center text-[10px] text-muted-foreground/60">
         ST Quant Desk · Proprietary trading · Data via Google Sheets · No execution
