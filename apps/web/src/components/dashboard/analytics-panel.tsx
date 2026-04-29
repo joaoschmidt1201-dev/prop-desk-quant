@@ -168,15 +168,24 @@ function VerticalBars({ rows }: { rows: AnalyticsGroup[] }) {
   );
 }
 
-function MoneyTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload: AnalyticsGroup }>; label?: string }) {
+type ChartPayload = AnalyticsGroup & { daily_pnl?: number };
+
+function MoneyTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload: ChartPayload }>; label?: string }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
+  const hasOpenRlzd = typeof row.open_pnl === "number" || typeof row.rlzd === "number";
   return (
     <div className="rounded-lg border border-border/70 bg-popover/95 px-3 py-2 text-xs shadow-xl">
       <div className="font-medium">{label ?? row.key}</div>
-      <div className={`mt-1 tabular ${pnlClass(Number(payload[0].value))}`}>{fmtMoney(Number(payload[0].value))}</div>
-      {"cumulative_pnl" in row && typeof row.cumulative_pnl === "number" && (
-        <div className={`mt-1 tabular ${pnlClass(row.cumulative_pnl)}`}>cumulative {fmtMoney(row.cumulative_pnl)}</div>
+      {hasOpenRlzd ? (
+        <>
+          <div className={`mt-1 tabular ${pnlClass(row.pnl)}`}>total {fmtMoney(row.pnl)}</div>
+          {typeof row.open_pnl === "number" && <div className={`mt-1 tabular ${pnlClass(row.open_pnl)}`}>open {fmtMoney(row.open_pnl)}</div>}
+          {typeof row.rlzd === "number" && <div className={`mt-1 tabular ${pnlClass(row.rlzd)}`}>RLZD {fmtMoney(row.rlzd)}</div>}
+          {typeof row.daily_pnl === "number" && <div className={`mt-1 tabular ${pnlClass(row.daily_pnl)}`}>day change {fmtMoney(row.daily_pnl)}</div>}
+        </>
+      ) : (
+        <div className={`mt-1 tabular ${pnlClass(Number(payload[0].value))}`}>{fmtMoney(Number(payload[0].value))}</div>
       )}
       {row.n_trades != null && <div className="mt-1 text-muted-foreground">{row.n_trades} trades</div>}
       {row.win_rate != null && <div className="text-muted-foreground">WR {fmtPct(row.win_rate)}</div>}

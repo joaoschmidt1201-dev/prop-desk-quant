@@ -647,18 +647,36 @@ def get_analytics(
     by_weekday = aggregate(trade_open_weekday)
     by_day = []
     daily_groups: dict[str, dict[str, Any]] = {}
+    has_total_daily_path = False
     for sheet in months_in_scope:
         for row in sheet_daily_pnls.get(str(sheet), []) or []:
             day = str(row.get("date") or "")
             if not day:
                 continue
-            g = daily_groups.setdefault(day, {"key": day, "pnl": 0.0, "n_trades": 0, "trades": []})
+            has_total_daily_path = has_total_daily_path or row.get("pnl_type") == "total_open_plus_rlzd" or "open_pnl" in row or "rlzd" in row
+            g = daily_groups.setdefault(
+                day,
+                {"key": day, "pnl": 0.0, "open_pnl": 0.0, "rlzd": 0.0, "daily_pnl": 0.0, "n_trades": 0, "trades": []},
+            )
             g["pnl"] += float(row.get("pnl") or 0)
+            g["open_pnl"] += float(row.get("open_pnl") or 0)
+            g["rlzd"] += float(row.get("rlzd") or 0)
+            g["daily_pnl"] += float(row.get("daily_pnl") or row.get("pnl") or 0)
             g["n_trades"] += int(row.get("n_trades") or 0)
             g["trades"].extend(row.get("trades") or [])
     if daily_groups:
         for row in sorted(daily_groups.values(), key=lambda r: str(r["key"])):
-            by_day.append({**row, "pnl": round(float(row["pnl"]), 2)})
+            pnl = round(float(row["pnl"]), 2)
+            if has_total_daily_path:
+                by_day.append({
+                    **row,
+                    "pnl": pnl,
+                    "open_pnl": round(float(row.get("open_pnl") or 0), 2),
+                    "rlzd": round(float(row.get("rlzd") or 0), 2),
+                    "daily_pnl": round(float(row.get("daily_pnl") or 0), 2),
+                })
+            else:
+                by_day.append({**row, "pnl": pnl})
     else:
         by_day_raw = aggregate(trade_pnl_event_date)
         cumulative_pnl = 0.0

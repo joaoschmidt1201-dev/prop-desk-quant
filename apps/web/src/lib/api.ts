@@ -69,6 +69,7 @@ export type AnalyticsGroup = {
   avg_pnl?: number | null;
   open_pnl?: number;
   rlzd?: number;
+  daily_pnl?: number;
 };
 
 export type AnalyticsTrade = {

@@ -303,10 +303,33 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             "pnl": last["pnl"],
         }
 
-    def daily_sheet_pnl(ws, start_row: int | None, date_col: int | None, blocks: list[tuple[int, str]], cutoff: date | None) -> list[dict]:
+    def daily_sheet_pnl(
+        ws,
+        start_row: int | None,
+        date_col: int | None,
+        blocks: list[tuple[int, str]],
+        cutoff: date | None,
+        status_row: tuple,
+        info_row: tuple,
+    ) -> list[dict]:
         if start_row is None or date_col is None:
             return []
+        last_marks = {
+            pnl_col: last_pnl_mark(ws, start_row, date_col, pnl_col)
+            for pnl_col, _ in blocks
+        }
+
+        def is_finalized(pnl_col: int, row_date: date, final_date: date | None) -> bool:
+            status_val = status_row[pnl_col] if len(status_row) > pnl_col else None
+            status = str(status_val).strip().lower() if status_val is not None else ""
+            exp_dt = as_date(info_row[pnl_col + 2] if len(info_row) > pnl_col + 2 else None)
+            status_closed = "closed" in status
+            expired = exp_dt is not None and row_date >= exp_dt
+            has_final_mark = final_date is not None and row_date >= final_date
+            return has_final_mark and (status_closed or expired)
+
         rows: list[dict] = []
+        prev_total: float | None = None
         for r_idx, row_data in enumerate(ws.iter_rows(min_row=start_row, values_only=True), start=start_row):
             row_date = as_date(row_data[date_col] if len(row_data) > date_col else None)
             if not row_date:
@@ -314,19 +337,42 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             if cutoff and row_date > cutoff:
                 continue
             trade_pnls = []
-            daily_total = 0.0
+            open_total = 0.0
+            rlzd_total = 0.0
             for pnl_col, trade_name in blocks:
                 pnl_val = row_data[pnl_col] if len(row_data) > pnl_col else None
+                final_mark = last_marks.get(pnl_col)
+                final_date = final_mark.get("date_obj") if final_mark else None
+
                 if not is_num(pnl_val):
-                    continue
-                pnl = float(pnl_val)
-                trade_pnls.append({"name": trade_name, "pnl": round(pnl, 2)})
-                daily_total += pnl
+                    if not (final_mark and final_date and is_finalized(pnl_col, row_date, final_date)):
+                        continue
+                    pnl = float(final_mark["pnl"])
+                    bucket = "rlzd"
+                    rlzd_total += pnl
+                else:
+                    pnl = float(pnl_val)
+                    if is_finalized(pnl_col, row_date, final_date):
+                        bucket = "rlzd"
+                        rlzd_total += pnl
+                    else:
+                        bucket = "open"
+                        open_total += pnl
+
+                trade_pnls.append({"name": trade_name, "pnl": round(pnl, 2), "bucket": bucket})
+
             if trade_pnls:
+                total = round(open_total + rlzd_total, 2)
+                daily_change = total if prev_total is None else total - prev_total
+                prev_total = total
                 rows.append({
                     "date": row_date.isoformat(),
                     "row": r_idx,
-                    "pnl": round(daily_total, 2),
+                    "pnl": total,
+                    "open_pnl": round(open_total, 2),
+                    "rlzd": round(rlzd_total, 2),
+                    "daily_pnl": round(daily_change, 2),
+                    "pnl_type": "total_open_plus_rlzd",
                     "n_trades": len(trade_pnls),
                     "trades": trade_pnls,
                 })
@@ -449,18 +495,27 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             print(f"  [{sheet_name}] no trade blocks found")
             continue
 
+        info_r = 6 if title_layout else 5
+        strikes_r = 7 if title_layout else 6
+        info_row = all_rows.get(info_r, ())
+        strikes_row = all_rows.get(strikes_r, ())
+
         # Record every detected trade name for this sheet (membership map)
         sheet_to_trades.setdefault(sheet_name, []).extend(name for _, name in blocks)
-        sheet_daily_pnls[sheet_name] = daily_sheet_pnl(ws, pnl_series_start_r, date_col, blocks, last_update_dt)
+        sheet_daily_pnls[sheet_name] = daily_sheet_pnl(
+            ws,
+            pnl_series_start_r,
+            date_col,
+            blocks,
+            last_update_dt,
+            status_row,
+            info_row,
+        )
 
         # For each block, find the DIT|DTE|PnL row (all three offsets numeric)
         for bc, trade_name in blocks:
             status_val = status_row[bc] if len(status_row) > bc else None
             status = str(status_val).strip() if status_val is not None and str(status_val).strip() else "Active"
-            info_r = 6 if title_layout else 5
-            strikes_r = 7 if title_layout else 6
-            info_row = all_rows.get(info_r, ())
-            strikes_row = all_rows.get(strikes_r, ())
             open_price = info_row[bc] if len(info_row) > bc else None
             open_dt = info_row[bc + 1] if len(info_row) > bc + 1 else None
             exp_dt = info_row[bc + 2] if len(info_row) > bc + 2 else None
