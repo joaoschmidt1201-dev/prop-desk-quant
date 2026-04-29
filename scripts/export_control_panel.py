@@ -37,6 +37,7 @@ CREDENTIALS_DIR  = ROOT / ".credentials"
 GDRIVE_CREDS     = CREDENTIALS_DIR / "gdrive_credentials.json"
 GDRIVE_TOKEN     = CREDENTIALS_DIR / "gdrive_token.json"
 GDRIVE_SCOPES    = ["https://www.googleapis.com/auth/drive.readonly"]
+NON_INTERACTIVE_ENV_VARS = ("RENDER", "RENDER_SERVICE_ID", "VERCEL", "CI")
 
 # ─── Environment mapping ─────────────────────────────────────────────────────
 ENV_MAP = {
@@ -119,6 +120,14 @@ def materialize_gdrive_env_files() -> None:
     _write_json_env_to_file("GDRIVE_TOKEN_JSON", GDRIVE_TOKEN)
 
 
+def can_run_browser_oauth() -> bool:
+    if os.getenv("GDRIVE_ALLOW_BROWSER_AUTH", "").strip().lower() in ("1", "true", "yes", "on"):
+        return True
+    if any(os.getenv(name) for name in NON_INTERACTIVE_ENV_VARS):
+        return False
+    return sys.stdin.isatty()
+
+
 def download_from_gdrive(file_id: str, output_path: Path) -> bool:
     """
     Baixa o Google Sheet como XLSX via Drive API (OAuth2).
@@ -147,6 +156,10 @@ def download_from_gdrive(file_id: str, output_path: Path) -> bool:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
+                if not can_run_browser_oauth():
+                    print("[!] Google Drive token ausente/invalido em ambiente non-interactive.")
+                    print("    Configure GDRIVE_CREDENTIALS_JSON e GDRIVE_TOKEN_JSON no Render.")
+                    return False
                 flow = InstalledAppFlow.from_client_secrets_file(str(GDRIVE_CREDS), GDRIVE_SCOPES)
                 creds = flow.run_local_server(port=0)
             GDRIVE_TOKEN.parent.mkdir(parents=True, exist_ok=True)

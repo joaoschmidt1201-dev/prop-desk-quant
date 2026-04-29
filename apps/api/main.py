@@ -42,7 +42,7 @@ load_dotenv(REPO_ROOT / ".env", override=False)
 SNAPSHOT_PATH = REPO_ROOT / os.getenv("SNAPSHOT_PATH", "reports/trades_snapshot_latest.json")
 SNAPSHOT_CACHE_TTL = int(os.getenv("SNAPSHOT_CACHE_TTL", "300"))
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
-GDRIVE_ID = "1RIXpDUIq1692_6UwoPFYyrKtukYB2UArCTWvI6Y5Xbk"
+GDRIVE_ID = os.getenv("GDRIVE_FILE_ID", "1RIXpDUIq1692_6UwoPFYyrKtukYB2UArCTWvI6Y5Xbk")
 MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
 MONTH_NUM = {
     "JAN": 1,
