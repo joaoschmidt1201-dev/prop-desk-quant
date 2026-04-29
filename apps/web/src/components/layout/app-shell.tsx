@@ -93,7 +93,7 @@ function Sidebar({ pathname, healthAge }: { pathname: string; healthAge: number 
           Coming soon
         </div>
         <ul className="space-y-1">
-          {["GEX Levels", "Morning Briefing", "Risk Engine"].map((label) => (
+          {["GEX Levels", "Forwardtests"].map((label) => (
             <li key={label}>
               <div className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/40">
                 <BarChart3 className="h-4 w-4" />

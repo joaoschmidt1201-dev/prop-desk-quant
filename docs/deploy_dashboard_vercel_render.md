@@ -120,7 +120,11 @@ Output Directory: .next
 NEXT_PUBLIC_API_URL=https://prop-desk-dashboard-api.onrender.com
 DASHBOARD_BASIC_AUTH_USER=<usuario>
 DASHBOARD_BASIC_AUTH_PASSWORD=<senha forte>
+DASHBOARD_BASIC_AUTH_EXTRA_USERS=cristiano:<senha forte>
 ```
+
+`DASHBOARD_BASIC_AUTH_EXTRA_USERS` aceita mais de um acesso separado por virgula, por exemplo:
+`cristiano:<senha>,joao-backup:<senha>`. O usuario/senha principal continua funcionando.
 
 4. Deployar.
 5. Sem dominio proprio: compartilhar a URL `.vercel.app` gerada pela Vercel.
