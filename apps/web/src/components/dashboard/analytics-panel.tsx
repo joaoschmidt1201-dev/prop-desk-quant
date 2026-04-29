@@ -27,6 +27,7 @@ export function AnalyticsPanel({ filter }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["analytics", filter.months, filter.env],
     queryFn: () => api.analytics(filter),
+    placeholderData: (previousData) => previousData,
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import type { Filter } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, type Filter } from "@/lib/api";
 import { AnalyticsPanel } from "./analytics-panel";
 import { ChatPanel } from "./chat-panel";
 import { DashboardHeader } from "./header";
@@ -12,6 +13,15 @@ import { TradesDownload } from "./trades-download";
 
 export function Dashboard() {
   const [filter, setFilter] = useState<Filter>({ months: [], env: null });
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    void queryClient.prefetchQuery({
+      queryKey: ["backtests"],
+      queryFn: () => api.backtests(),
+      staleTime: 5 * 60_000,
+    });
+  }, [queryClient]);
 
   return (
     <div className="flex min-h-screen flex-col">

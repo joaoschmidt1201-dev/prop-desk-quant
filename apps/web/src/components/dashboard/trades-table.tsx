@@ -11,6 +11,7 @@ export function TradesTable({ filter }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["trades", filter.months, filter.env],
     queryFn: () => api.trades(filter),
+    placeholderData: (previousData) => previousData,
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });

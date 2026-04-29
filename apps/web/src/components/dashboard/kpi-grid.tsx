@@ -12,6 +12,7 @@ export function KpiGrid({ filter }: Props) {
   const { data, isLoading } = useQuery({
     queryKey: ["kpis", filter.months, filter.env],
     queryFn: () => api.kpis(filter),
+    placeholderData: (previousData) => previousData,
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
     refetchIntervalInBackground: true,
   });

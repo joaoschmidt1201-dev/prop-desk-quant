@@ -14,6 +14,7 @@ Run locally:
 from __future__ import annotations
 
 import json
+import csv
 import os
 import re
 import subprocess
@@ -749,6 +750,8 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
     },
 ]
 
+_backtest_csv_cache: dict[str, dict[str, Any]] = {}
+
 
 def _backtest_meta(bt_id: str) -> dict[str, Any]:
     for bt in BACKTESTS_REGISTRY:
@@ -773,24 +776,48 @@ def _sanitize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def _read_backtest_trades(meta: dict[str, Any]) -> list[dict[str, Any]]:
-    import pandas as pd
+def _parse_csv_value(value: str | None) -> Any:
+    if value is None:
+        return None
+    value = value.strip()
+    if value == "":
+        return None
+    lowered = value.lower()
+    if lowered == "true":
+        return True
+    if lowered == "false":
+        return False
+    try:
+        if "." not in value and "e" not in lowered:
+            return int(value)
+        return float(value)
+    except ValueError:
+        return value
 
-    path = BACKTESTS_ROOT / meta["trades_csv"]
+
+def _read_backtest_csv(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
-    df = pd.read_csv(path)
-    return _sanitize_records(df.to_dict(orient="records"))
+    mtime = path.stat().st_mtime
+    cached = _backtest_csv_cache.get(str(path))
+    if cached and cached.get("mtime") == mtime:
+        return cached["rows"]
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        rows = [
+            {k: _parse_csv_value(v) for k, v in row.items()}
+            for row in csv.DictReader(f)
+        ]
+    rows = _sanitize_records(rows)
+    _backtest_csv_cache[str(path)] = {"mtime": mtime, "rows": rows}
+    return rows
+
+
+def _read_backtest_trades(meta: dict[str, Any]) -> list[dict[str, Any]]:
+    return _read_backtest_csv(BACKTESTS_ROOT / meta["trades_csv"])
 
 
 def _read_backtest_daily(meta: dict[str, Any]) -> list[dict[str, Any]]:
-    import pandas as pd
-
-    path = BACKTESTS_ROOT / meta["daily_csv"]
-    if not path.exists():
-        return []
-    df = pd.read_csv(path)
-    return _sanitize_records(df.to_dict(orient="records"))
+    return _read_backtest_csv(BACKTESTS_ROOT / meta["daily_csv"])
 
 
 SS42_RULES = [
