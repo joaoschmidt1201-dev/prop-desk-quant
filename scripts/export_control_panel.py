@@ -220,7 +220,7 @@ def read_sheet_summaries(xlsx_path: Path) -> dict[str, list[dict]]:
     return result
 
 
-def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[str, list[str]], dict[str, dict]]:
+def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[str, list[str]], dict[str, dict], dict[str, list[dict]]]:
     """
     For every sheet matching MONTH_SHEET_REGEX (APR26, MAR26, JS APR26, future
     MAY26 etc.), reads each trade's last PnL directly from the visual block AND
@@ -239,6 +239,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
     result: dict[str, float] = {}
     sheet_to_trades: dict[str, list[str]] = {}
     trade_visual_details: dict[str, dict] = {}
+    sheet_daily_pnls: dict[str, list[dict]] = {}
 
     def is_num(v):
         return isinstance(v, (int, float)) and not isinstance(v, bool)
@@ -269,6 +270,16 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
                     return r, ci
         return None, None
 
+    def sheet_last_update(rows: dict[int, tuple]) -> date | None:
+        for row_data in rows.values():
+            for ci, val in enumerate(row_data):
+                if val is not None and str(val).strip().lower().startswith("last update"):
+                    for maybe_date in row_data[ci + 1 : ci + 6]:
+                        parsed = as_date(maybe_date)
+                        if parsed:
+                            return parsed
+        return None
+
     def last_pnl_mark(ws, start_row: int | None, date_col: int | None, pnl_col: int) -> dict | None:
         if start_row is None or date_col is None:
             return None
@@ -291,6 +302,35 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             "weekday": weekday_str(last["date"]),
             "pnl": last["pnl"],
         }
+
+    def daily_sheet_pnl(ws, start_row: int | None, date_col: int | None, blocks: list[tuple[int, str]], cutoff: date | None) -> list[dict]:
+        if start_row is None or date_col is None:
+            return []
+        rows: list[dict] = []
+        for r_idx, row_data in enumerate(ws.iter_rows(min_row=start_row, values_only=True), start=start_row):
+            row_date = as_date(row_data[date_col] if len(row_data) > date_col else None)
+            if not row_date:
+                continue
+            if cutoff and row_date > cutoff:
+                continue
+            trade_pnls = []
+            daily_total = 0.0
+            for pnl_col, trade_name in blocks:
+                pnl_val = row_data[pnl_col] if len(row_data) > pnl_col else None
+                if not is_num(pnl_val):
+                    continue
+                pnl = float(pnl_val)
+                trade_pnls.append({"name": trade_name, "pnl": round(pnl, 2)})
+                daily_total += pnl
+            if trade_pnls:
+                rows.append({
+                    "date": row_date.isoformat(),
+                    "row": r_idx,
+                    "pnl": round(daily_total, 2),
+                    "n_trades": len(trade_pnls),
+                    "trades": trade_pnls,
+                })
+        return rows
 
     def last_dte_bucket(row: tuple, block_col: int) -> str | None:
         bucket = None
@@ -332,6 +372,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             all_rows[r_idx] = row
         date_header_r, date_col = date_header_location(all_rows)
         pnl_series_start_r = date_header_r + 1 if date_header_r is not None else None
+        last_update_dt = sheet_last_update(all_rows)
 
         # Locate the row containing "Titel" — this is the trade-name row
         name_r = None
@@ -410,6 +451,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
 
         # Record every detected trade name for this sheet (membership map)
         sheet_to_trades.setdefault(sheet_name, []).extend(name for _, name in blocks)
+        sheet_daily_pnls[sheet_name] = daily_sheet_pnl(ws, pnl_series_start_r, date_col, blocks, last_update_dt)
 
         # For each block, find the DIT|DTE|PnL row (all three offsets numeric)
         for bc, trade_name in blocks:
@@ -474,7 +516,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
                 print(f"  [{sheet_name}] {trade_name:22s}: PnL row not found — db_robots ffill used")
 
     wb.close()
-    return result, sheet_to_trades, trade_visual_details
+    return result, sheet_to_trades, trade_visual_details, sheet_daily_pnls
 
 
 def load_closed_trades_from_sheets(xlsx_path: Path) -> set[str]:
@@ -902,7 +944,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
             print(f"  {m['month']:15s} [{env:12s}]  OpenPnL={m['open_pnl']:+,.0f}  RLZD={m['rlzd']:+,.0f}  Delta={m['delta']:+.0f}")
 
     print("[export] Lendo PnLs individuais das abas visuais ...")
-    individual_trade_pnls, sheet_to_trades, trade_visual_details = read_individual_trade_pnls(xlsx_path)
+    individual_trade_pnls, sheet_to_trades, trade_visual_details, sheet_daily_pnls = read_individual_trade_pnls(xlsx_path)
     # Reverse map: trade_name -> sheet (first sheet wins if duplicated)
     trade_to_sheet: dict[str, str] = {}
     for sheet_name, names in sheet_to_trades.items():
@@ -1015,6 +1057,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
         "portfolio":           kpis,
         "sheet_summaries":     sheet_summaries,
         "individual_trade_pnls": individual_trade_pnls,
+        "sheet_daily_pnls":    sheet_daily_pnls,
         "trades":              trades,
     }
     snap_path = REPORTS_DIR / f"trades_snapshot_{today_str}.json"

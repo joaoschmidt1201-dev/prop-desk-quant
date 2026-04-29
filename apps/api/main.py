@@ -576,6 +576,7 @@ def get_analytics(
     months = parse_months(month)
     individual_pnls = snap.get("individual_trade_pnls") or {}
     sheet_summaries = sheet_summary_lookup(snap)
+    sheet_daily_pnls = snap.get("sheet_daily_pnls") or {}
 
     def valid_month_trade(t: dict[str, Any]) -> bool:
         sheet = (t.get("sheet") or "").strip()
@@ -643,12 +644,26 @@ def get_analytics(
     by_underlying = aggregate(lambda t: t.get("underlying") or "Unknown")
     by_dte_bucket = aggregate(trade_dte_bucket)
     by_weekday = aggregate(trade_open_weekday)
-    by_day_raw = aggregate(trade_pnl_event_date)
     by_day = []
-    cumulative_pnl = 0.0
-    for row in sorted(by_day_raw, key=lambda r: str(r["key"])):
-        cumulative_pnl += float(row["pnl"])
-        by_day.append({**row, "cumulative_pnl": round(cumulative_pnl, 2)})
+    daily_groups: dict[str, dict[str, Any]] = {}
+    for sheet in months_in_scope:
+        for row in sheet_daily_pnls.get(str(sheet), []) or []:
+            day = str(row.get("date") or "")
+            if not day:
+                continue
+            g = daily_groups.setdefault(day, {"key": day, "pnl": 0.0, "n_trades": 0, "trades": []})
+            g["pnl"] += float(row.get("pnl") or 0)
+            g["n_trades"] += int(row.get("n_trades") or 0)
+            g["trades"].extend(row.get("trades") or [])
+    if daily_groups:
+        for row in sorted(daily_groups.values(), key=lambda r: str(r["key"])):
+            by_day.append({**row, "pnl": round(float(row["pnl"]), 2)})
+    else:
+        by_day_raw = aggregate(trade_pnl_event_date)
+        cumulative_pnl = 0.0
+        for row in sorted(by_day_raw, key=lambda r: str(r["key"])):
+            cumulative_pnl += float(row["pnl"])
+            by_day.append({**row, "cumulative_pnl": round(cumulative_pnl, 2)})
     closed_trades = [t for t in trades if not t.get("is_active")]
     closed_with_close_weekday = [t for t in closed_trades if trade_close_weekday(t) != "Unknown"]
     by_close_weekday = aggregate(trade_close_weekday, closed_with_close_weekday)
