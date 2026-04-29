@@ -156,6 +156,17 @@ def load_snapshot(force: bool = False) -> dict[str, Any]:
     return _snapshot_cache["data"]
 
 
+def snapshot_age_seconds(snap: dict[str, Any]) -> float | None:
+    generated_at = snap.get("generated_at")
+    if not generated_at:
+        return time.time() - SNAPSHOT_PATH.stat().st_mtime
+    try:
+        generated_dt = datetime.fromisoformat(str(generated_at))
+    except ValueError:
+        return time.time() - SNAPSHOT_PATH.stat().st_mtime
+    return max(0.0, (datetime.now() - generated_dt).total_seconds())
+
+
 # ─── Filter helpers ───────────────────────────────────────────────────────────
 
 # Map sheet names → environment (matches scripts/export_control_panel.py SHEET_ENV_MAP)
@@ -348,7 +359,7 @@ def health() -> HealthResponse:
         return HealthResponse(snapshot_age_seconds=None, snapshot_generated_at=None)
     snap = load_snapshot()
     return HealthResponse(
-        snapshot_age_seconds=time.time() - SNAPSHOT_PATH.stat().st_mtime,
+        snapshot_age_seconds=snapshot_age_seconds(snap),
         snapshot_generated_at=snap.get("generated_at"),
     )
 
@@ -391,12 +402,13 @@ def _trigger_export_script(*, source: str = "manual") -> bool:
                     str(REPO_ROOT / "scripts" / "export_control_panel.py"),
                     "--gdrive-id",
                     GDRIVE_ID,
+                    "--snapshot-only",
                 ],
                 cwd=str(REPO_ROOT),
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=300,
+                timeout=900,
             )
             if proc.stdout:
                 print(proc.stdout, end="")

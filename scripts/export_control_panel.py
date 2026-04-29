@@ -987,7 +987,7 @@ def compute_portfolio_kpis(trades: list[dict], monthly: pd.DataFrame) -> dict:
 
 # ─── Main export ─────────────────────────────────────────────────────────────
 
-def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
+def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only: bool = False) -> dict:
     today_str = date.today().strftime("%Y-%m-%d")
 
     # ── Download do Google Drive (se configurado) ──
@@ -1029,7 +1029,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
 
     trades   = build_trade_snapshot(db_robots, db_cria, closed_from_sheets)
     monthly  = build_monthly_summary(db_robots, db_cria)
-    history  = build_trade_history(db_robots, db_cria)
+    history  = pd.DataFrame() if snapshot_only else build_trade_history(db_robots, db_cria)
 
     # Attach `sheet` (visual month sheet, e.g. APR26) to each trade for filtering
     for t in trades:
@@ -1139,19 +1139,21 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None) -> dict:
         json.dump(snapshot, f, ensure_ascii=False, indent=2, default=str)
 
     # -- Trade history parquet --
-    if not history.empty:
+    if not snapshot_only and not history.empty:
         hist_path = REPORTS_DIR / "trade_history.parquet"
         history.to_parquet(hist_path, index=False)
         print(f"[export] History  -> {hist_path.name} ({len(history)} linhas)")
 
     # -- Monthly summary CSV --
-    if not monthly.empty:
+    if not snapshot_only and not monthly.empty:
         csv_path = REPORTS_DIR / "monthly_summary.csv"
         try:
             monthly.to_csv(csv_path, index=False)
             print(f"[export] Monthly  -> {csv_path.name} ({len(monthly)} trades)")
         except PermissionError:
             print(f"[!] Monthly CSV bloqueado; snapshot ja foi atualizado. Feche o arquivo e rode novamente: {csv_path}")
+    elif snapshot_only:
+        print("[export] Snapshot-only: pulando parquet/CSV auxiliares")
 
     # -- Alertas --
     if kpis["alerts"]:
@@ -1183,6 +1185,11 @@ if __name__ == "__main__":
         default=os.environ.get("GDRIVE_FILE_ID", ""),
         help="ID do Google Sheet para download automatico (ou variavel GDRIVE_FILE_ID)",
     )
+    parser.add_argument(
+        "--snapshot-only",
+        action="store_true",
+        help="Gera apenas trades_snapshot_*.json e pula parquet/CSV auxiliares.",
+    )
     args = parser.parse_args()
 
     xlsx = Path(args.xlsx)
@@ -1192,4 +1199,4 @@ if __name__ == "__main__":
         print(f"[ERROR] Arquivo nao encontrado: {xlsx}")
         sys.exit(1)
 
-    run_export(xlsx, gdrive_file_id=gdrive_id)
+    run_export(xlsx, gdrive_file_id=gdrive_id, snapshot_only=args.snapshot_only)
