@@ -16,16 +16,16 @@ type Props = { filter: Filter };
 
 const SUGGESTED = [
   "What is my biggest leak right now?",
+  "Search the latest VIX context and explain how it affects this book.",
+  "Search today's market news for SPX, NDX and RUT, then connect it to my open risk.",
   "Where is my edge coming from by strategy, DTE and underlying?",
-  "Which trade family is hurting expectancy the most?",
-  "Compare winners versus losers and find repeated patterns.",
 ];
 
 export function ChatPanel({ filter }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [provider, setProvider] = useState<"anthropic" | "openai">("anthropic");
+  const [provider, setProvider] = useState<"anthropic" | "openai">("openai");
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -79,8 +79,8 @@ export function ChatPanel({ filter }: Props) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="anthropic" className="text-xs">Claude</SelectItem>
             <SelectItem value="openai" className="text-xs">GPT</SelectItem>
+            <SelectItem value="anthropic" className="text-xs">Claude</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -280,10 +280,18 @@ function MarkdownTable({ lines }: { lines: string[] }) {
 }
 
 function renderInline(text: string): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
   return parts.map((part, idx) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return <strong key={idx} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+    }
+    const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (link) {
+      return (
+        <a key={idx} href={link[2]} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+          {link[1]}
+        </a>
+      );
     }
     return <span key={idx}>{part}</span>;
   });

@@ -325,7 +325,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     filter: FilterEcho = Field(default_factory=lambda: FilterEcho(months=[], env=None))
-    provider: Literal["anthropic", "openai"] = "anthropic"
+    provider: Literal["anthropic", "openai"] = "openai"
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -1194,7 +1194,9 @@ def _build_system_prompt(trades: list[dict[str, Any]], snap: dict[str, Any], mon
         "weaknesses, and structural patterns. You may also discuss options strategy design, "
         "risk management, volatility selling concepts, technical-analysis frameworks, "
         "backtest methodology, and general market structure when the user asks broader "
-        "research questions.\n\n"
+        "research questions. You have access to live web search; use it when the user asks "
+        "for current facts such as news, VIX level, market prices, macro calendar, or recent "
+        "events.\n\n"
         f"Active filter: {filter_desc}\n"
         f"Snapshot generated at: {snap.get('generated_at','?')}\n\n"
         f"{scope_metrics}\n"
@@ -1203,8 +1205,9 @@ def _build_system_prompt(trades: list[dict[str, Any]], snap: dict[str, Any], mon
         "- NEVER recommend specific trade execution (entry/exit). Cristiano executes; you analyze.\n"
         "- Answer like a senior quant analyst in a ChatGPT-style conversation: clear, structured, sufficiently detailed, and practical. Do not be terse unless the user asks for a short answer.\n"
         "- When discussing PnL, always cite the specific trade names from above.\n"
-        "- If asked about live/current external data that is not provided here (news, VIX level, market prices, IV Rank, GEX, macro calendar, or broker data), say that this dashboard AI does not currently have live external-data tools connected. Do not invent current facts. You can still explain how to analyze that data if the user provides it.\n"
+        "- If asked about live/current external data (news, VIX level, market prices, IV Rank, GEX, macro calendar, or broker data), use web search when available and cite sources. If web search fails or cannot verify the fact, say that clearly. Do not invent current facts.\n"
         "- If asked about strategies or research not directly present in the trade list, answer from general options/quant knowledge and clearly label it as general research, not a conclusion from the current book.\n"
+        "- For current market questions, separate verified web facts from inferences about the desk's current trades.\n"
         "- Answer in the user's language.\n"
         "- Use clean Markdown: short headings, bullets, and compact tables for comparisons. Include an executive summary first for long answers.\n"
         "- Keep calculations auditable: show totals and the trade names behind them, but avoid long arithmetic walls.\n"
@@ -1236,6 +1239,7 @@ async def _stream_anthropic(system: str, messages: list[dict[str, str]]) -> Iter
             max_tokens=4096,
             system=system,
             messages=messages,
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
         ) as stream:
             async for text in stream.text_stream:
                 yield _sse({"delta": text, "done": False})
@@ -1266,6 +1270,8 @@ async def _stream_openai(system: str, messages: list[dict[str, str]]) -> Iterabl
             model="gpt-5.5",
             instructions=system,
             input=response_input,
+            tools=[{"type": "web_search"}],
+            tool_choice="auto",
             reasoning={"effort": "medium"},
             text={"verbosity": "medium"},
             max_output_tokens=4096,
