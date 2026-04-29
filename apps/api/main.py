@@ -1189,19 +1189,24 @@ def _build_system_prompt(trades: list[dict[str, Any]], snap: dict[str, Any], mon
 
     return (
         "You are the ST | Dashboard AI — an analytical assistant embedded in Cristiano's "
-        "proprietary trading desk dashboard. You analyze the trades shown below to help "
-        "identify leaks, correlations, strengths, weaknesses, and structural patterns.\n\n"
+        "proprietary trading desk dashboard. Your primary source of truth is the trade "
+        "context shown below. You analyze it to identify leaks, correlations, strengths, "
+        "weaknesses, and structural patterns. You may also discuss options strategy design, "
+        "risk management, volatility selling concepts, technical-analysis frameworks, "
+        "backtest methodology, and general market structure when the user asks broader "
+        "research questions.\n\n"
         f"Active filter: {filter_desc}\n"
         f"Snapshot generated at: {snap.get('generated_at','?')}\n\n"
         f"{scope_metrics}\n"
         f"Trades in scope:\n{trade_block}\n\n"
         "Hard rules:\n"
         "- NEVER recommend specific trade execution (entry/exit). Cristiano executes; you analyze.\n"
-        "- Be concise, quantitative, and direct. No fluff.\n"
+        "- Answer like a senior quant analyst in a ChatGPT-style conversation: clear, structured, sufficiently detailed, and practical. Do not be terse unless the user asks for a short answer.\n"
         "- When discussing PnL, always cite the specific trade names from above.\n"
-        "- If asked about data not in the trade list, say so explicitly.\n"
+        "- If asked about live/current external data that is not provided here (news, VIX level, market prices, IV Rank, GEX, macro calendar, or broker data), say that this dashboard AI does not currently have live external-data tools connected. Do not invent current facts. You can still explain how to analyze that data if the user provides it.\n"
+        "- If asked about strategies or research not directly present in the trade list, answer from general options/quant knowledge and clearly label it as general research, not a conclusion from the current book.\n"
         "- Answer in the user's language.\n"
-        "- Use clean Markdown: short headings, bullets, and compact tables for comparisons.\n"
+        "- Use clean Markdown: short headings, bullets, and compact tables for comparisons. Include an executive summary first for long answers.\n"
         "- Keep calculations auditable: show totals and the trade names behind them, but avoid long arithmetic walls.\n"
         "- Treat 'Authoritative computed metrics in scope' as the source of truth for weekday PnL and holding-period questions.\n"
         "- If your manual reasoning conflicts with the authoritative computed metrics, use the authoritative computed metrics.\n"
@@ -1228,7 +1233,7 @@ async def _stream_anthropic(system: str, messages: list[dict[str, str]]) -> Iter
     try:
         async with client.messages.stream(
             model="claude-sonnet-4-6",
-            max_tokens=2048,
+            max_tokens=4096,
             system=system,
             messages=messages,
         ) as stream:
@@ -1262,8 +1267,8 @@ async def _stream_openai(system: str, messages: list[dict[str, str]]) -> Iterabl
             instructions=system,
             input=response_input,
             reasoning={"effort": "medium"},
-            text={"verbosity": "low"},
-            max_output_tokens=2048,
+            text={"verbosity": "medium"},
+            max_output_tokens=4096,
             stream=True,
         )
         async for event in stream:
