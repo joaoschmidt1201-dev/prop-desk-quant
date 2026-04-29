@@ -48,11 +48,11 @@ export function DashboardHeader() {
     const initialGeneratedAt = data?.snapshot_generated_at ?? null;
     try {
       await api.refreshSnapshot();
-      // Poll /api/health for up to 60s until snapshot_generated_at advances.
-      const deadline = Date.now() + 60_000;
+      // Render free can take several minutes to export the Google Sheet.
+      const deadline = Date.now() + 10 * 60_000;
       let advanced = false;
       while (Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 1_500));
+        await new Promise((r) => setTimeout(r, 5_000));
         try {
           const fresh = await api.health();
           if (fresh.snapshot_generated_at && fresh.snapshot_generated_at !== initialGeneratedAt) {
@@ -67,7 +67,7 @@ export function DashboardHeader() {
         refetch(),
         invalidateDashboardData(queryClient),
       ]);
-      if (!advanced) console.warn("Snapshot refresh did not advance within 60s");
+      if (!advanced) console.warn("Snapshot refresh did not advance within 10 minutes");
     } catch (e) {
       console.error("Snapshot refresh failed", e);
     } finally {

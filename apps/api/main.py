@@ -430,7 +430,7 @@ def _trigger_export_script(*, source: str = "manual") -> bool:
 @app.post("/api/snapshot/refresh")
 def refresh_snapshot() -> JSONResponse:
     if not _trigger_export_script(source="manual"):
-        return JSONResponse({"status": "already_running"}, status_code=409)
+        return JSONResponse({"status": "already_running"}, status_code=202)
     return JSONResponse({"status": "refresh_started"}, status_code=202)
 
 
