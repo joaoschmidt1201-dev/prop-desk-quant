@@ -101,6 +101,7 @@ export type Analytics = {
   by_underlying: AnalyticsGroup[];
   by_dte_bucket: AnalyticsGroup[];
   by_weekday: AnalyticsGroup[];
+  by_day?: Array<AnalyticsGroup & { cumulative_pnl?: number }>;
   by_close_weekday?: AnalyticsGroup[];
   top_winners: AnalyticsTrade[];
   top_losers: AnalyticsTrade[];

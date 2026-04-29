@@ -32,6 +32,7 @@ export function TradesDownload({ filter }: Props) {
           by_underlying: analytics.by_underlying,
           by_dte_bucket: analytics.by_dte_bucket,
           by_weekday: analytics.by_weekday,
+          by_day: analytics.by_day,
           by_close_weekday: analytics.by_close_weekday,
           top_winners: analytics.top_winners,
           top_losers: analytics.top_losers,

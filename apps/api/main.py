@@ -262,6 +262,16 @@ def trade_days_held(trade: dict[str, Any]) -> int | None:
         return None
 
 
+def trade_pnl_event_date(trade: dict[str, Any]) -> str:
+    if not trade.get("is_active") and trade.get("inferred_close_date"):
+        return str(trade["inferred_close_date"])[:10]
+    for key in ("visual_last_pnl_date", "last_update", "visual_open_date", "open_date"):
+        value = trade.get(key)
+        if value:
+            return str(value)[:10]
+    return "Unknown"
+
+
 def trade_dte_bucket(trade: dict[str, Any]) -> str:
     if trade.get("dte_bucket"):
         return str(trade["dte_bucket"])
@@ -633,6 +643,12 @@ def get_analytics(
     by_underlying = aggregate(lambda t: t.get("underlying") or "Unknown")
     by_dte_bucket = aggregate(trade_dte_bucket)
     by_weekday = aggregate(trade_open_weekday)
+    by_day_raw = aggregate(trade_pnl_event_date)
+    by_day = []
+    cumulative_pnl = 0.0
+    for row in sorted(by_day_raw, key=lambda r: str(r["key"])):
+        cumulative_pnl += float(row["pnl"])
+        by_day.append({**row, "cumulative_pnl": round(cumulative_pnl, 2)})
     closed_trades = [t for t in trades if not t.get("is_active")]
     closed_with_close_weekday = [t for t in closed_trades if trade_close_weekday(t) != "Unknown"]
     by_close_weekday = aggregate(trade_close_weekday, closed_with_close_weekday)
@@ -670,6 +686,7 @@ def get_analytics(
         "by_underlying": by_underlying,
         "by_dte_bucket": by_dte_bucket,
         "by_weekday": by_weekday,
+        "by_day": by_day,
         "by_close_weekday": by_close_weekday,
         "top_winners": [_analytics_trade(t, pnl_for(t)) for t in top_winners],
         "top_losers": [_analytics_trade(t, pnl_for(t)) for t in top_losers],

@@ -39,6 +39,14 @@ export function AnalyticsPanel({ filter }: Props) {
     (a, b) => WEEKDAY_ORDER.indexOf(a.key) - WEEKDAY_ORDER.indexOf(b.key),
   );
   const monthRows = data.by_month.map((m) => ({ ...m, key: m.label ?? m.key }));
+  const singleMonth = data.filter.months.length === 1;
+  const dailyRows = (data.by_day ?? []).filter((d) => d.key !== "Unknown").map((d) => ({
+    ...d,
+    label: d.key,
+    key: formatDayLabel(d.key),
+  }));
+  const pathRows = singleMonth && dailyRows.length ? dailyRows : monthRows;
+  const pathTitle = singleMonth && dailyRows.length ? "Daily P&L path" : "Monthly P&L path";
 
   return (
     <section className="space-y-5 rounded-2xl border border-border/40 bg-card/30 p-6">
@@ -62,9 +70,9 @@ export function AnalyticsPanel({ filter }: Props) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <ChartCard className="xl:col-span-7" title="Monthly P&L path" icon={<CalendarDays className="h-4 w-4" />}>
+        <ChartCard className="xl:col-span-7" title={pathTitle} icon={<CalendarDays className="h-4 w-4" />}>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={monthRows} margin={{ left: 6, right: 12, top: 16, bottom: 0 }}>
+            <LineChart data={pathRows} margin={{ left: 6, right: 12, top: 16, bottom: 0 }}>
               <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" opacity={0.55} />
               <XAxis dataKey="key" tickLine={false} axisLine={false} fontSize={11} />
               <YAxis tickFormatter={(v) => `$${Math.round(Number(v) / 1000)}k`} tickLine={false} axisLine={false} fontSize={11} width={46} />
@@ -166,10 +174,19 @@ function MoneyTooltip({ active, payload, label }: { active?: boolean; payload?: 
     <div className="rounded-lg border border-border/70 bg-popover/95 px-3 py-2 text-xs shadow-xl">
       <div className="font-medium">{label ?? row.key}</div>
       <div className={`mt-1 tabular ${pnlClass(Number(payload[0].value))}`}>{fmtMoney(Number(payload[0].value))}</div>
+      {"cumulative_pnl" in row && typeof row.cumulative_pnl === "number" && (
+        <div className={`mt-1 tabular ${pnlClass(row.cumulative_pnl)}`}>cumulative {fmtMoney(row.cumulative_pnl)}</div>
+      )}
       {row.n_trades != null && <div className="mt-1 text-muted-foreground">{row.n_trades} trades</div>}
       {row.win_rate != null && <div className="text-muted-foreground">WR {fmtPct(row.win_rate)}</div>}
     </div>
   );
+}
+
+function formatDayLabel(value: string) {
+  const parts = value.split("-");
+  if (parts.length !== 3) return value;
+  return `${parts[1]}/${parts[2]}`;
 }
 
 function InsightStrip({ insights }: { insights: { label: string; value: string; detail: number | string }[] }) {
