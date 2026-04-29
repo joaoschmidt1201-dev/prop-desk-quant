@@ -1251,15 +1251,29 @@ async def _stream_openai(system: str, messages: list[dict[str, str]]) -> Iterabl
         return
 
     client = AsyncOpenAI(api_key=api_key)
-    full_messages = [{"role": "system", "content": system}, *messages]
+    response_input = [
+        {"role": m["role"], "content": m["content"]}
+        for m in messages
+        if m["role"] in ("user", "assistant")
+    ]
     try:
-        stream = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=full_messages,
+        stream = await client.responses.create(
+            model="gpt-5.5",
+            instructions=system,
+            input=response_input,
+            reasoning={"effort": "medium"},
+            text={"verbosity": "low"},
+            max_output_tokens=2048,
             stream=True,
         )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta else None
+        async for event in stream:
+            if getattr(event, "type", None) == "response.error":
+                error = getattr(event, "error", None)
+                yield _sse({"error": f"OpenAI API error: {error}", "done": True})
+                return
+            if getattr(event, "type", None) != "response.output_text.delta":
+                continue
+            delta = getattr(event, "delta", None)
             if delta:
                 yield _sse({"delta": delta, "done": False})
         yield _sse({"done": True})
