@@ -10,16 +10,15 @@ type Props = { filter: Filter };
 
 const SORT_OPTIONS = [
   { value: "status_dte", label: "Status + DTE" },
-  { value: "name_az", label: "Alphabetical A-Z" },
-  { value: "open_newest", label: "Opening date newest" },
-  { value: "open_oldest", label: "Opening date oldest" },
-  { value: "ticker_az", label: "Ticker A-Z" },
-  { value: "pnl_best", label: "P&L best first" },
-  { value: "pnl_worst", label: "P&L worst first" },
-  { value: "expiration", label: "Expiration soonest" },
+  { value: "name", label: "Alphabetical" },
+  { value: "open_date", label: "Opening date" },
+  { value: "ticker", label: "Ticker" },
+  { value: "pnl", label: "P&L" },
+  { value: "expiration", label: "Expiration" },
 ] as const;
 
 type SortMode = (typeof SORT_OPTIONS)[number]["value"];
+type SortDirection = "asc" | "desc";
 
 function textValue(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -55,19 +54,15 @@ function tradePnl(t: Trade): number | null {
   return numericValue(t.pnl ?? t.open_pnl);
 }
 
-function compareTrades(sortMode: SortMode, a: Trade, b: Trade): number {
+function compareTradesAsc(sortMode: SortMode, a: Trade, b: Trade): number {
   switch (sortMode) {
-    case "name_az":
+    case "name":
       return compareText(a.name, b.name);
-    case "open_newest":
-      return compareNullableNumber(dateValue(a.open_date), dateValue(b.open_date), "desc") || compareText(a.name, b.name);
-    case "open_oldest":
+    case "open_date":
       return compareNullableNumber(dateValue(a.open_date), dateValue(b.open_date), "asc") || compareText(a.name, b.name);
-    case "ticker_az":
+    case "ticker":
       return compareText(a.underlying, b.underlying) || compareText(a.name, b.name);
-    case "pnl_best":
-      return compareNullableNumber(tradePnl(a), tradePnl(b), "desc") || compareText(a.name, b.name);
-    case "pnl_worst":
+    case "pnl":
       return compareNullableNumber(tradePnl(a), tradePnl(b), "asc") || compareText(a.name, b.name);
     case "expiration":
       return compareNullableNumber(dateValue(a.exp_date), dateValue(b.exp_date), "asc") || compareText(a.name, b.name);
@@ -80,8 +75,14 @@ function compareTrades(sortMode: SortMode, a: Trade, b: Trade): number {
   }
 }
 
+function compareTrades(sortMode: SortMode, sortDirection: SortDirection, a: Trade, b: Trade): number {
+  const result = compareTradesAsc(sortMode, a, b);
+  return sortDirection === "asc" ? result : -result;
+}
+
 export function TradesTable({ filter }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("status_dte");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { data, isLoading } = useQuery({
     queryKey: ["trades", filter.months, filter.env],
     queryFn: () => api.trades(filter),
@@ -91,12 +92,13 @@ export function TradesTable({ filter }: Props) {
   });
 
   const sortLabel = SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? "Status + DTE";
+  const directionLabel = sortDirection === "asc" ? "Ascending" : "Descending";
   const trades = useMemo(() => {
     if (!data?.trades) return [];
     return [...data.trades].sort(
-      (a, b) => compareTrades(sortMode, a, b) || compareText(a.name, b.name),
+      (a, b) => compareTrades(sortMode, sortDirection, a, b) || compareText(a.name, b.name),
     );
-  }, [data?.trades, sortMode]);
+  }, [data?.trades, sortDirection, sortMode]);
 
   if (isLoading || !data) {
     return <div className="h-72 animate-pulse rounded-2xl bg-card/20" />;
@@ -111,23 +113,36 @@ export function TradesTable({ filter }: Props) {
         <div>
           <h3 className="text-sm font-semibold tracking-tight">Positions</h3>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {active.length} active / {closed.length} closed / sorted: {sortLabel}
+            {active.length} active / {closed.length} closed / sorted: {sortLabel}, {directionLabel.toLowerCase()}
           </p>
         </div>
-        <label className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/70">Sort</span>
-          <select
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as SortMode)}
-            className="h-8 rounded-md border border-border/50 bg-background/80 px-3 text-[11px] font-medium text-foreground outline-none transition hover:bg-card/60 focus:ring-1 focus:ring-primary/50"
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/70">Sort</span>
+            <select
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as SortMode)}
+              className="h-8 rounded-md border border-border/50 bg-background/80 px-3 text-[11px] font-medium text-foreground outline-none transition hover:bg-card/60 focus:ring-1 focus:ring-primary/50"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/70">Order</span>
+            <select
+              value={sortDirection}
+              onChange={(event) => setSortDirection(event.target.value as SortDirection)}
+              className="h-8 rounded-md border border-border/50 bg-background/80 px-3 text-[11px] font-medium text-foreground outline-none transition hover:bg-card/60 focus:ring-1 focus:ring-primary/50"
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
