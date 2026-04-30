@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, type Filter } from "@/lib/api";
 import { AnalyticsPanel } from "./analytics-panel";
@@ -12,8 +12,16 @@ import { TradesTable } from "./trades-table";
 import { TradesDownload } from "./trades-download";
 
 export function Dashboard() {
-  const [filter, setFilter] = useState<Filter>({ months: [], env: null });
+  const [selectedUser, setSelectedUser] = useState<"CZ" | "JS">("CZ");
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const queryClient = useQueryClient();
+  const filter = useMemo<Filter>(
+    () => ({
+      months: selectedMonths,
+      env: selectedUser === "JS" ? "JS_Forward" : "CZ_Live",
+    }),
+    [selectedMonths, selectedUser],
+  );
 
   useEffect(() => {
     void queryClient.prefetchQuery({
@@ -29,8 +37,10 @@ export function Dashboard() {
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
         <div className="mb-7">
           <MonthFilter
-            selectedMonths={filter.months}
-            onChange={(months) => setFilter((f) => ({ ...f, months }))}
+            selectedUser={selectedUser}
+            selectedMonths={selectedMonths}
+            onUserChange={setSelectedUser}
+            onChange={setSelectedMonths}
           />
         </div>
 
