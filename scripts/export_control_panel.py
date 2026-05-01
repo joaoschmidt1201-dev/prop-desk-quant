@@ -87,6 +87,40 @@ VISUAL_SHEETS = ["APR26", "MAR26", "JS APR26", "JS-FOR MAR26", "FOR Trades"]
 # Future months (MAY26, JUN26, JS MAY26, ...) are picked up automatically.
 MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
 
+TRADE_UNDERLYINGS = (
+    "SPX",
+    "SPXW",
+    "XSP",
+    "SPY",
+    "NDX",
+    "NDXP",
+    "QQQ",
+    "RUT",
+    "IWM",
+    "DIA",
+    "GLD",
+    "SLV",
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY",
+    "BTC",
+    "BITCOIN",
+)
+
+UNDERLYING_ALIASES = {
+    "SPXW": "SPX",
+    "NDXP": "NDX",
+    "BITCOIN": "BTC",
+}
+
 
 def infer_visual_sheet_env(sheet_name: str) -> str:
     return SHEET_ENV_MAP.get(
@@ -846,9 +880,9 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
 
 def _infer_underlying(name: str) -> str:
     n = name.upper()
-    for sym in ["NDX", "SPX", "RUT", "SPY", "QQQ", "IWM", "GLD", "SLV", "DIA", "XLV", "XLI", "META", "NVDA", "GOOGL", "JPM"]:
-        if sym in n:
-            return sym
+    for sym in TRADE_UNDERLYINGS:
+        if re.search(rf"(?<![A-Z0-9]){re.escape(sym)}(?![A-Z0-9])", n):
+            return UNDERLYING_ALIASES.get(sym, sym)
     return "?"
 
 

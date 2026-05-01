@@ -58,6 +58,38 @@ MONTH_NUM = {
     "NOV": 11,
     "DEC": 12,
 }
+TRADE_UNDERLYINGS = (
+    "SPX",
+    "SPXW",
+    "XSP",
+    "SPY",
+    "NDX",
+    "NDXP",
+    "QQQ",
+    "RUT",
+    "IWM",
+    "DIA",
+    "GLD",
+    "SLV",
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY",
+    "BTC",
+    "BITCOIN",
+)
+UNDERLYING_ALIASES = {
+    "SPXW": "SPX",
+    "NDXP": "NDX",
+    "BITCOIN": "BTC",
+}
 
 # ─── App + scheduler lifecycle ────────────────────────────────────────────────
 
@@ -151,6 +183,7 @@ def load_snapshot(force: bool = False) -> dict[str, Any]:
     if not fresh_enough:
         with SNAPSHOT_PATH.open(encoding="utf-8") as f:
             _snapshot_cache["data"] = json.load(f)
+        _normalize_snapshot_underlyings(_snapshot_cache["data"])
         _snapshot_cache["loaded_at"] = time.time()
         _snapshot_cache["mtime"] = mtime
     return _snapshot_cache["data"]
@@ -166,6 +199,24 @@ def snapshot_age_seconds(snap: dict[str, Any]) -> float | None:
         return time.time() - SNAPSHOT_PATH.stat().st_mtime
     now_dt = datetime.now(generated_dt.tzinfo) if generated_dt.tzinfo else datetime.now()
     return max(0.0, (now_dt - generated_dt).total_seconds())
+
+
+def _infer_underlying_from_name(name: Any) -> str | None:
+    n = str(name or "").upper()
+    for sym in TRADE_UNDERLYINGS:
+        if re.search(rf"(?<![A-Z0-9]){re.escape(sym)}(?![A-Z0-9])", n):
+            return UNDERLYING_ALIASES.get(sym, sym)
+    return None
+
+
+def _normalize_snapshot_underlyings(snap: dict[str, Any]) -> None:
+    for trade in snap.get("trades") or []:
+        underlying = str(trade.get("underlying") or "").strip()
+        if underlying and underlying not in {"?", "Unknown"}:
+            continue
+        inferred = _infer_underlying_from_name(trade.get("name"))
+        if inferred:
+            trade["underlying"] = inferred
 
 
 # ─── Filter helpers ───────────────────────────────────────────────────────────
