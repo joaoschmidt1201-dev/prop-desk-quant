@@ -417,5 +417,29 @@
       {"label": "p", "price": 697, "bucket": "green"},
       {"label": "n", "price": 695, "bucket": "red"}
     ]
+  },
+  {
+    "week": "2026-04-27",
+    "ticker": "SPY",
+    "expiry": "2026-05-01",
+    "source_file": "manual_tradinglit",
+    "source_type": "manual_levels",
+    "raw_text": "SEM 27APR - 01MAY\np - 725\np - 723\ncoi - 720\np2 - 716\np1 - 715\np3 + ag3 - 714\nn + ag2 - 713\ng flip + n + ag - 712\nn + ag4 - 711\npos gex isld - 710\nn - 709\nn - 706\nn4 - 700\nn2 - 699",
+    "manual_levels": [
+      {"label": "p", "price": 725, "bucket": "green"},
+      {"label": "p", "price": 723, "bucket": "green"},
+      {"label": "coi", "price": 720, "bucket": "green"},
+      {"label": "p2", "price": 716, "bucket": "green"},
+      {"label": "p1", "price": 715, "bucket": "green"},
+      {"label": "p3 + ag3", "price": 714, "bucket": "green"},
+      {"label": "n + ag2", "price": 713, "bucket": "red"},
+      {"label": "g flip + n + ag", "price": 712, "bucket": "gray"},
+      {"label": "n + ag4", "price": 711, "bucket": "red"},
+      {"label": "pos gex isld", "price": 710, "bucket": "green"},
+      {"label": "n", "price": 709, "bucket": "red"},
+      {"label": "n", "price": 706, "bucket": "red"},
+      {"label": "n4", "price": 700, "bucket": "red"},
+      {"label": "n2", "price": 699, "bucket": "red"}
+    ]
   }
 ]

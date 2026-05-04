@@ -3,8 +3,8 @@
 // GEX Weekly Levels [TradingLitt Style] — SPX + NDX + SPY + QQQ + IWM — AUTO-GENERATED
 // DO NOT EDIT MANUALLY. Regenerate via:
 //   python scripts/gex_csv_parser.py <csv_path> --week YYYY-MM-DD
-// Last updated : 2026-04-27
-// Weeks stored : 21
+// Last updated : 2026-05-04
+// Weeks stored : 22
 // =======================================================================
 indicator("GEX Weekly Levels [TradingLitt]", overlay=true, max_lines_count=500, max_labels_count=500, shorttitle="GEX Levels")
 
@@ -78,109 +78,43 @@ SH_N3    = input.bool(true, "Neg GEX n3", group=_GSL)
 SH_AGG   = input.bool(true, "Aggregate",  group=_GSL)
 
 // --- CONSTANTS ------------------------------------------------------
-// D = bars per trading day; W = Monday open -> Friday close span — auto-adapted to any timeframe
-// US equity session: 9:30-16:00 = 390 minutes
-int D = timeframe.isintraday ? math.max(1, math.round(390.0 / (timeframe.in_seconds() / 60.0))) : 1
-int W = D * 5 - 1
-string _update_date = "2026-04-27"
-
-f_week_x2(int bi, int next_bi) =>
-    na(bi) ? na : na(next_bi) ? bi + W : math.max(bi, next_bi - 1)
+// All horizontal x-coordinates are UNIX timestamps in ms (xloc.bar_time).
+// Drawings are session-agnostic: identical behavior in RTH/ETH and across
+// holidays. The Python generator encodes each Monday's open in ET (DST-aware)
+// and uses the next Monday's open as the week-end boundary, so 4-day holiday
+// weeks terminate naturally at next Monday's pre-open.
+int DAY_MS = 86400000
+string _update_date = "2026-05-04"
 
 // --- HELPERS --------------------------------------------------------
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
 
-f_lbl_x(x1, x2, lpos, loff) =>
-    lpos == "Left" ? x1 + loff : lpos == "Center" ? x1 + math.floor((x2 - x1) / 2) + loff : x2 + loff
-
 f_lbl_size(s) =>
     s == "Tiny" ? size.tiny : s == "Large" ? size.large : s == "Normal" ? size.normal : size.small
 
-// True on the first bar of a given Monday (by timestamp)
-is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
+// Convert LBL_OFFSET (in bars) to a ms delta at the active timeframe.
+f_off_ms() =>
+    int sec = timeframe.in_seconds()
+    int s   = sec > 0 ? sec : 60
+    s * 1000 * LBL_OFFSET
 
-// --- MONDAY BAR INDEX DETECTION (auto-generated) --------------------
-var int _bi0 = na
-var int _bi1 = na
-var int _bi2 = na
-var int _bi3 = na
-var int _bi4 = na
-var int _bi5 = na
-var int _bi6 = na
-var int _bi7 = na
-var int _bi8 = na
-var int _bi9 = na
-var int _bi10 = na
-var int _bi11 = na
-var int _bi12 = na
-var int _bi13 = na
-var int _bi14 = na
-var int _bi15 = na
-var int _bi16 = na
-var int _bi17 = na
-var int _bi18 = na
-var int _bi19 = na
-var int _bi20 = na
-
-if is_week_start(1765204200000) and _valid
-    _bi0 := bar_index
-if is_week_start(1765809000000) and _valid
-    _bi1 := bar_index
-if is_week_start(1766413800000) and _valid
-    _bi2 := bar_index
-if is_week_start(1767018600000) and _valid
-    _bi3 := bar_index
-if is_week_start(1767623400000) and _valid
-    _bi4 := bar_index
-if is_week_start(1768228200000) and _valid
-    _bi5 := bar_index
-if is_week_start(1768833000000) and _valid
-    _bi6 := bar_index
-if is_week_start(1769437800000) and _valid
-    _bi7 := bar_index
-if is_week_start(1770042600000) and _valid
-    _bi8 := bar_index
-if is_week_start(1770647400000) and _valid
-    _bi9 := bar_index
-if is_week_start(1771252200000) and _valid
-    _bi10 := bar_index
-if is_week_start(1771857000000) and _valid
-    _bi11 := bar_index
-if is_week_start(1772461800000) and _valid
-    _bi12 := bar_index
-if is_week_start(1773063000000) and _valid
-    _bi13 := bar_index
-if is_week_start(1773667800000) and _valid
-    _bi14 := bar_index
-if is_week_start(1774272600000) and _valid
-    _bi15 := bar_index
-if is_week_start(1774877400000) and _valid
-    _bi16 := bar_index
-if is_week_start(1775482200000) and _valid
-    _bi17 := bar_index
-if is_week_start(1776087000000) and _valid
-    _bi18 := bar_index
-if is_week_start(1776691800000) and _valid
-    _bi19 := bar_index
-if is_week_start(1777296600000) and _valid
-    _bi20 := bar_index
+f_lbl_t(t1, t2, lpos) =>
+    int off = f_off_ms()
+    lpos == "Left" ? t1 + off : lpos == "Center" ? t1 + (t2 - t1) / 2 + off : t2 + off
 
 // --- GLOBAL LINE / LABEL STORAGE ------------------------------------
 var line[]  _lines  = array.new_line()
 var label[] _labels = array.new_label()
 
-f_draw_sep(x, clr, sty, lw) =>
-    array.push(_lines, line.new(x, 0.0, x, 1.0, xloc=xloc.bar_index, color=clr, style=f_style(sty), width=lw, extend=extend.both))
+f_draw_sep(ts, clr, sty, lw) =>
+    array.push(_lines, line.new(ts, 0.0, ts, 1.0, xloc=xloc.bar_time, color=clr, style=f_style(sty), width=lw, extend=extend.both))
 
-f_draw_sep_clamped(x, x2, clr, sty, lw) =>
-    if not na(x2) and x <= x2
-        f_draw_sep(x, clr, sty, lw)
-
-f_draw_level(x1, x2, price, clr, sty, lw, show, lbl) =>
-    if show and not na(price) and not na(x2) and x2 >= x1
-        array.push(_lines, line.new(x1, price, x2, price, color=clr, style=f_style(sty), width=lw))
-        array.push(_labels, label.new(f_lbl_x(x1, x2, LBL_POS, LBL_OFFSET), price, lbl, color=color.new(color.black, 100), textcolor=clr, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+f_draw_level(t1, t2, price, clr, sty, lw, show, lbl) =>
+    if show and not na(price)
+        int _lt = f_lbl_t(t1, t2, LBL_POS)
+        array.push(_lines,  line.new(t1, price, t2, price, xloc=xloc.bar_time, color=clr, style=f_style(sty), width=lw))
+        array.push(_labels, label.new(_lt, price, lbl, xloc=xloc.bar_time, color=color.new(color.black, 100), textcolor=clr, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
 
 // --- REDRAW ON LAST BAR (delete all → redraw with current inputs) ---
 f_redraw_all() =>
@@ -192,564 +126,640 @@ f_redraw_all() =>
     array.clear(_labels)
 f_draw_week_0() =>
     // --- Week 0: 2025-12-08 ---
-    if not na(_bi0)
-        int _x2 = f_week_x2(_bi0, _bi1)
-        if _is_spy
-            f_draw_sep_clamped(_bi0, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi0 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi0 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi0 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi0 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi0, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 689.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 687.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag2 ($" + str.tostring(math.round(687.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 686.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + ag ($" + str.tostring(math.round(686.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi + ag3 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 683.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 677.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi0, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "poi ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1765204200000
+    int _t2 = 1765808999999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 687.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag2 ($" + str.tostring(math.round(687.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 686.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + ag ($" + str.tostring(math.round(686.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi + ag3 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 683.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 677.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "poi ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_1() =>
     // --- Week 1: 2025-12-15 ---
-    if not na(_bi1)
-        int _x2 = f_week_x2(_bi1, _bi2)
-        if _is_spy
-            f_draw_sep_clamped(_bi1, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi1 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi1 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi1 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi1 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi1, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 688.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 681.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(681.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + poi ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi1, _x2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + hoi ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1765809000000
+    int _t2 = 1766413799999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 681.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(681.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + poi ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + hoi ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_2() =>
     // --- Week 2: 2025-12-22 ---
-    if not na(_bi2)
-        int _x2 = f_week_x2(_bi2, _bi3)
-        if _is_spy
-            f_draw_sep_clamped(_bi2, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi2 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi2 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi2 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi2 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi2, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 683.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 681.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(681.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag1 + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 679.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(679.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 678.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(678.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi2, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1766413800000
+    int _t2 = 1767018599999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 683.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 681.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(681.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag1 + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 679.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(679.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 678.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(678.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_3() =>
     // --- Week 3: 2025-12-29 ---
-    if not na(_bi3)
-        int _x2 = f_week_x2(_bi3, _bi4)
-        if _is_spy
-            f_draw_sep_clamped(_bi3, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi3 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi3 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi3 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi3 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi3, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 + hoi + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 692.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 689.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 688.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + n2 + ag3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 683.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi3, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1767018600000
+    int _t2 = 1767623399999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 + hoi + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 692.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + n2 + ag3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 683.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_4() =>
     // --- Week 4: 2026-01-05 ---
-    if not na(_bi4)
-        int _x2 = f_week_x2(_bi4, _bi5)
-        if _is_spy
-            f_draw_sep_clamped(_bi4, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi4 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi4 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi4 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi4 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi4, _x2, 701.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(701.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 693.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + hoi + coi ($" + str.tostring(math.round(693.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag1 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 689.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 688.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 685.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 684.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(684.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 682.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(682.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + poi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi4, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1767623400000
+    int _t2 = 1768228199999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 701.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(701.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 693.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + hoi + coi ($" + str.tostring(math.round(693.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag1 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 684.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(684.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 682.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(682.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + poi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_5() =>
     // --- Week 5: 2026-01-12 ---
-    if not na(_bi5)
-        int _x2 = f_week_x2(_bi5, _bi6)
-        if _is_spy
-            f_draw_sep_clamped(_bi5, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi5 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi5 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi5 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi5 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi5, _x2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 699.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(699.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag2 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 694.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + n2 ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 693.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(693.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 690.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 689.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 684.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(684.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi5, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1768228200000
+    int _t2 = 1768832999999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 699.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(699.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + ag2 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 694.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + n2 ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 693.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(693.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 684.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(684.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_6() =>
     // --- Week 6: 2026-01-19 ---
-    if not na(_bi6)
-        int _x2 = f_week_x2(_bi6, _bi7)
-        if _is_spy
-            f_draw_sep_clamped(_bi6, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi6 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi6 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi6 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi6 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi6, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 697.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(697.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 694.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 690.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 683.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi6, _x2, 677.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1768833000000
+    int _t2 = 1769437799999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 697.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(697.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 694.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 683.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 677.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_7() =>
     // --- Week 7: 2026-01-26 ---
-    if not na(_bi7)
-        int _x2 = f_week_x2(_bi7, _bi8)
-        if _is_spy
-            f_draw_sep_clamped(_bi7, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi7 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi7 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi7 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi7 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi7, _x2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 692.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 691.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + p1 + ag2 ($" + str.tostring(math.round(691.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 689.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag + n4 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 677.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi7, _x2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + hoi + poi ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1769437800000
+    int _t2 = 1770042599999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 692.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 691.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + p1 + ag2 ($" + str.tostring(math.round(691.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag + n4 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 677.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + hoi + poi ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_8() =>
     // --- Week 8: 2026-02-02 ---
-    if not na(_bi8)
-        int _x2 = f_week_x2(_bi8, _bi9)
-        if _is_spy
-            f_draw_sep_clamped(_bi8, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi8 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi8 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi8 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi8 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi8, _x2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 699.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(699.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 693.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(693.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 692.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 690.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + ag3 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 688.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi8, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1770042600000
+    int _t2 = 1770647399999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 699.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(699.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 693.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(693.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 692.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + ag3 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_9() =>
     // --- Week 9: 2026-02-09 ---
-    if not na(_bi9)
-        int _x2 = f_week_x2(_bi9, _bi10)
-        if _is_spy
-            f_draw_sep_clamped(_bi9, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi9 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi9 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi9 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi9 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi9, _x2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 690.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 688.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 686.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(686.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + poi + ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi9, _x2, 669.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(669.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1770647400000
+    int _t2 = 1771252199999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 686.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(686.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + poi + ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 669.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(669.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_10() =>
     // --- Week 10: 2026-02-16 ---
-    if not na(_bi10)
-        int _x2 = f_week_x2(_bi10, _bi11)
-        if _is_spy
-            f_draw_sep_clamped(_bi10, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi10 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi10 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi10 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi10 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi10, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 691.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(691.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 688.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 687.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(687.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 685.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 680.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag + n3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag3 + hoi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + poi + ag4 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi10, _x2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1771252200000
+    int _t2 = 1771856999999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p4 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 691.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(691.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 687.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(687.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag + n3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag3 + hoi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + poi + ag4 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_11() =>
     // --- Week 11: 2026-02-23 ---
-    if not na(_bi11)
-        int _x2 = f_week_x2(_bi11, _bi12)
-        if _is_spy
-            f_draw_sep_clamped(_bi11, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi11 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi11 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi11 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi11 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi11, _x2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 692.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 690.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 689.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 688.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 682.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(682.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag4 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi11, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + hoi + poi ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1771857000000
+    int _t2 = 1772461799999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 705.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 692.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(692.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 688.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(688.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 682.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(682.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag4 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + hoi + poi ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_12() =>
     // --- Week 12: 2026-03-02 ---
-    if not na(_bi12)
-        int _x2 = f_week_x2(_bi12, _bi13)
-        if _is_spy
-            f_draw_sep_clamped(_bi12, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi12 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi12 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi12 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi12 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi12, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 694.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 689.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 685.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag + hoi + poi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi12, _x2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1772461800000
+    int _t2 = 1773062999999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 696.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(696.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 694.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag + hoi + poi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_13() =>
     // --- Week 13: 2026-03-09 ---
-    if not na(_bi13)
-        int _x2 = f_week_x2(_bi13, _bi14)
-        if _is_spy
-            f_draw_sep_clamped(_bi13, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi13 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi13 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi13 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi13 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi13, _x2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 689.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 683.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 681.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(681.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 679.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(679.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 676.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(676.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag2 + hoi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag2 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag4 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 + poi + ag5 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 657.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(657.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 655.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 654.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(654.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi13, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1773063000000
+    int _t2 = 1773667799999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 689.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(689.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 683.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(683.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 681.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(681.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 679.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(679.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 676.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(676.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag2 + hoi ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag2 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag4 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 + poi + ag5 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 657.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(657.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 655.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 654.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(654.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_14() =>
     // --- Week 14: 2026-03-16 ---
-    if not na(_bi14)
-        int _x2 = f_week_x2(_bi14, _bi15)
-        if _is_spy
-            f_draw_sep_clamped(_bi14, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi14 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi14 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi14 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi14 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi14, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 694.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 678.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(678.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 673.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(673.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 672.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(672.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 674.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(674.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 670.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 665.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 655.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi14, _x2, 645.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1773667800000
+    int _t2 = 1774272599999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 694.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(694.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 678.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(678.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 673.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(673.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 672.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(672.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 674.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(674.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 655.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 645.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_15() =>
     // --- Week 15: 2026-03-23 ---
-    if not na(_bi15)
-        int _x2 = f_week_x2(_bi15, _bi16)
-        if _is_spy
-            f_draw_sep_clamped(_bi15, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi15 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi15 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi15 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi15 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi15, _x2, 679.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(679.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 670.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + p3 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 665.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p + ag2 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 660.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag + coi ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 + ag4 ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 645.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 640.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi + ag3 ($" + str.tostring(math.round(640.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 635.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(635.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 630.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(630.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi15, _x2, 625.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(625.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1774272600000
+    int _t2 = 1774877399999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 679.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(679.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + p3 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p + ag2 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag + coi ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 + ag4 ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 645.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 640.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi + ag3 ($" + str.tostring(math.round(640.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 635.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(635.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 630.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(630.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 625.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 ($" + str.tostring(math.round(625.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_16() =>
     // --- Week 16: 2026-03-30 ---
-    if not na(_bi16)
-        int _x2 = f_week_x2(_bi16, _bi17)
-        if _is_spy
-            f_draw_sep_clamped(_bi16, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi16 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi16 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi16 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi16 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi16, _x2, 670.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 663.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(663.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 660.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 655.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + coi ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 646.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(646.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 645.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag4 ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 640.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(640.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 635.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag3 ($" + str.tostring(math.round(635.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 630.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag + hoi + poi ($" + str.tostring(math.round(630.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi16, _x2, 625.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(625.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1774877400000
+    int _t2 = 1775482199999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 670.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 663.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(663.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 655.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + coi ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 646.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(646.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 645.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag4 ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 640.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(640.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 635.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag3 ($" + str.tostring(math.round(635.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 630.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag + hoi + poi ($" + str.tostring(math.round(630.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 625.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(625.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_17() =>
     // --- Week 17: 2026-04-06 ---
-    if not na(_bi17)
-        int _x2 = f_week_x2(_bi17, _bi18)
-        if _is_spy
-            f_draw_sep_clamped(_bi17, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi17 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi17 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi17 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi17 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi17, _x2, 675.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 670.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 665.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 662.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(662.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 661.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(661.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 660.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi + ag2 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 657.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(657.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 656.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(656.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 655.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 654.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag4 ($" + str.tostring(math.round(654.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 645.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 640.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 ($" + str.tostring(math.round(640.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi17, _x2, 630.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + hoi + poi ($" + str.tostring(math.round(630.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1775482200000
+    int _t2 = 1776086999999
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 675.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 662.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(662.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 661.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(661.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + coi + ag2 ($" + str.tostring(math.round(660.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 657.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(657.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 656.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(656.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 655.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag ($" + str.tostring(math.round(655.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 654.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag4 ($" + str.tostring(math.round(654.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 645.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(645.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 640.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 ($" + str.tostring(math.round(640.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 630.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + hoi + poi ($" + str.tostring(math.round(630.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_18() =>
     // --- Week 18: 2026-04-13 ---
-    if not na(_bi18)
-        int _x2 = f_week_x2(_bi18, _bi19)
-        if _is_spx
-            f_draw_sep_clamped(_bi18, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi18 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi18, _x2, 6667.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6667.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 7000.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(7000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 6900.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(6900.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 7100.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(7100.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 6800.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(6800.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 6700.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(6700.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 6755.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(6755.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_ndx
-            f_draw_sep_clamped(_bi18, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi18 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi18, _x2, 23825.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(23825.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 25900.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(25900.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 25300.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(25300.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 25700.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(25700.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 24500.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(24500.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 24800.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(24800.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 24000.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(24000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_spy
-            f_draw_sep_clamped(_bi18, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi18 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi18 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi18, _x2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi + ag3 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 680.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 678.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(678.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 677.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + ag5 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag4 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi18, _x2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "hoi + poi ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1776087000000
+    int _t2 = 1776691799999
+    if _is_spx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 6667.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6667.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7000.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(7000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 6900.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(6900.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7100.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(7100.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 6800.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(6800.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 6700.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(6700.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 6755.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(6755.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_ndx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 23825.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(23825.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 25900.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(25900.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 25300.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(25300.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 25700.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(25700.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 24500.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(24500.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 24800.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(24800.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 24000.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(24000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 695.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 ($" + str.tostring(math.round(690.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi + ag3 ($" + str.tostring(math.round(685.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag3 ($" + str.tostring(math.round(680.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 678.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(678.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 677.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 + ag ($" + str.tostring(math.round(677.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + ag2 ($" + str.tostring(math.round(675.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + ag5 ($" + str.tostring(math.round(670.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag4 ($" + str.tostring(math.round(665.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "hoi + poi ($" + str.tostring(math.round(650.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_19() =>
     // --- Week 19: 2026-04-20 ---
-    if not na(_bi19)
-        int _x2 = f_week_x2(_bi19, _bi20)
-        if _is_spx
-            f_draw_sep_clamped(_bi19, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi19 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi19, _x2, 6845.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6845.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 7200.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(7200.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 7150.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(7150.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 7050.0, C_P3, STY_P3, LW_P3, (SH_P3 or SH_AGG), (SHORT_NAME ? "p3 + agg" : "Pos p3 + Aggregate") + " " + str.tostring(math.round(7050.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 7045.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(7045.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 7040.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(7040.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 7100.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(7100.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_ndx
-            f_draw_sep_clamped(_bi19, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi19 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi19, _x2, 26380.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(26380.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 26700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(26700.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 26500.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(26500.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 26600.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(26600.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 26620.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(26620.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 26540.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(26540.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 26710.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(26710.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_spy
-            f_draw_sep_clamped(_bi19, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi19 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi19, _x2, 715.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + coi ($" + str.tostring(math.round(715.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 711.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(711.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 710.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag ($" + str.tostring(math.round(710.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 709.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + ag3 ($" + str.tostring(math.round(709.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 708.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(708.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 706.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(706.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 705.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 700.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 697.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(697.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 695.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_qqq
-            f_draw_sep_clamped(_bi19, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi19 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi19 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi19, _x2, 633.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(633.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 660.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(660.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 648.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(648.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 635.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(635.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 636.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(636.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 645.0, C_N2, STY_N2, LW_N2, (SH_N2 or SH_AGG), (SHORT_NAME ? "n2 + agg" : "Neg n2 + Aggregate") + " " + str.tostring(math.round(645.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi19, _x2, 640.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(640.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1776691800000
+    int _t2 = 1777296599999
+    if _is_spx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 6845.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6845.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7200.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(7200.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7150.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(7150.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7050.0, C_P3, STY_P3, LW_P3, (SH_P3 or SH_AGG), (SHORT_NAME ? "p3 + agg" : "Pos p3 + Aggregate") + " " + str.tostring(math.round(7050.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7045.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(7045.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7040.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(7040.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7100.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(7100.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_ndx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 26380.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(26380.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26700.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(26700.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26500.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(26500.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26600.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(26600.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26620.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(26620.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26540.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(26540.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26710.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(26710.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 715.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 + coi ($" + str.tostring(math.round(715.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 711.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(711.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 710.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 + ag ($" + str.tostring(math.round(710.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 709.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n3 + ag3 ($" + str.tostring(math.round(709.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 708.0, C_AGG, STY_AGG, LW_AGG, SH_AGG, "ag2 ($" + str.tostring(math.round(708.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 706.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip ($" + str.tostring(math.round(706.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 705.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(705.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n1 + hoi + poi ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 697.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(697.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 695.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(695.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_qqq
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 633.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(633.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 660.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(660.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 648.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(648.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 635.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(635.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 636.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(636.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 645.0, C_N2, STY_N2, LW_N2, (SH_N2 or SH_AGG), (SHORT_NAME ? "n2 + agg" : "Neg n2 + Aggregate") + " " + str.tostring(math.round(645.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 640.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(640.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 f_draw_week_20() =>
     // --- Week 20: 2026-04-27 ---
-    if not na(_bi20)
-        int _x2 = f_week_x2(_bi20, int(na))
-        if _is_spx
-            f_draw_sep_clamped(_bi20, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi20 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi20, _x2, 6885.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6885.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 7200.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(7200.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 7100.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(7100.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 7300.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(7300.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 6950.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(6950.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 7080.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(7080.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 6985.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(6985.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 7000.0, C_AGG, STY_AGG, LW_AGG, (SH_AGG), (SHORT_NAME ? "agg" : "Aggregate") + " " + str.tostring(math.round(7000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_ndx
-            f_draw_sep_clamped(_bi20, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi20 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi20, _x2, 27850.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(27850.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 27400.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(27400.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 27300.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(27300.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 27500.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(27500.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 26780.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(26780.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 26860.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(26860.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 26830.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(26830.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_qqq
-            f_draw_sep_clamped(_bi20, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi20 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi20, _x2, 643.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP or SH_N1), (SHORT_NAME ? "g-flip + n1" : "Gamma Flip + Neg n1") + " " + str.tostring(math.round(643.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 665.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(665.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 645.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(645.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 675.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(675.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 639.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(639.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 640.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(640.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 650.0, C_AGG, STY_AGG, LW_AGG, (SH_AGG), (SHORT_NAME ? "agg" : "Aggregate") + " " + str.tostring(math.round(650.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-        if _is_iwm
-            f_draw_sep_clamped(_bi20, _x2, C_SEP_W, STY_SEP_W, LW_SEP_W)
-            f_draw_sep_clamped(_bi20 + D, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 2, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 3, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_sep_clamped(_bi20 + D * 4, _x2, C_SEP_D, STY_SEP_D, LW_SEP_D)
-            f_draw_level(_bi20, _x2, 277.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP or SH_P2), (SHORT_NAME ? "g-flip + p2" : "Gamma Flip + Pos p2") + " " + str.tostring(math.round(277.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 280.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(280.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 278.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(278.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 270.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(270.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 275.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(275.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
-            f_draw_level(_bi20, _x2, 268.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(268.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    int _t1 = 1777296600000
+    int _t2 = 1777901399999
+    if _is_spx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 6885.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6885.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7200.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(7200.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7100.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(7100.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7300.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(7300.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 6950.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(6950.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7080.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(7080.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 6985.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(6985.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7000.0, C_AGG, STY_AGG, LW_AGG, (SH_AGG), (SHORT_NAME ? "agg" : "Aggregate") + " " + str.tostring(math.round(7000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_ndx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 27850.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(27850.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27400.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(27400.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27300.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(27300.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27500.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(27500.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26780.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(26780.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26860.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(26860.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 26830.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(26830.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_spy
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 725.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(725.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 723.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p ($" + str.tostring(math.round(723.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 720.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "coi ($" + str.tostring(math.round(720.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 716.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p2 ($" + str.tostring(math.round(716.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 715.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p1 ($" + str.tostring(math.round(715.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 714.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "p3 + ag3 ($" + str.tostring(math.round(714.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 713.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag2 ($" + str.tostring(math.round(713.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 712.0, C_GFLIP, STY_GFLIP, LW_GFLIP, SH_GFLIP, "g flip + n + ag ($" + str.tostring(math.round(712.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 711.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n + ag4 ($" + str.tostring(math.round(711.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 710.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_P2 or SH_P3), "pos gex isld ($" + str.tostring(math.round(710.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 709.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(709.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 706.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n ($" + str.tostring(math.round(706.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n4 ($" + str.tostring(math.round(700.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 699.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_N2 or SH_N3), "n2 ($" + str.tostring(math.round(699.0)) + ")" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_qqq
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 643.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP or SH_N1), (SHORT_NAME ? "g-flip + n1" : "Gamma Flip + Neg n1") + " " + str.tostring(math.round(643.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 665.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(665.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 645.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(645.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(675.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 639.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(639.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 640.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(640.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 650.0, C_AGG, STY_AGG, LW_AGG, (SH_AGG), (SHORT_NAME ? "agg" : "Aggregate") + " " + str.tostring(math.round(650.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_iwm
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 277.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP or SH_P2), (SHORT_NAME ? "g-flip + p2" : "Gamma Flip + Pos p2") + " " + str.tostring(math.round(277.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 280.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(280.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 278.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(278.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 270.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(270.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 275.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(275.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 268.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(268.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+
+f_draw_week_21() =>
+    // --- Week 21: 2026-05-04 ---
+    int _t1 = 1777901400000
+    int _t2 = 1778506199999
+    if _is_spx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 6945.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(6945.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7350.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(7350.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7240.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(7240.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7200.0, C_P3, STY_P3, LW_P3, (SH_P3 or SH_AGG), (SHORT_NAME ? "p3 + agg" : "Pos p3 + Aggregate") + " " + str.tostring(math.round(7200.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7000.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(7000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7095.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(7095.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7050.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(7050.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_ndx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 28090.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(28090.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 28000.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(28000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27300.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(27300.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27400.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(27400.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27190.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(27190.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27910.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(27910.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27320.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(27320.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_qqq
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 655.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(655.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 675.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(675.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 670.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(670.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 680.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(680.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 654.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(654.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 653.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(653.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 661.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(661.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_iwm
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 280.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP or SH_P2), (SHORT_NAME ? "g-flip + p2" : "Gamma Flip + Pos p2") + " " + str.tostring(math.round(280.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 285.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(285.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 287.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(287.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 266.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_AGG), (SHORT_NAME ? "n1 + agg" : "Neg n1 + Aggregate") + " " + str.tostring(math.round(266.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 270.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(270.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 269.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(269.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
 if barstate.islast and _valid
     f_redraw_all()
@@ -774,3 +784,4 @@ if barstate.islast and _valid
     f_draw_week_18()
     f_draw_week_19()
     f_draw_week_20()
+    f_draw_week_21()

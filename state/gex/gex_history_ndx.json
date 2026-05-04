@@ -107,5 +107,41 @@
       27400
     ],
     "source_file": "$IUXX-gamma-levels-exp-20260501-weekly.csv"
+  },
+  {
+    "week": "2026-05-04",
+    "ticker": "NDX",
+    "expiry": "2026-05-08",
+    "gflip": 28090,
+    "pos": [
+      28000,
+      27300,
+      27400
+    ],
+    "neg": [
+      27190,
+      27910,
+      27320
+    ],
+    "coi": [
+      28000,
+      27100
+    ],
+    "poi": [
+      27200,
+      27100
+    ],
+    "agg": 28000,
+    "pos_zone": null,
+    "neg_zone": null,
+    "conf": [
+      27100,
+      27190,
+      27200,
+      27300,
+      27320,
+      28000
+    ],
+    "source_file": "$IUXX-gamma-levels-exp-20260508-weekly.csv"
   }
 ]

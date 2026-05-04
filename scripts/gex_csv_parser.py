@@ -177,48 +177,43 @@ SH_N3    = input.bool(true, "Neg GEX n3", group=_GSL)
 SH_AGG   = input.bool(true, "Aggregate",  group=_GSL)
 
 // --- CONSTANTS ------------------------------------------------------
-// D = bars per trading day; W = Monday open -> Friday close span — auto-adapted to any timeframe
-// US equity session: 9:30-16:00 = 390 minutes
-int D = timeframe.isintraday ? math.max(1, math.round(390.0 / (timeframe.in_seconds() / 60.0))) : 1
-int W = D * 5 - 1
+// All horizontal x-coordinates are UNIX timestamps in ms (xloc.bar_time).
+// Drawings are session-agnostic: identical behavior in RTH/ETH and across
+// holidays. The Python generator encodes each Monday's open in ET (DST-aware)
+// and uses the next Monday's open as the week-end boundary, so 4-day holiday
+// weeks terminate naturally at next Monday's pre-open.
+int DAY_MS = 86400000
 string _update_date = "{generated_date}"
-
-f_week_x2(int bi, int next_bi) =>
-    na(bi) ? na : na(next_bi) ? bi + W : math.max(bi, next_bi - 1)
 
 // --- HELPERS --------------------------------------------------------
 f_style(s) =>
     s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
 
-f_lbl_x(x1, x2, lpos, loff) =>
-    lpos == "Left" ? x1 + loff : lpos == "Center" ? x1 + math.floor((x2 - x1) / 2) + loff : x2 + loff
-
 f_lbl_size(s) =>
     s == "Tiny" ? size.tiny : s == "Large" ? size.large : s == "Normal" ? size.normal : size.small
 
-// True on the first bar of a given Monday (by timestamp)
-is_week_start(ts) => time >= ts and (na(time[1]) or time[1] < ts)
+// Convert LBL_OFFSET (in bars) to a ms delta at the active timeframe.
+f_off_ms() =>
+    int sec = timeframe.in_seconds()
+    int s   = sec > 0 ? sec : 60
+    s * 1000 * LBL_OFFSET
 
-// --- MONDAY BAR INDEX DETECTION (auto-generated) --------------------
-{bi_vars}
-
-{bi_detections}
+f_lbl_t(t1, t2, lpos) =>
+    int off = f_off_ms()
+    lpos == "Left" ? t1 + off : lpos == "Center" ? t1 + (t2 - t1) / 2 + off : t2 + off
 
 // --- GLOBAL LINE / LABEL STORAGE ------------------------------------
 var line[]  _lines  = array.new_line()
 var label[] _labels = array.new_label()
 
-f_draw_sep(x, clr, sty, lw) =>
-    array.push(_lines, line.new(x, 0.0, x, 1.0, xloc=xloc.bar_index, color=clr, style=f_style(sty), width=lw, extend=extend.both))
+f_draw_sep(ts, clr, sty, lw) =>
+    array.push(_lines, line.new(ts, 0.0, ts, 1.0, xloc=xloc.bar_time, color=clr, style=f_style(sty), width=lw, extend=extend.both))
 
-f_draw_sep_clamped(x, x2, clr, sty, lw) =>
-    if not na(x2) and x <= x2
-        f_draw_sep(x, clr, sty, lw)
-
-f_draw_level(x1, x2, price, clr, sty, lw, show, lbl) =>
-    if show and not na(price) and not na(x2) and x2 >= x1
-        array.push(_lines, line.new(x1, price, x2, price, color=clr, style=f_style(sty), width=lw))
-        array.push(_labels, label.new(f_lbl_x(x1, x2, LBL_POS, LBL_OFFSET), price, lbl, color=color.new(color.black, 100), textcolor=clr, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
+f_draw_level(t1, t2, price, clr, sty, lw, show, lbl) =>
+    if show and not na(price)
+        int _lt = f_lbl_t(t1, t2, LBL_POS)
+        array.push(_lines,  line.new(t1, price, t2, price, xloc=xloc.bar_time, color=clr, style=f_style(sty), width=lw))
+        array.push(_labels, label.new(_lt, price, lbl, xloc=xloc.bar_time, color=color.new(color.black, 100), textcolor=clr, style=label.style_none, size=f_lbl_size(LBL_SIZE)))
 
 // --- REDRAW ON LAST BAR (delete all → redraw with current inputs) ---
 f_redraw_all() =>
@@ -535,8 +530,6 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
     all_weeks = sorted(set(e["week"] for entries in histories.values() for e in entries))
     by_week   = {t: {e["week"]: e for e in histories.get(t, [])} for t in tickers}
 
-    bi_vars_lines       = []
-    bi_detections_lines = []
     draw_functions      = []
     draw_calls          = []
 
@@ -545,18 +538,19 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
         entries    = {t: by_week[t].get(week_date) for t in tickers}
         confs      = {t: (entries[t].get("conf", []) if entries[t] else []) for t in tickers}
 
-        bi_vars_lines.append(f"var int _bi{i} = na")
-        bi_detections_lines.append(
-            f"if is_week_start({mon_ts}) and _valid\n    _bi{i} := bar_index"
-        )
-
-        next_bi = f"_bi{i + 1}" if i + 1 < len(all_weeks) else "int(na)"
-        x2_expr = f"f_week_x2(_bi{i}, {next_bi})"
+        # Week boundary: next week's Monday open - 1ms (handles holiday weeks
+        # naturally — a 4-day week ends where the next Monday starts).
+        # For the most recent week (no next entry yet), project ~7 calendar days
+        # forward; TradingView clips the line to its forward-projection limit.
+        if i + 1 < len(all_weeks):
+            end_ts = monday_ts_ms(all_weeks[i + 1]) - 1
+        else:
+            end_ts = mon_ts + 7 * 86400000 - 1
 
         block = [
             f"    // --- Week {i}: {week_date} ---",
-            f"    if not na(_bi{i})",
-            f"        int _x2 = {x2_expr}",
+            f"    int _t1 = {mon_ts}",
+            f"    int _t2 = {end_ts}",
         ]
 
         # Per-ticker GEX levels — merged independently per ticker
@@ -567,15 +561,15 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
 
             manual_levels = entry.get("manual_levels", []) if entry else []
             if manual_levels:
-                block.append(f"        if _is_{tl}")
+                block.append(f"    if _is_{tl}")
                 for offset, clr, sty, lw in [
-                    (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
-                    (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-                    (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-                    (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-                    (f"_bi{i} + D * 4", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    ("_t1",              "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
+                    ("_t1 + DAY_MS",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    ("_t1 + DAY_MS * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    ("_t1 + DAY_MS * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                    ("_t1 + DAY_MS * 4", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
                 ]:
-                    block.append(f"            f_draw_sep_clamped({offset}, _x2, {clr}, {sty}, {lw})")
+                    block.append(f"        f_draw_sep({offset}, {clr}, {sty}, {lw})")
 
                 for j, level in enumerate(manual_levels):
                     price = level.get("price")
@@ -592,7 +586,7 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
                     )
 
                     block.append(
-                        f"            f_draw_level(_bi{i}, _x2, {pval}, {clr}, {sty}, {lw}, {show_expr}, {lbl_expr})"
+                        f"        f_draw_level(_t1, _t2, {pval}, {clr}, {sty}, {lw}, {show_expr}, {lbl_expr})"
                     )
                 continue
 
@@ -622,15 +616,15 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
                     merged[idx][2] += f" + {full_lbl}"
                     merged[idx][6].append(show_var)
 
-            block.append(f"        if _is_{tl}")
+            block.append(f"    if _is_{tl}")
             for offset, clr, sty, lw in [
-                (f"_bi{i}",         "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
-                (f"_bi{i} + D",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-                (f"_bi{i} + D * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-                (f"_bi{i} + D * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
-                (f"_bi{i} + D * 4", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                ("_t1",              "C_SEP_W", "STY_SEP_W", "LW_SEP_W"),
+                ("_t1 + DAY_MS",     "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                ("_t1 + DAY_MS * 2", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                ("_t1 + DAY_MS * 3", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
+                ("_t1 + DAY_MS * 4", "C_SEP_D", "STY_SEP_D", "LW_SEP_D"),
             ]:
-                block.append(f"            f_draw_sep_clamped({offset}, _x2, {clr}, {sty}, {lw})")
+                block.append(f"        f_draw_sep({offset}, {clr}, {sty}, {lw})")
 
             for j, (price, short_lbl, full_lbl, clr, sty, lw, show_vars) in enumerate(merged):
                 pval      = _pf(price)
@@ -644,7 +638,7 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
                 )
 
                 block.append(
-                    f"            f_draw_level(_bi{i}, _x2, {pval}, {clr}, {sty}, {lw}, ({show_expr}), {lbl_expr})"
+                    f"        f_draw_level(_t1, _t2, {pval}, {clr}, {sty}, {lw}, ({show_expr}), {lbl_expr})"
                 )
 
         draw_functions.append(f"f_draw_week_{i}() =>\n" + "\n".join(block))
@@ -654,8 +648,6 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
         generated_date   = date.today().strftime("%Y-%m-%d"),
         total_weeks      = len(all_weeks),
         ticker_detection = _build_ticker_detection(),
-        bi_vars          = "\n".join(bi_vars_lines),
-        bi_detections    = "\n".join(bi_detections_lines),
         draw_week_functions = "\n\n".join(draw_functions),
         draw_week_calls     = "\n".join(draw_calls),
     )
