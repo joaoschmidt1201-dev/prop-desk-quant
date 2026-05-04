@@ -21,7 +21,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -78,6 +78,56 @@ def _parse_money(val) -> float | None:
         return float(s)
     except ValueError:
         return None
+
+
+def _parse_sheet_date(val) -> date | None:
+    """Coerce Excel/Sheets date cells, formatted strings, or serials to date."""
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    if isinstance(val, (int, float)) and not isinstance(val, bool):
+        if 20000 <= float(val) <= 80000:
+            return (datetime(1899, 12, 30) + timedelta(days=float(val))).date()
+        return None
+    if isinstance(val, str):
+        s = val.strip()
+        if not s:
+            return None
+        dot_match = re.match(r"^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$", s)
+        if dot_match:
+            day = int(dot_match.group(1))
+            month = int(dot_match.group(2))
+            year_raw = dot_match.group(3)
+            year = int(year_raw) if year_raw else date.today().year
+            if year < 100:
+                year += 2000
+            try:
+                return date(year, month, day)
+            except ValueError:
+                return None
+        parsed = pd.to_datetime(s, errors="coerce", dayfirst=True)
+        if pd.notna(parsed):
+            return parsed.date()
+    return None
+
+
+def _looks_like_date_label(val) -> bool:
+    if isinstance(val, (datetime, date)):
+        return True
+    if not isinstance(val, str):
+        return False
+    s = val.strip()
+    return bool(re.match(r"^\d{1,4}[./-]\d{1,2}(?:[./-]\d{1,4})?$", s))
+
+
+def _coerce_date_series(values) -> pd.Series:
+    index = values.index if hasattr(values, "index") else None
+    return pd.to_datetime(
+        pd.Series(values, index=index).map(lambda v: _parse_sheet_date(v) or v),
+        errors="coerce",
+        dayfirst=True,
+    )
 
 
 VISUAL_SHEETS = ["APR26", "MAR26", "JS APR26", "JS-FOR MAR26", "FOR Trades"]
@@ -162,6 +212,66 @@ def can_run_browser_oauth() -> bool:
     return sys.stdin.isatty()
 
 
+def _quote_sheet_title(title: str) -> str:
+    return "'" + title.replace("'", "''") + "'"
+
+
+def _sheet_values_range(title: str) -> str:
+    return f"{_quote_sheet_title(title)}!A:ZZ"
+
+
+def _write_values_workbook(value_ranges: list[dict], output_path: Path) -> None:
+    wb = openpyxl.Workbook()
+    default = wb.active
+    wb.remove(default)
+
+    for value_range in value_ranges:
+        range_name = str(value_range.get("range") or "")
+        title = range_name.split("!", 1)[0].strip("'").replace("''", "'")
+        ws = wb.create_sheet(title[:31])
+        for row_values in value_range.get("values") or []:
+            ws.append(row_values)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(output_path)
+
+
+def download_sheet_values(file_id: str, output_path: Path, creds) -> bool:
+    """Fallback for Google Sheets that exceed the Drive XLSX export limit."""
+    from googleapiclient.discovery import build
+
+    sheets = build("sheets", "v4", credentials=creds)
+    meta = sheets.spreadsheets().get(
+        spreadsheetId=file_id,
+        fields="sheets(properties(title))",
+        includeGridData=False,
+    ).execute()
+    titles = [
+        item["properties"]["title"]
+        for item in meta.get("sheets", [])
+        if item.get("properties", {}).get("title")
+    ]
+    needed = [
+        title
+        for title in titles
+        if title in {"db_robots", "db_cria"} or MONTH_SHEET_REGEX.match(title) or title in VISUAL_SHEETS
+    ]
+    if not needed:
+        print("[!] Sheets API fallback nao encontrou abas necessarias.")
+        return False
+
+    print(f"[export] Sheets API fallback: lendo {len(needed)} abas ({', '.join(needed)})")
+    value_ranges = sheets.spreadsheets().values().batchGet(
+        spreadsheetId=file_id,
+        ranges=[_sheet_values_range(title) for title in needed],
+        valueRenderOption="UNFORMATTED_VALUE",
+        dateTimeRenderOption="FORMATTED_STRING",
+        majorDimension="ROWS",
+    ).execute().get("valueRanges", [])
+    _write_values_workbook(value_ranges, output_path)
+    return True
+
+
 def download_from_gdrive(file_id: str, output_path: Path) -> bool:
     """
     Baixa o Google Sheet como XLSX via Drive API (OAuth2).
@@ -179,33 +289,58 @@ def download_from_gdrive(file_id: str, output_path: Path) -> bool:
         return False
     try:
         from google.auth.transport.requests import Request
+        from google.auth.exceptions import RefreshError
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
         from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError
 
         creds = None
         if GDRIVE_TOKEN.exists():
             creds = Credentials.from_authorized_user_file(str(GDRIVE_TOKEN), GDRIVE_SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    creds.refresh(Request())
+                except RefreshError as e:
+                    if not can_run_browser_oauth():
+                        print(f"[!] Google Drive token expirado/revogado em ambiente non-interactive: {e}")
+                        print("    Recrie GDRIVE_TOKEN_JSON e atualize o secret no Render.")
+                        return False
+                    print(f"[!] Google Drive token expirado/revogado; abrindo OAuth local: {e}")
+                    creds = None
             else:
+                creds = None
+
+            if not creds:
                 if not can_run_browser_oauth():
                     print("[!] Google Drive token ausente/invalido em ambiente non-interactive.")
                     print("    Configure GDRIVE_CREDENTIALS_JSON e GDRIVE_TOKEN_JSON no Render.")
                     return False
                 flow = InstalledAppFlow.from_client_secrets_file(str(GDRIVE_CREDS), GDRIVE_SCOPES)
                 creds = flow.run_local_server(port=0)
+
             GDRIVE_TOKEN.parent.mkdir(parents=True, exist_ok=True)
             GDRIVE_TOKEN.write_text(creds.to_json())
 
         service = build("drive", "v3", credentials=creds)
-        content = service.files().export_media(
-            fileId=file_id,
-            mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ).execute()
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_bytes(content)
+        try:
+            content = service.files().export_media(
+                fileId=file_id,
+                mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ).execute()
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(content)
+        except HttpError as e:
+            reason = ""
+            try:
+                reason = (e.error_details or [{}])[0].get("reason", "")
+            except Exception:
+                reason = ""
+            if reason != "exportSizeLimitExceeded":
+                raise
+            print("[!] Drive export bloqueado por tamanho; usando Sheets API fallback.")
+            return download_sheet_values(file_id, output_path, creds)
         return True
     except Exception as e:
         print(f"[!] Google Drive download falhou: {e}")
@@ -292,11 +427,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
         return isinstance(v, (int, float)) and not isinstance(v, bool)
 
     def as_date(v) -> date | None:
-        if isinstance(v, datetime):
-            return v.date()
-        if isinstance(v, date):
-            return v
-        return None
+        return _parse_sheet_date(v)
 
     def as_date_str(v) -> str | None:
         d = as_date(v)
@@ -484,7 +615,7 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
                 status_row = all_rows.get(candidate_r - 1, ())
                 score = 0
                 for ci, val in enumerate(row_data):
-                    if val is None or isinstance(val, (datetime, date)):
+                    if val is None or _looks_like_date_label(val):
                         continue
                     s = str(val).strip()
                     if not s or s.lower() in SKIP_LABELS or s.startswith("http"):
@@ -518,8 +649,8 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
         for ci, val in enumerate(name_row):
             if val is None:
                 continue
-            # Skip date/datetime objects returned by openpyxl for date cells
-            if isinstance(val, (datetime, date)):
+            # Skip date labels returned by openpyxl or the Sheets API fallback.
+            if _looks_like_date_label(val):
                 continue
             s = str(val).strip()
             if not s or s.lower() in SKIP_LABELS or s.startswith("http"):
@@ -697,7 +828,7 @@ def load_db_robots(xlsx_path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["date"] = _coerce_date_series(df["date"])
     df.dropna(subset=["date"], inplace=True)
     df["env_norm"] = df["environment"].map(lambda e: normalize_env(e))
     df.sort_values("date", inplace=True)
@@ -739,8 +870,8 @@ def load_db_cria(xlsx_path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    df["scraped_date"] = pd.to_datetime(df["scraped_date"], errors="coerce")
-    df["open_date"]    = pd.to_datetime(df["open_date"], errors="coerce")
+    df["scraped_date"] = _coerce_date_series(df["scraped_date"])
+    df["open_date"]    = _coerce_date_series(df["open_date"])
     df.dropna(subset=["trade_name"], inplace=True)
     df.sort_values("scraped_date", inplace=True)
     # Keep last entry per trade_name (most recent scrape wins)
