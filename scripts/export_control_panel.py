@@ -191,7 +191,7 @@ def iter_visual_sheet_names(wb) -> list[str]:
 
 def _write_json_env_to_file(env_name: str, path: Path) -> None:
     raw = os.environ.get(env_name, "").strip()
-    if not raw or path.exists():
+    if not raw:
         return
     parsed = json.loads(raw)
     path.parent.mkdir(parents=True, exist_ok=True)
