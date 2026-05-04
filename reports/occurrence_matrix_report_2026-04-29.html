@@ -1,0 +1,1746 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Occurrence Matrix Report - 2026-04-29</title>
+  <style>
+
+@page {
+  size: A4;
+  margin: 14mm 12mm 14mm 12mm;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #1a1f2e;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.35;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+header {
+  border-top: 3px solid #c89e3a;
+  padding: 12px 0 14px 0;
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0 0 8px 0;
+  color: #0d1f3c;
+  font-size: 22pt;
+  line-height: 1.05;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.subtitle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 18px;
+  margin: 8px 0 12px 0;
+  color: #5a6378;
+}
+
+.meta-item strong {
+  color: #1a1f2e;
+  font-weight: 650;
+}
+
+.read-box {
+  background: #f6f7fb;
+  border-left: 3px solid #0d1f3c;
+  padding: 10px 14px;
+  color: #1a1f2e;
+}
+
+.read-box h2 {
+  border: 0;
+  margin: 0 0 5px 0;
+  padding: 0;
+}
+
+.read-box ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.read-box li {
+  margin: 2px 0;
+}
+
+h2 {
+  margin: 17px 0 7px 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #0d1f3c;
+  color: #0d1f3c;
+  font-size: 13pt;
+  line-height: 1.2;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+h3 {
+  margin: 9px 0 5px 0;
+  color: #3d465a;
+  font-size: 11pt;
+  line-height: 1.2;
+  font-weight: 680;
+  letter-spacing: 0;
+}
+
+.matrix-section {
+  margin-bottom: 10px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d6dae3;
+  margin: 0 0 7px 0;
+  table-layout: fixed;
+}
+
+th,
+td {
+  border: 1px solid #e7eaf0;
+  padding: 5px 7px;
+  vertical-align: middle;
+  font-size: 9pt;
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  background: #0d1f3c;
+  color: #ffffff;
+  font-weight: 650;
+  text-align: center;
+}
+
+tr {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.ticker {
+  width: 11%;
+  color: #0d1f3c;
+  font-weight: 760;
+  text-align: left;
+}
+
+.summary-table th,
+.summary-table td {
+  text-align: center;
+}
+
+.summary-table .ticker,
+.detail-table .ticker {
+  text-align: left;
+}
+
+.ma-cell {
+  font-weight: 640;
+}
+
+.sample {
+  font-weight: 460;
+  white-space: nowrap;
+}
+
+.low-confidence {
+  opacity: 0.55;
+}
+
+.heat-0 {
+  background: #fde2e2;
+  color: #7a1f1f;
+}
+
+.heat-1 {
+  background: #fdedd2;
+  color: #6e4d18;
+}
+
+.heat-2 {
+  background: #fff8d6;
+  color: #5d5418;
+}
+
+.heat-3 {
+  background: #e1f1d6;
+  color: #345417;
+}
+
+.heat-4 {
+  background: #bfe5b0;
+  color: #1f4012;
+}
+
+.heat-5 {
+  background: #94d27a;
+  color: #143008;
+}
+
+.no-data {
+  background: #f0f0f0;
+  color: #9aa0a6;
+  font-weight: 560;
+}
+
+.best-cell {
+  background: #0d1f3c;
+  color: #ffffff;
+  font-weight: 520;
+  text-align: center;
+}
+
+.best-cell strong {
+  font-weight: 800;
+}
+
+.best-cell span {
+  font-weight: 450;
+  color: #dbe4f4;
+}
+
+.best-cell.no-best {
+  color: #dbe4f4;
+}
+
+.detail-table tbody tr:nth-child(even) {
+  background: #fafbfd;
+}
+
+.detail-table td {
+  text-align: center;
+  color: #2c3446;
+}
+
+.detail-b,
+.detail-bk,
+.detail-f {
+  font-weight: 650;
+}
+
+.notes {
+  margin-top: 16px;
+  color: #343c50;
+}
+
+.notes ul {
+  margin: 5px 0 0 0;
+  padding-left: 16px;
+}
+
+.exec-summary {
+  margin: 4px 0 18px 0;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.exec-summary h2 {
+  margin-top: 0;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 8px 0 12px 0;
+}
+
+.kpi {
+  background: linear-gradient(135deg, #0d1f3c 0%, #1c3461 100%);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.kpi-value {
+  font-size: 18pt;
+  font-weight: 760;
+  line-height: 1.05;
+  color: #f3c969;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-label {
+  font-size: 8pt;
+  font-weight: 520;
+  letter-spacing: 0.3pt;
+  text-transform: uppercase;
+  color: #c9d4ec;
+  margin-top: 3px;
+}
+
+.exec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.exec-col h3 {
+  margin: 0 0 4px 0;
+  color: #0d1f3c;
+}
+
+.exec-caption {
+  margin: 0 0 6px 0;
+  font-size: 8.5pt;
+  color: #5a6378;
+}
+
+.leaderboard {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #d6dae3;
+}
+
+.leaderboard th {
+  background: #0d1f3c;
+  color: #ffffff;
+  padding: 5px 6px;
+  font-size: 8.5pt;
+  font-weight: 650;
+}
+
+.leaderboard td {
+  padding: 5px 7px;
+  font-size: 9pt;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #e7eaf0;
+}
+
+.leaderboard td.rank {
+  width: 7%;
+  text-align: center;
+  color: #7a8396;
+  font-weight: 700;
+}
+
+.leaderboard td.ticker {
+  width: 22%;
+  color: #0d1f3c;
+  font-weight: 720;
+}
+
+.leaderboard td.tf-cell {
+  width: 8%;
+  text-align: center;
+  font-weight: 620;
+  color: #3d465a;
+}
+
+.leaderboard td.hl {
+  width: 18%;
+  text-align: center;
+  background: #fff8d6;
+  color: #5d3d0a;
+  font-weight: 800;
+}
+
+.leaderboard td.sample {
+  width: 15%;
+  text-align: center;
+  color: #5a6378;
+  font-weight: 480;
+}
+
+.footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #d6dae3;
+  color: #7a8396;
+  font-size: 8pt;
+}
+
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Occurrence Matrix Report</h1>
+    <div class="subtitle-grid">
+      <div class="meta-item"><strong>Report date:</strong> 2026-04-29</div>
+      <div class="meta-item"><strong>Snapshots:</strong> Daily 2026-04-29 &nbsp;·&nbsp; Weekly 2026-04-27</div>
+      <div class="meta-item"><strong>Universe:</strong> 29 tickers across 5 categories</div>
+      <div class="meta-item"><strong>Parameters:</strong> Zone Tolerance 0.1% &nbsp;·&nbsp; Lookahead 2 candles &nbsp;·&nbsp; Min sample 20</div>
+      <div class="meta-item"><strong>MAs evaluated:</strong> EMA 9, EMA 20, SMA 50, SMA 200, VWAP</div>
+    </div>
+    <div class="read-box">
+      <h2>How to Read</h2>
+      <ul>
+        <li><strong>Bounce%</strong> = % of events where the close returned to the original side (mean reversion).</li>
+        <li><strong>Break%</strong> = % of events where the close persisted on the opposite side for 2 candles.</li>
+        <li><strong>False%</strong> = % of events with an intra-bar violation that reverted to the original side.</li>
+        <li><strong>Best</strong> = MA with the highest Bounce% in the row, only with n ≥ 20. Low-sample cells are dimmed.</li>
+      </ul>
+    </div>
+  </header>
+
+  <main>
+    
+<section class="exec-summary">
+  <h2>Executive Summary</h2>
+  <div class="kpi-row">
+    <div class="kpi"><span class="kpi-value">32%</span><span class="kpi-label">Avg Bounce% — Daily</span></div>
+    <div class="kpi"><span class="kpi-value">31%</span><span class="kpi-label">Avg Bounce% — Weekly</span></div>
+    <div class="kpi"><span class="kpi-value">47,486</span><span class="kpi-label">Daily events analyzed</span></div>
+    <div class="kpi"><span class="kpi-value">9,102</span><span class="kpi-label">Weekly events analyzed</span></div>
+  </div>
+  <div class="exec-grid">
+    <div class="exec-col">
+      <h3>Top 5 Mean-Reversion Setups</h3>
+      <p class="exec-caption">Highest Bounce% across the desk universe (n ≥ 20).</p>
+      <table class="leaderboard"><thead><tr><th>#</th><th>Ticker</th><th>MA</th><th>TF</th><th>Bounce%</th><th>Events</th></tr></thead><tbody><tr><td class="rank">1</td><td class="ticker">EURCHF</td><td>EMA 9</td><td class="tf-cell">D</td><td class="hl">65%</td><td class="sample">n=615</td></tr><tr><td class="rank">2</td><td class="ticker">EURCHF</td><td>EMA 20</td><td class="tf-cell">D</td><td class="hl">62%</td><td class="sample">n=426</td></tr><tr><td class="rank">3</td><td class="ticker">EURCHF</td><td>SMA 50</td><td class="tf-cell">D</td><td class="hl">60%</td><td class="sample">n=223</td></tr><tr><td class="rank">4</td><td class="ticker">EURCHF</td><td>VWAP</td><td class="tf-cell">D</td><td class="hl">59%</td><td class="sample">n=712</td></tr><tr><td class="rank">5</td><td class="ticker">EURCHF</td><td>SMA 200</td><td class="tf-cell">D</td><td class="hl">59%</td><td class="sample">n=91</td></tr></tbody></table>
+    </div>
+    <div class="exec-col">
+      <h3>Top 5 Breakout / Trending Setups</h3>
+      <p class="exec-caption">Highest Break% — strongest follow-through after the touch.</p>
+      <table class="leaderboard"><thead><tr><th>#</th><th>Ticker</th><th>MA</th><th>TF</th><th>Break%</th><th>Events</th></tr></thead><tbody><tr><td class="rank">1</td><td class="ticker">ETH</td><td>SMA 50</td><td class="tf-cell">W</td><td class="hl">71%</td><td class="sample">n=31</td></tr><tr><td class="rank">2</td><td class="ticker">GOOGL</td><td>SMA 50</td><td class="tf-cell">D</td><td class="hl">67%</td><td class="sample">n=123</td></tr><tr><td class="rank">3</td><td class="ticker">RUT</td><td>SMA 200</td><td class="tf-cell">W</td><td class="hl">67%</td><td class="sample">n=24</td></tr><tr><td class="rank">4</td><td class="ticker">TSLA</td><td>SMA 200</td><td class="tf-cell">W</td><td class="hl">67%</td><td class="sample">n=21</td></tr><tr><td class="rank">5</td><td class="ticker">RTY</td><td>SMA 50</td><td class="tf-cell">W</td><td class="hl">65%</td><td class="sample">n=31</td></tr></tbody></table>
+    </div>
+  </div>
+</section>
+
+
+    <h2>Summary - Bounce%</h2>
+    <h2>Indices/Futures</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">ES</td>
+<td class="ma-cell heat-2"><span class="pct">42%</span> <span class="sample">(n=463)</span></td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=281)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=143)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=64)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=692)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>42%</span></td>
+</tr>
+<tr>
+<td class="ticker">SPX</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=409)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=247)</span></td>
+<td class="ma-cell heat-0"><span class="pct">24%</span> <span class="sample">(n=124)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=55)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=693)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">SPY</td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=409)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=248)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=126)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=55)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=692)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>35%</span></td>
+</tr>
+<tr>
+<td class="ticker">XSP</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=409)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=247)</span></td>
+<td class="ma-cell heat-0"><span class="pct">24%</span> <span class="sample">(n=124)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=55)</span></td>
+<td class="ma-cell no-data">—</td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">NQ</td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=447)</span></td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=271)</span></td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=138)</span></td>
+<td class="ma-cell heat-2"><span class="pct">42%</span> <span class="sample">(n=43)</span></td>
+<td class="ma-cell heat-0"><span class="pct">22%</span> <span class="sample">(n=691)</span></td>
+<td class="best-cell"><strong>SMA 200</strong> <span>42%</span></td>
+</tr>
+<tr>
+<td class="ticker">NDX</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=387)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=241)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=125)</span></td>
+<td class="ma-cell heat-2"><span class="pct">43%</span> <span class="sample">(n=37)</span></td>
+<td class="ma-cell heat-0"><span class="pct">24%</span> <span class="sample">(n=691)</span></td>
+<td class="best-cell"><strong>SMA 200</strong> <span>43%</span></td>
+</tr>
+<tr>
+<td class="ticker">QQQ</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=397)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=246)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=125)</span></td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=34)</span></td>
+<td class="ma-cell heat-0"><span class="pct">24%</span> <span class="sample">(n=686)</span></td>
+<td class="best-cell"><strong>SMA 200</strong> <span>38%</span></td>
+</tr>
+<tr>
+<td class="ticker">RTY</td>
+<td class="ma-cell heat-2"><span class="pct">40%</span> <span class="sample">(n=493)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=321)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=158)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=78)</span></td>
+<td class="ma-cell heat-0"><span class="pct">16%</span> <span class="sample">(n=691)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>40%</span></td>
+</tr>
+<tr>
+<td class="ticker">RUT</td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=434)</span></td>
+<td class="ma-cell heat-1"><span class="pct">28%</span> <span class="sample">(n=280)</span></td>
+<td class="ma-cell heat-1"><span class="pct">25%</span> <span class="sample">(n=138)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=72)</span></td>
+<td class="ma-cell no-data">—</td>
+<td class="best-cell"><strong>SMA 200</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">IWM</td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=456)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=294)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=148)</span></td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=76)</span></td>
+<td class="ma-cell heat-0"><span class="pct">18%</span> <span class="sample">(n=693)</span></td>
+<td class="best-cell"><strong>SMA 200</strong> <span>39%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">ES</td>
+<td class="ma-cell heat-2"><span class="pct">44%</span> <span class="sample">(n=88)</span></td>
+<td class="ma-cell heat-3"><span class="pct">47%</span> <span class="sample">(n=53)</span></td>
+<td class="ma-cell heat-1"><span class="pct">28%</span> <span class="sample">(n=25)</span></td>
+<td class="ma-cell heat-3 low-confidence"><span class="pct">50%</span> <span class="sample">(n=4)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=144)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>47%</span></td>
+</tr>
+<tr>
+<td class="ticker">SPX</td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=85)</span></td>
+<td class="ma-cell heat-3"><span class="pct">46%</span> <span class="sample">(n=52)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=23)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">25%</span> <span class="sample">(n=4)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=144)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>46%</span></td>
+</tr>
+<tr>
+<td class="ticker">SPY</td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=85)</span></td>
+<td class="ma-cell heat-2"><span class="pct">44%</span> <span class="sample">(n=50)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=23)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">25%</span> <span class="sample">(n=4)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=146)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>44%</span></td>
+</tr>
+<tr>
+<td class="ticker">XSP</td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=85)</span></td>
+<td class="ma-cell heat-3"><span class="pct">46%</span> <span class="sample">(n=52)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=23)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">25%</span> <span class="sample">(n=4)</span></td>
+<td class="ma-cell no-data">—</td>
+<td class="best-cell"><strong>EMA 20</strong> <span>46%</span></td>
+</tr>
+<tr>
+<td class="ticker">NQ</td>
+<td class="ma-cell heat-3"><span class="pct">49%</span> <span class="sample">(n=91)</span></td>
+<td class="ma-cell heat-2"><span class="pct">43%</span> <span class="sample">(n=47)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=20)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">17%</span> <span class="sample">(n=6)</span></td>
+<td class="ma-cell heat-0"><span class="pct">22%</span> <span class="sample">(n=144)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>49%</span></td>
+</tr>
+<tr>
+<td class="ticker">NDX</td>
+<td class="ma-cell heat-2"><span class="pct">43%</span> <span class="sample">(n=83)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=44)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">28%</span> <span class="sample">(n=18)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">29%</span> <span class="sample">(n=7)</span></td>
+<td class="ma-cell heat-0"><span class="pct">22%</span> <span class="sample">(n=144)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>43%</span></td>
+</tr>
+<tr>
+<td class="ticker">QQQ</td>
+<td class="ma-cell heat-2"><span class="pct">43%</span> <span class="sample">(n=82)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=45)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">28%</span> <span class="sample">(n=18)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">17%</span> <span class="sample">(n=6)</span></td>
+<td class="ma-cell heat-0"><span class="pct">21%</span> <span class="sample">(n=145)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>43%</span></td>
+</tr>
+<tr>
+<td class="ticker">RTY</td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=108)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=71)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=31)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=21)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=137)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>39%</span></td>
+</tr>
+<tr>
+<td class="ticker">RUT</td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=97)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=63)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=30)</span></td>
+<td class="ma-cell heat-0"><span class="pct">17%</span> <span class="sample">(n=24)</span></td>
+<td class="ma-cell no-data">—</td>
+<td class="best-cell"><strong>EMA 9</strong> <span>36%</span></td>
+</tr>
+<tr>
+<td class="ticker">IWM</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=101)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=64)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=31)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=28)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=136)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>Crypto</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">BTC</td>
+<td class="ma-cell heat-2"><span class="pct">42%</span> <span class="sample">(n=688)</span></td>
+<td class="ma-cell heat-2"><span class="pct">40%</span> <span class="sample">(n=407)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=194)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=77)</span></td>
+<td class="ma-cell heat-0"><span class="pct">16%</span> <span class="sample">(n=1005)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>42%</span></td>
+</tr>
+<tr>
+<td class="ticker">ETH</td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=671)</span></td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=392)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=185)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=62)</span></td>
+<td class="ma-cell heat-0"><span class="pct">14%</span> <span class="sample">(n=1013)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>39%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">BTC</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=86)</span></td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=46)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">26%</span> <span class="sample">(n=19)</span></td>
+<td class="ma-cell heat-1 low-confidence"><span class="pct">25%</span> <span class="sample">(n=12)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=142)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">ETH</td>
+<td class="ma-cell heat-2"><span class="pct">42%</span> <span class="sample">(n=88)</span></td>
+<td class="ma-cell heat-3"><span class="pct">45%</span> <span class="sample">(n=53)</span></td>
+<td class="ma-cell heat-0"><span class="pct">16%</span> <span class="sample">(n=31)</span></td>
+<td class="ma-cell heat-2"><span class="pct">43%</span> <span class="sample">(n=21)</span></td>
+<td class="ma-cell heat-0"><span class="pct">17%</span> <span class="sample">(n=138)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>45%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>FX</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">EURUSD</td>
+<td class="ma-cell heat-3"><span class="pct">52%</span> <span class="sample">(n=548)</span></td>
+<td class="ma-cell heat-3"><span class="pct">49%</span> <span class="sample">(n=383)</span></td>
+<td class="ma-cell heat-3"><span class="pct">50%</span> <span class="sample">(n=202)</span></td>
+<td class="ma-cell heat-3"><span class="pct">46%</span> <span class="sample">(n=69)</span></td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=714)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>52%</span></td>
+</tr>
+<tr>
+<td class="ticker">EURCHF</td>
+<td class="ma-cell heat-5"><span class="pct">65%</span> <span class="sample">(n=615)</span></td>
+<td class="ma-cell heat-4"><span class="pct">62%</span> <span class="sample">(n=426)</span></td>
+<td class="ma-cell heat-4"><span class="pct">60%</span> <span class="sample">(n=223)</span></td>
+<td class="ma-cell heat-4"><span class="pct">59%</span> <span class="sample">(n=91)</span></td>
+<td class="ma-cell heat-4"><span class="pct">59%</span> <span class="sample">(n=712)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>65%</span></td>
+</tr>
+<tr>
+<td class="ticker">GBPUSD</td>
+<td class="ma-cell heat-3"><span class="pct">54%</span> <span class="sample">(n=555)</span></td>
+<td class="ma-cell heat-3"><span class="pct">54%</span> <span class="sample">(n=364)</span></td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=174)</span></td>
+<td class="ma-cell heat-3"><span class="pct">51%</span> <span class="sample">(n=91)</span></td>
+<td class="ma-cell heat-1"><span class="pct">34%</span> <span class="sample">(n=709)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>54%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">EURUSD</td>
+<td class="ma-cell heat-3"><span class="pct">48%</span> <span class="sample">(n=103)</span></td>
+<td class="ma-cell heat-3"><span class="pct">47%</span> <span class="sample">(n=60)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=28)</span></td>
+<td class="ma-cell heat-4"><span class="pct">57%</span> <span class="sample">(n=23)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=147)</span></td>
+<td class="best-cell"><strong>SMA 200</strong> <span>57%</span></td>
+</tr>
+<tr>
+<td class="ticker">EURCHF</td>
+<td class="ma-cell heat-3"><span class="pct">47%</span> <span class="sample">(n=111)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=78)</span></td>
+<td class="ma-cell heat-2"><span class="pct">44%</span> <span class="sample">(n=39)</span></td>
+<td class="ma-cell heat-5 low-confidence"><span class="pct">67%</span> <span class="sample">(n=3)</span></td>
+<td class="ma-cell heat-1"><span class="pct">34%</span> <span class="sample">(n=143)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>47%</span></td>
+</tr>
+<tr>
+<td class="ticker">GBPUSD</td>
+<td class="ma-cell heat-3"><span class="pct">48%</span> <span class="sample">(n=104)</span></td>
+<td class="ma-cell heat-2"><span class="pct">42%</span> <span class="sample">(n=62)</span></td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=37)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=25)</span></td>
+<td class="ma-cell heat-0"><span class="pct">23%</span> <span class="sample">(n=142)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>48%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>Commodities/ETFs</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">GLD</td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=434)</span></td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=300)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=140)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=64)</span></td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=692)</span></td>
+<td class="best-cell"><strong>VWAP</strong> <span>39%</span></td>
+</tr>
+<tr>
+<td class="ticker">SLV</td>
+<td class="ma-cell heat-1"><span class="pct">28%</span> <span class="sample">(n=404)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=274)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=155)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=83)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=689)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">USO</td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=413)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=287)</span></td>
+<td class="ma-cell heat-0"><span class="pct">23%</span> <span class="sample">(n=162)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=103)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=704)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>31%</span></td>
+</tr>
+<tr>
+<td class="ticker">EWZ</td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=407)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=257)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=131)</span></td>
+<td class="ma-cell heat-0"><span class="pct">22%</span> <span class="sample">(n=103)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=687)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>32%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">GLD</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=86)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=50)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">21%</span> <span class="sample">(n=19)</span></td>
+<td class="ma-cell heat-2 low-confidence"><span class="pct">43%</span> <span class="sample">(n=7)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=146)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">SLV</td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=93)</span></td>
+<td class="ma-cell heat-1"><span class="pct">28%</span> <span class="sample">(n=65)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=33)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=25)</span></td>
+<td class="ma-cell heat-0"><span class="pct">12%</span> <span class="sample">(n=147)</span></td>
+<td class="best-cell"><strong>SMA 50</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">USO</td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=98)</span></td>
+<td class="ma-cell heat-0"><span class="pct">23%</span> <span class="sample">(n=60)</span></td>
+<td class="ma-cell heat-0"><span class="pct">23%</span> <span class="sample">(n=39)</span></td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=30)</span></td>
+<td class="ma-cell heat-0"><span class="pct">15%</span> <span class="sample">(n=146)</span></td>
+<td class="best-cell"><strong>SMA 200</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">EWZ</td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=96)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=69)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=35)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=24)</span></td>
+<td class="ma-cell heat-0"><span class="pct">17%</span> <span class="sample">(n=143)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>39%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>QQQ Top 10</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">NVDA</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=406)</span></td>
+<td class="ma-cell heat-1"><span class="pct">25%</span> <span class="sample">(n=256)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=148)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=31)</span></td>
+<td class="ma-cell heat-0"><span class="pct">14%</span> <span class="sample">(n=698)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">AAPL</td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=394)</span></td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=242)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=146)</span></td>
+<td class="ma-cell heat-0"><span class="pct">23%</span> <span class="sample">(n=47)</span></td>
+<td class="ma-cell heat-0"><span class="pct">17%</span> <span class="sample">(n=704)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>38%</span></td>
+</tr>
+<tr>
+<td class="ticker">MSFT</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=447)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=286)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=166)</span></td>
+<td class="ma-cell heat-1"><span class="pct">25%</span> <span class="sample">(n=57)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=698)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">AMZN</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=423)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=280)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=160)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=78)</span></td>
+<td class="ma-cell heat-0"><span class="pct">16%</span> <span class="sample">(n=698)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOGL</td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=421)</span></td>
+<td class="ma-cell heat-1"><span class="pct">34%</span> <span class="sample">(n=258)</span></td>
+<td class="ma-cell heat-0"><span class="pct">24%</span> <span class="sample">(n=123)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=61)</span></td>
+<td class="ma-cell heat-0"><span class="pct">17%</span> <span class="sample">(n=695)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>34%</span></td>
+</tr>
+<tr>
+<td class="ticker">AVGO</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=438)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=288)</span></td>
+<td class="ma-cell heat-0"><span class="pct">22%</span> <span class="sample">(n=158)</span></td>
+<td class="ma-cell heat-1"><span class="pct">25%</span> <span class="sample">(n=67)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=700)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOG</td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=423)</span></td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=263)</span></td>
+<td class="ma-cell heat-1"><span class="pct">25%</span> <span class="sample">(n=121)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=60)</span></td>
+<td class="ma-cell heat-0"><span class="pct">18%</span> <span class="sample">(n=690)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>36%</span></td>
+</tr>
+<tr>
+<td class="ticker">META</td>
+<td class="ma-cell heat-1"><span class="pct">34%</span> <span class="sample">(n=418)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=279)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=149)</span></td>
+<td class="ma-cell heat-1"><span class="pct">25%</span> <span class="sample">(n=51)</span></td>
+<td class="ma-cell heat-0"><span class="pct">14%</span> <span class="sample">(n=692)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>34%</span></td>
+</tr>
+<tr>
+<td class="ticker">TSLA</td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=405)</span></td>
+<td class="ma-cell heat-1"><span class="pct">34%</span> <span class="sample">(n=274)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=135)</span></td>
+<td class="ma-cell heat-0"><span class="pct">21%</span> <span class="sample">(n=100)</span></td>
+<td class="ma-cell heat-0"><span class="pct">14%</span> <span class="sample">(n=696)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>35%</span></td>
+</tr>
+<tr>
+<td class="ticker">BRK.B</td>
+<td class="ma-cell heat-2"><span class="pct">40%</span> <span class="sample">(n=445)</span></td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=289)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=150)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=89)</span></td>
+<td class="ma-cell heat-1"><span class="pct">26%</span> <span class="sample">(n=697)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>40%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="summary-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+<th>Best</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">NVDA</td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=85)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=44)</span></td>
+<td class="ma-cell heat-3 low-confidence"><span class="pct">46%</span> <span class="sample">(n=13)</span></td>
+<td class="ma-cell heat-3 low-confidence"><span class="pct">50%</span> <span class="sample">(n=4)</span></td>
+<td class="ma-cell heat-0"><span class="pct">15%</span> <span class="sample">(n=144)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>32%</span></td>
+</tr>
+<tr>
+<td class="ticker">AAPL</td>
+<td class="ma-cell heat-2"><span class="pct">40%</span> <span class="sample">(n=83)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=56)</span></td>
+<td class="ma-cell heat-0"><span class="pct">20%</span> <span class="sample">(n=20)</span></td>
+<td class="ma-cell heat-5 low-confidence"><span class="pct">100%</span> <span class="sample">(n=1)</span></td>
+<td class="ma-cell heat-0"><span class="pct">16%</span> <span class="sample">(n=141)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>40%</span></td>
+</tr>
+<tr>
+<td class="ticker">MSFT</td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=92)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=51)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=22)</span></td>
+<td class="ma-cell heat-3 low-confidence"><span class="pct">50%</span> <span class="sample">(n=4)</span></td>
+<td class="ma-cell heat-0"><span class="pct">17%</span> <span class="sample">(n=144)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>41%</span></td>
+</tr>
+<tr>
+<td class="ticker">AMZN</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=91)</span></td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=64)</span></td>
+<td class="ma-cell heat-2"><span class="pct">44%</span> <span class="sample">(n=36)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">10%</span> <span class="sample">(n=10)</span></td>
+<td class="ma-cell heat-0"><span class="pct">14%</span> <span class="sample">(n=145)</span></td>
+<td class="best-cell"><strong>SMA 50</strong> <span>44%</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOGL</td>
+<td class="ma-cell heat-2"><span class="pct">37%</span> <span class="sample">(n=86)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=49)</span></td>
+<td class="ma-cell heat-1"><span class="pct">32%</span> <span class="sample">(n=22)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">17%</span> <span class="sample">(n=6)</span></td>
+<td class="ma-cell heat-0"><span class="pct">10%</span> <span class="sample">(n=145)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>37%</span></td>
+</tr>
+<tr>
+<td class="ticker">AVGO</td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=89)</span></td>
+<td class="ma-cell heat-2"><span class="pct">35%</span> <span class="sample">(n=60)</span></td>
+<td class="ma-cell heat-1"><span class="pct">28%</span> <span class="sample">(n=25)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">0%</span> <span class="sample">(n=2)</span></td>
+<td class="ma-cell heat-0"><span class="pct">14%</span> <span class="sample">(n=146)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>35%</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOG</td>
+<td class="ma-cell heat-2"><span class="pct">39%</span> <span class="sample">(n=87)</span></td>
+<td class="ma-cell heat-1"><span class="pct">31%</span> <span class="sample">(n=49)</span></td>
+<td class="ma-cell heat-2"><span class="pct">38%</span> <span class="sample">(n=24)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">17%</span> <span class="sample">(n=6)</span></td>
+<td class="ma-cell heat-0"><span class="pct">13%</span> <span class="sample">(n=147)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>39%</span></td>
+</tr>
+<tr>
+<td class="ticker">META</td>
+<td class="ma-cell heat-2"><span class="pct">36%</span> <span class="sample">(n=88)</span></td>
+<td class="ma-cell heat-2"><span class="pct">41%</span> <span class="sample">(n=49)</span></td>
+<td class="ma-cell heat-1"><span class="pct">29%</span> <span class="sample">(n=24)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">12%</span> <span class="sample">(n=8)</span></td>
+<td class="ma-cell heat-0"><span class="pct">15%</span> <span class="sample">(n=142)</span></td>
+<td class="best-cell"><strong>EMA 20</strong> <span>41%</span></td>
+</tr>
+<tr>
+<td class="ticker">TSLA</td>
+<td class="ma-cell heat-1"><span class="pct">33%</span> <span class="sample">(n=90)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=64)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=37)</span></td>
+<td class="ma-cell heat-0"><span class="pct">24%</span> <span class="sample">(n=21)</span></td>
+<td class="ma-cell heat-0"><span class="pct">10%</span> <span class="sample">(n=143)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>33%</span></td>
+</tr>
+<tr>
+<td class="ticker">BRK.B</td>
+<td class="ma-cell heat-2"><span class="pct">40%</span> <span class="sample">(n=101)</span></td>
+<td class="ma-cell heat-1"><span class="pct">30%</span> <span class="sample">(n=57)</span></td>
+<td class="ma-cell heat-1"><span class="pct">27%</span> <span class="sample">(n=37)</span></td>
+<td class="ma-cell heat-0 low-confidence"><span class="pct">0%</span> <span class="sample">(n=5)</span></td>
+<td class="ma-cell heat-0"><span class="pct">19%</span> <span class="sample">(n=145)</span></td>
+<td class="best-cell"><strong>EMA 9</strong> <span>40%</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+    <section class="notes">
+      <h2>Breakdown - Bounce / Break / False</h2>
+      <p>Each cell shows <strong>B / Bk / F (n=T)</strong>. High Break% indicates a firm break-through; high False% indicates intra-bar noise.</p>
+    </section>
+    <h2>Indices/Futures</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">ES</td>
+<td><span class="detail-b">42</span> / <span class="detail-bk">44</span> / <span class="detail-f">14</span> <span class="sample">(n=463)</span></td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">49</span> / <span class="detail-f">13</span> <span class="sample">(n=281)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">50</span> / <span class="detail-f">17</span> <span class="sample">(n=143)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">45</span> / <span class="detail-f">19</span> <span class="sample">(n=64)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">38</span> / <span class="detail-f">33</span> <span class="sample">(n=692)</span></td>
+</tr>
+<tr>
+<td class="ticker">SPX</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">49</span> / <span class="detail-f">14</span> <span class="sample">(n=409)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">52</span> / <span class="detail-f">17</span> <span class="sample">(n=247)</span></td>
+<td><span class="detail-b">24</span> / <span class="detail-bk">56</span> / <span class="detail-f">20</span> <span class="sample">(n=124)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">55</span> / <span class="detail-f">18</span> <span class="sample">(n=55)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">36</span> / <span class="detail-f">31</span> <span class="sample">(n=693)</span></td>
+</tr>
+<tr>
+<td class="ticker">SPY</td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">52</span> / <span class="detail-f">13</span> <span class="sample">(n=409)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">54</span> / <span class="detail-f">15</span> <span class="sample">(n=248)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">53</span> / <span class="detail-f">21</span> <span class="sample">(n=126)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">55</span> / <span class="detail-f">18</span> <span class="sample">(n=55)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">36</span> / <span class="detail-f">31</span> <span class="sample">(n=692)</span></td>
+</tr>
+<tr>
+<td class="ticker">XSP</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">49</span> / <span class="detail-f">14</span> <span class="sample">(n=409)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">52</span> / <span class="detail-f">17</span> <span class="sample">(n=247)</span></td>
+<td><span class="detail-b">24</span> / <span class="detail-bk">56</span> / <span class="detail-f">20</span> <span class="sample">(n=124)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">55</span> / <span class="detail-f">18</span> <span class="sample">(n=55)</span></td>
+<td class="no-data">—</td>
+</tr>
+<tr>
+<td class="ticker">NQ</td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">43</span> / <span class="detail-f">16</span> <span class="sample">(n=447)</span></td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">44</span> / <span class="detail-f">18</span> <span class="sample">(n=271)</span></td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">48</span> / <span class="detail-f">14</span> <span class="sample">(n=138)</span></td>
+<td><span class="detail-b">42</span> / <span class="detail-bk">47</span> / <span class="detail-f">12</span> <span class="sample">(n=43)</span></td>
+<td><span class="detail-b">22</span> / <span class="detail-bk">42</span> / <span class="detail-f">36</span> <span class="sample">(n=691)</span></td>
+</tr>
+<tr>
+<td class="ticker">NDX</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">50</span> / <span class="detail-f">17</span> <span class="sample">(n=387)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">49</span> / <span class="detail-f">19</span> <span class="sample">(n=241)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">53</span> / <span class="detail-f">14</span> <span class="sample">(n=125)</span></td>
+<td><span class="detail-b">43</span> / <span class="detail-bk">41</span> / <span class="detail-f">16</span> <span class="sample">(n=37)</span></td>
+<td><span class="detail-b">24</span> / <span class="detail-bk">42</span> / <span class="detail-f">34</span> <span class="sample">(n=691)</span></td>
+</tr>
+<tr>
+<td class="ticker">QQQ</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">51</span> / <span class="detail-f">16</span> <span class="sample">(n=397)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">47</span> / <span class="detail-f">18</span> <span class="sample">(n=246)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">51</span> / <span class="detail-f">17</span> <span class="sample">(n=125)</span></td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">44</span> / <span class="detail-f">18</span> <span class="sample">(n=34)</span></td>
+<td><span class="detail-b">24</span> / <span class="detail-bk">42</span> / <span class="detail-f">34</span> <span class="sample">(n=686)</span></td>
+</tr>
+<tr>
+<td class="ticker">RTY</td>
+<td><span class="detail-b">40</span> / <span class="detail-bk">42</span> / <span class="detail-f">18</span> <span class="sample">(n=493)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">47</span> / <span class="detail-f">17</span> <span class="sample">(n=321)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">49</span> / <span class="detail-f">20</span> <span class="sample">(n=158)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">45</span> / <span class="detail-f">19</span> <span class="sample">(n=78)</span></td>
+<td><span class="detail-b">16</span> / <span class="detail-bk">46</span> / <span class="detail-f">37</span> <span class="sample">(n=691)</span></td>
+</tr>
+<tr>
+<td class="ticker">RUT</td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">49</span> / <span class="detail-f">20</span> <span class="sample">(n=434)</span></td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">54</span> / <span class="detail-f">18</span> <span class="sample">(n=280)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">58</span> / <span class="detail-f">17</span> <span class="sample">(n=138)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">50</span> / <span class="detail-f">17</span> <span class="sample">(n=72)</span></td>
+<td class="no-data">—</td>
+</tr>
+<tr>
+<td class="ticker">IWM</td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">46</span> / <span class="detail-f">18</span> <span class="sample">(n=456)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">53</span> / <span class="detail-f">17</span> <span class="sample">(n=294)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">53</span> / <span class="detail-f">18</span> <span class="sample">(n=148)</span></td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">46</span> / <span class="detail-f">14</span> <span class="sample">(n=76)</span></td>
+<td><span class="detail-b">18</span> / <span class="detail-bk">47</span> / <span class="detail-f">35</span> <span class="sample">(n=693)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">ES</td>
+<td><span class="detail-b">44</span> / <span class="detail-bk">39</span> / <span class="detail-f">17</span> <span class="sample">(n=88)</span></td>
+<td><span class="detail-b">47</span> / <span class="detail-bk">45</span> / <span class="detail-f">8</span> <span class="sample">(n=53)</span></td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">52</span> / <span class="detail-f">20</span> <span class="sample">(n=25)</span></td>
+<td><span class="detail-b">50</span> / <span class="detail-bk">50</span> / <span class="detail-f">0</span> <span class="sample">(n=4)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">42</span> / <span class="detail-f">32</span> <span class="sample">(n=144)</span></td>
+</tr>
+<tr>
+<td class="ticker">SPX</td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">41</span> / <span class="detail-f">18</span> <span class="sample">(n=85)</span></td>
+<td><span class="detail-b">46</span> / <span class="detail-bk">46</span> / <span class="detail-f">8</span> <span class="sample">(n=52)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">57</span> / <span class="detail-f">17</span> <span class="sample">(n=23)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">50</span> / <span class="detail-f">25</span> <span class="sample">(n=4)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">38</span> / <span class="detail-f">36</span> <span class="sample">(n=144)</span></td>
+</tr>
+<tr>
+<td class="ticker">SPY</td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">42</span> / <span class="detail-f">16</span> <span class="sample">(n=85)</span></td>
+<td><span class="detail-b">44</span> / <span class="detail-bk">46</span> / <span class="detail-f">10</span> <span class="sample">(n=50)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">52</span> / <span class="detail-f">22</span> <span class="sample">(n=23)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">50</span> / <span class="detail-f">25</span> <span class="sample">(n=4)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">38</span> / <span class="detail-f">34</span> <span class="sample">(n=146)</span></td>
+</tr>
+<tr>
+<td class="ticker">XSP</td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">41</span> / <span class="detail-f">18</span> <span class="sample">(n=85)</span></td>
+<td><span class="detail-b">46</span> / <span class="detail-bk">46</span> / <span class="detail-f">8</span> <span class="sample">(n=52)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">57</span> / <span class="detail-f">17</span> <span class="sample">(n=23)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">50</span> / <span class="detail-f">25</span> <span class="sample">(n=4)</span></td>
+<td class="no-data">—</td>
+</tr>
+<tr>
+<td class="ticker">NQ</td>
+<td><span class="detail-b">49</span> / <span class="detail-bk">42</span> / <span class="detail-f">9</span> <span class="sample">(n=91)</span></td>
+<td><span class="detail-b">43</span> / <span class="detail-bk">43</span> / <span class="detail-f">15</span> <span class="sample">(n=47)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">40</span> / <span class="detail-f">25</span> <span class="sample">(n=20)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">67</span> / <span class="detail-f">17</span> <span class="sample">(n=6)</span></td>
+<td><span class="detail-b">22</span> / <span class="detail-bk">42</span> / <span class="detail-f">36</span> <span class="sample">(n=144)</span></td>
+</tr>
+<tr>
+<td class="ticker">NDX</td>
+<td><span class="detail-b">43</span> / <span class="detail-bk">47</span> / <span class="detail-f">10</span> <span class="sample">(n=83)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">45</span> / <span class="detail-f">18</span> <span class="sample">(n=44)</span></td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">44</span> / <span class="detail-f">28</span> <span class="sample">(n=18)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">57</span> / <span class="detail-f">14</span> <span class="sample">(n=7)</span></td>
+<td><span class="detail-b">22</span> / <span class="detail-bk">43</span> / <span class="detail-f">35</span> <span class="sample">(n=144)</span></td>
+</tr>
+<tr>
+<td class="ticker">QQQ</td>
+<td><span class="detail-b">43</span> / <span class="detail-bk">46</span> / <span class="detail-f">11</span> <span class="sample">(n=82)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">49</span> / <span class="detail-f">18</span> <span class="sample">(n=45)</span></td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">44</span> / <span class="detail-f">28</span> <span class="sample">(n=18)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">67</span> / <span class="detail-f">17</span> <span class="sample">(n=6)</span></td>
+<td><span class="detail-b">21</span> / <span class="detail-bk">42</span> / <span class="detail-f">37</span> <span class="sample">(n=145)</span></td>
+</tr>
+<tr>
+<td class="ticker">RTY</td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">44</span> / <span class="detail-f">17</span> <span class="sample">(n=108)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">49</span> / <span class="detail-f">15</span> <span class="sample">(n=71)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">65</span> / <span class="detail-f">16</span> <span class="sample">(n=31)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">57</span> / <span class="detail-f">10</span> <span class="sample">(n=21)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">41</span> / <span class="detail-f">39</span> <span class="sample">(n=137)</span></td>
+</tr>
+<tr>
+<td class="ticker">RUT</td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">47</span> / <span class="detail-f">16</span> <span class="sample">(n=97)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">49</span> / <span class="detail-f">17</span> <span class="sample">(n=63)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">63</span> / <span class="detail-f">17</span> <span class="sample">(n=30)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">67</span> / <span class="detail-f">17</span> <span class="sample">(n=24)</span></td>
+<td class="no-data">—</td>
+</tr>
+<tr>
+<td class="ticker">IWM</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">48</span> / <span class="detail-f">16</span> <span class="sample">(n=101)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">50</span> / <span class="detail-f">19</span> <span class="sample">(n=64)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">61</span> / <span class="detail-f">19</span> <span class="sample">(n=31)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">57</span> / <span class="detail-f">14</span> <span class="sample">(n=28)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">38</span> / <span class="detail-f">43</span> <span class="sample">(n=136)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>Crypto</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">BTC</td>
+<td><span class="detail-b">42</span> / <span class="detail-bk">43</span> / <span class="detail-f">15</span> <span class="sample">(n=688)</span></td>
+<td><span class="detail-b">40</span> / <span class="detail-bk">49</span> / <span class="detail-f">12</span> <span class="sample">(n=407)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">54</span> / <span class="detail-f">13</span> <span class="sample">(n=194)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">53</span> / <span class="detail-f">12</span> <span class="sample">(n=77)</span></td>
+<td><span class="detail-b">16</span> / <span class="detail-bk">45</span> / <span class="detail-f">40</span> <span class="sample">(n=1005)</span></td>
+</tr>
+<tr>
+<td class="ticker">ETH</td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">44</span> / <span class="detail-f">17</span> <span class="sample">(n=671)</span></td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">47</span> / <span class="detail-f">14</span> <span class="sample">(n=392)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">52</span> / <span class="detail-f">12</span> <span class="sample">(n=185)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">53</span> / <span class="detail-f">11</span> <span class="sample">(n=62)</span></td>
+<td><span class="detail-b">14</span> / <span class="detail-bk">44</span> / <span class="detail-f">42</span> <span class="sample">(n=1013)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">BTC</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">44</span> / <span class="detail-f">19</span> <span class="sample">(n=86)</span></td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">52</span> / <span class="detail-f">11</span> <span class="sample">(n=46)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">53</span> / <span class="detail-f">21</span> <span class="sample">(n=19)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">67</span> / <span class="detail-f">8</span> <span class="sample">(n=12)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">43</span> / <span class="detail-f">38</span> <span class="sample">(n=142)</span></td>
+</tr>
+<tr>
+<td class="ticker">ETH</td>
+<td><span class="detail-b">42</span> / <span class="detail-bk">39</span> / <span class="detail-f">19</span> <span class="sample">(n=88)</span></td>
+<td><span class="detail-b">45</span> / <span class="detail-bk">43</span> / <span class="detail-f">11</span> <span class="sample">(n=53)</span></td>
+<td><span class="detail-b">16</span> / <span class="detail-bk">71</span> / <span class="detail-f">13</span> <span class="sample">(n=31)</span></td>
+<td><span class="detail-b">43</span> / <span class="detail-bk">43</span> / <span class="detail-f">14</span> <span class="sample">(n=21)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">42</span> / <span class="detail-f">41</span> <span class="sample">(n=138)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>FX</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">EURUSD</td>
+<td><span class="detail-b">52</span> / <span class="detail-bk">37</span> / <span class="detail-f">11</span> <span class="sample">(n=548)</span></td>
+<td><span class="detail-b">49</span> / <span class="detail-bk">40</span> / <span class="detail-f">11</span> <span class="sample">(n=383)</span></td>
+<td><span class="detail-b">50</span> / <span class="detail-bk">39</span> / <span class="detail-f">10</span> <span class="sample">(n=202)</span></td>
+<td><span class="detail-b">46</span> / <span class="detail-bk">41</span> / <span class="detail-f">13</span> <span class="sample">(n=69)</span></td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">33</span> / <span class="detail-f">26</span> <span class="sample">(n=714)</span></td>
+</tr>
+<tr>
+<td class="ticker">EURCHF</td>
+<td><span class="detail-b">65</span> / <span class="detail-bk">28</span> / <span class="detail-f">7</span> <span class="sample">(n=615)</span></td>
+<td><span class="detail-b">62</span> / <span class="detail-bk">31</span> / <span class="detail-f">6</span> <span class="sample">(n=426)</span></td>
+<td><span class="detail-b">60</span> / <span class="detail-bk">33</span> / <span class="detail-f">7</span> <span class="sample">(n=223)</span></td>
+<td><span class="detail-b">59</span> / <span class="detail-bk">34</span> / <span class="detail-f">7</span> <span class="sample">(n=91)</span></td>
+<td><span class="detail-b">59</span> / <span class="detail-bk">23</span> / <span class="detail-f">18</span> <span class="sample">(n=712)</span></td>
+</tr>
+<tr>
+<td class="ticker">GBPUSD</td>
+<td><span class="detail-b">54</span> / <span class="detail-bk">33</span> / <span class="detail-f">13</span> <span class="sample">(n=555)</span></td>
+<td><span class="detail-b">54</span> / <span class="detail-bk">36</span> / <span class="detail-f">10</span> <span class="sample">(n=364)</span></td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">48</span> / <span class="detail-f">13</span> <span class="sample">(n=174)</span></td>
+<td><span class="detail-b">51</span> / <span class="detail-bk">43</span> / <span class="detail-f">7</span> <span class="sample">(n=91)</span></td>
+<td><span class="detail-b">34</span> / <span class="detail-bk">36</span> / <span class="detail-f">29</span> <span class="sample">(n=709)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">EURUSD</td>
+<td><span class="detail-b">48</span> / <span class="detail-bk">38</span> / <span class="detail-f">15</span> <span class="sample">(n=103)</span></td>
+<td><span class="detail-b">47</span> / <span class="detail-bk">48</span> / <span class="detail-f">5</span> <span class="sample">(n=60)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">57</span> / <span class="detail-f">11</span> <span class="sample">(n=28)</span></td>
+<td><span class="detail-b">57</span> / <span class="detail-bk">35</span> / <span class="detail-f">9</span> <span class="sample">(n=23)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">44</span> / <span class="detail-f">37</span> <span class="sample">(n=147)</span></td>
+</tr>
+<tr>
+<td class="ticker">EURCHF</td>
+<td><span class="detail-b">47</span> / <span class="detail-bk">41</span> / <span class="detail-f">13</span> <span class="sample">(n=111)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">47</span> / <span class="detail-f">17</span> <span class="sample">(n=78)</span></td>
+<td><span class="detail-b">44</span> / <span class="detail-bk">46</span> / <span class="detail-f">10</span> <span class="sample">(n=39)</span></td>
+<td><span class="detail-b">67</span> / <span class="detail-bk">33</span> / <span class="detail-f">0</span> <span class="sample">(n=3)</span></td>
+<td><span class="detail-b">34</span> / <span class="detail-bk">41</span> / <span class="detail-f">26</span> <span class="sample">(n=143)</span></td>
+</tr>
+<tr>
+<td class="ticker">GBPUSD</td>
+<td><span class="detail-b">48</span> / <span class="detail-bk">40</span> / <span class="detail-f">12</span> <span class="sample">(n=104)</span></td>
+<td><span class="detail-b">42</span> / <span class="detail-bk">42</span> / <span class="detail-f">16</span> <span class="sample">(n=62)</span></td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">49</span> / <span class="detail-f">14</span> <span class="sample">(n=37)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">52</span> / <span class="detail-f">16</span> <span class="sample">(n=25)</span></td>
+<td><span class="detail-b">23</span> / <span class="detail-bk">43</span> / <span class="detail-f">35</span> <span class="sample">(n=142)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>Commodities/ETFs</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">GLD</td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">48</span> / <span class="detail-f">13</span> <span class="sample">(n=434)</span></td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">49</span> / <span class="detail-f">14</span> <span class="sample">(n=300)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">56</span> / <span class="detail-f">12</span> <span class="sample">(n=140)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">55</span> / <span class="detail-f">14</span> <span class="sample">(n=64)</span></td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">33</span> / <span class="detail-f">27</span> <span class="sample">(n=692)</span></td>
+</tr>
+<tr>
+<td class="ticker">SLV</td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">50</span> / <span class="detail-f">21</span> <span class="sample">(n=404)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">53</span> / <span class="detail-f">15</span> <span class="sample">(n=274)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">55</span> / <span class="detail-f">16</span> <span class="sample">(n=155)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">58</span> / <span class="detail-f">11</span> <span class="sample">(n=83)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">40</span> / <span class="detail-f">34</span> <span class="sample">(n=689)</span></td>
+</tr>
+<tr>
+<td class="ticker">USO</td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">55</span> / <span class="detail-f">15</span> <span class="sample">(n=413)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">55</span> / <span class="detail-f">16</span> <span class="sample">(n=287)</span></td>
+<td><span class="detail-b">23</span> / <span class="detail-bk">57</span> / <span class="detail-f">19</span> <span class="sample">(n=162)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">53</span> / <span class="detail-f">17</span> <span class="sample">(n=103)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">46</span> / <span class="detail-f">34</span> <span class="sample">(n=704)</span></td>
+</tr>
+<tr>
+<td class="ticker">EWZ</td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">50</span> / <span class="detail-f">18</span> <span class="sample">(n=407)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">56</span> / <span class="detail-f">13</span> <span class="sample">(n=257)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">49</span> / <span class="detail-f">20</span> <span class="sample">(n=131)</span></td>
+<td><span class="detail-b">22</span> / <span class="detail-bk">63</span> / <span class="detail-f">15</span> <span class="sample">(n=103)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">43</span> / <span class="detail-f">37</span> <span class="sample">(n=687)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">GLD</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">41</span> / <span class="detail-f">22</span> <span class="sample">(n=86)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">56</span> / <span class="detail-f">12</span> <span class="sample">(n=50)</span></td>
+<td><span class="detail-b">21</span> / <span class="detail-bk">63</span> / <span class="detail-f">16</span> <span class="sample">(n=19)</span></td>
+<td><span class="detail-b">43</span> / <span class="detail-bk">57</span> / <span class="detail-f">0</span> <span class="sample">(n=7)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">49</span> / <span class="detail-f">32</span> <span class="sample">(n=146)</span></td>
+</tr>
+<tr>
+<td class="ticker">SLV</td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">47</span> / <span class="detail-f">20</span> <span class="sample">(n=93)</span></td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">46</span> / <span class="detail-f">26</span> <span class="sample">(n=65)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">52</span> / <span class="detail-f">15</span> <span class="sample">(n=33)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">44</span> / <span class="detail-f">24</span> <span class="sample">(n=25)</span></td>
+<td><span class="detail-b">12</span> / <span class="detail-bk">53</span> / <span class="detail-f">35</span> <span class="sample">(n=147)</span></td>
+</tr>
+<tr>
+<td class="ticker">USO</td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">45</span> / <span class="detail-f">19</span> <span class="sample">(n=98)</span></td>
+<td><span class="detail-b">23</span> / <span class="detail-bk">50</span> / <span class="detail-f">27</span> <span class="sample">(n=60)</span></td>
+<td><span class="detail-b">23</span> / <span class="detail-bk">54</span> / <span class="detail-f">23</span> <span class="sample">(n=39)</span></td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">50</span> / <span class="detail-f">13</span> <span class="sample">(n=30)</span></td>
+<td><span class="detail-b">15</span> / <span class="detail-bk">41</span> / <span class="detail-f">44</span> <span class="sample">(n=146)</span></td>
+</tr>
+<tr>
+<td class="ticker">EWZ</td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">45</span> / <span class="detail-f">17</span> <span class="sample">(n=96)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">51</span> / <span class="detail-f">19</span> <span class="sample">(n=69)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">51</span> / <span class="detail-f">23</span> <span class="sample">(n=35)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">58</span> / <span class="detail-f">12</span> <span class="sample">(n=24)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">47</span> / <span class="detail-f">36</span> <span class="sample">(n=143)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<h2>QQQ Top 10</h2>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Daily</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">NVDA</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">52</span> / <span class="detail-f">15</span> <span class="sample">(n=406)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">60</span> / <span class="detail-f">16</span> <span class="sample">(n=256)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">60</span> / <span class="detail-f">14</span> <span class="sample">(n=148)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">52</span> / <span class="detail-f">16</span> <span class="sample">(n=31)</span></td>
+<td><span class="detail-b">14</span> / <span class="detail-bk">48</span> / <span class="detail-f">37</span> <span class="sample">(n=698)</span></td>
+</tr>
+<tr>
+<td class="ticker">AAPL</td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">47</span> / <span class="detail-f">15</span> <span class="sample">(n=394)</span></td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">48</span> / <span class="detail-f">15</span> <span class="sample">(n=242)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">55</span> / <span class="detail-f">14</span> <span class="sample">(n=146)</span></td>
+<td><span class="detail-b">23</span> / <span class="detail-bk">55</span> / <span class="detail-f">21</span> <span class="sample">(n=47)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">48</span> / <span class="detail-f">35</span> <span class="sample">(n=704)</span></td>
+</tr>
+<tr>
+<td class="ticker">MSFT</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">46</span> / <span class="detail-f">17</span> <span class="sample">(n=447)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">51</span> / <span class="detail-f">14</span> <span class="sample">(n=286)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">55</span> / <span class="detail-f">18</span> <span class="sample">(n=166)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">54</span> / <span class="detail-f">21</span> <span class="sample">(n=57)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">44</span> / <span class="detail-f">35</span> <span class="sample">(n=698)</span></td>
+</tr>
+<tr>
+<td class="ticker">AMZN</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">49</span> / <span class="detail-f">18</span> <span class="sample">(n=423)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">53</span> / <span class="detail-f">15</span> <span class="sample">(n=280)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">49</span> / <span class="detail-f">20</span> <span class="sample">(n=160)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">46</span> / <span class="detail-f">23</span> <span class="sample">(n=78)</span></td>
+<td><span class="detail-b">16</span> / <span class="detail-bk">47</span> / <span class="detail-f">37</span> <span class="sample">(n=698)</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOGL</td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">54</span> / <span class="detail-f">15</span> <span class="sample">(n=421)</span></td>
+<td><span class="detail-b">34</span> / <span class="detail-bk">50</span> / <span class="detail-f">15</span> <span class="sample">(n=258)</span></td>
+<td><span class="detail-b">24</span> / <span class="detail-bk">67</span> / <span class="detail-f">10</span> <span class="sample">(n=123)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">54</span> / <span class="detail-f">16</span> <span class="sample">(n=61)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">45</span> / <span class="detail-f">38</span> <span class="sample">(n=695)</span></td>
+</tr>
+<tr>
+<td class="ticker">AVGO</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">52</span> / <span class="detail-f">15</span> <span class="sample">(n=438)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">54</span> / <span class="detail-f">17</span> <span class="sample">(n=288)</span></td>
+<td><span class="detail-b">22</span> / <span class="detail-bk">61</span> / <span class="detail-f">17</span> <span class="sample">(n=158)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">60</span> / <span class="detail-f">15</span> <span class="sample">(n=67)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">49</span> / <span class="detail-f">31</span> <span class="sample">(n=700)</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOG</td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">53</span> / <span class="detail-f">16</span> <span class="sample">(n=423)</span></td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">50</span> / <span class="detail-f">14</span> <span class="sample">(n=263)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">60</span> / <span class="detail-f">15</span> <span class="sample">(n=121)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">52</span> / <span class="detail-f">18</span> <span class="sample">(n=60)</span></td>
+<td><span class="detail-b">18</span> / <span class="detail-bk">44</span> / <span class="detail-f">39</span> <span class="sample">(n=690)</span></td>
+</tr>
+<tr>
+<td class="ticker">META</td>
+<td><span class="detail-b">34</span> / <span class="detail-bk">49</span> / <span class="detail-f">17</span> <span class="sample">(n=418)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">50</span> / <span class="detail-f">18</span> <span class="sample">(n=279)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">52</span> / <span class="detail-f">19</span> <span class="sample">(n=149)</span></td>
+<td><span class="detail-b">25</span> / <span class="detail-bk">49</span> / <span class="detail-f">25</span> <span class="sample">(n=51)</span></td>
+<td><span class="detail-b">14</span> / <span class="detail-bk">49</span> / <span class="detail-f">37</span> <span class="sample">(n=692)</span></td>
+</tr>
+<tr>
+<td class="ticker">TSLA</td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">48</span> / <span class="detail-f">18</span> <span class="sample">(n=405)</span></td>
+<td><span class="detail-b">34</span> / <span class="detail-bk">50</span> / <span class="detail-f">15</span> <span class="sample">(n=274)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">55</span> / <span class="detail-f">15</span> <span class="sample">(n=135)</span></td>
+<td><span class="detail-b">21</span> / <span class="detail-bk">63</span> / <span class="detail-f">16</span> <span class="sample">(n=100)</span></td>
+<td><span class="detail-b">14</span> / <span class="detail-bk">51</span> / <span class="detail-f">35</span> <span class="sample">(n=696)</span></td>
+</tr>
+<tr>
+<td class="ticker">BRK.B</td>
+<td><span class="detail-b">40</span> / <span class="detail-bk">46</span> / <span class="detail-f">13</span> <span class="sample">(n=445)</span></td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">49</span> / <span class="detail-f">14</span> <span class="sample">(n=289)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">60</span> / <span class="detail-f">13</span> <span class="sample">(n=150)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">47</span> / <span class="detail-f">21</span> <span class="sample">(n=89)</span></td>
+<td><span class="detail-b">26</span> / <span class="detail-bk">39</span> / <span class="detail-f">35</span> <span class="sample">(n=697)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section class="matrix-section" style="page-break-inside: avoid">
+<h3>Weekly</h3>
+<table class="detail-table">
+<thead><tr>
+<th>Ticker</th>
+<th>EMA 9</th>
+<th>EMA 20</th>
+<th>SMA 50</th>
+<th>SMA 200</th>
+<th>VWAP</th>
+</tr></thead>
+<tbody>
+<tr>
+<td class="ticker">NVDA</td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">51</span> / <span class="detail-f">18</span> <span class="sample">(n=85)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">50</span> / <span class="detail-f">18</span> <span class="sample">(n=44)</span></td>
+<td><span class="detail-b">46</span> / <span class="detail-bk">46</span> / <span class="detail-f">8</span> <span class="sample">(n=13)</span></td>
+<td><span class="detail-b">50</span> / <span class="detail-bk">50</span> / <span class="detail-f">0</span> <span class="sample">(n=4)</span></td>
+<td><span class="detail-b">15</span> / <span class="detail-bk">47</span> / <span class="detail-f">38</span> <span class="sample">(n=144)</span></td>
+</tr>
+<tr>
+<td class="ticker">AAPL</td>
+<td><span class="detail-b">40</span> / <span class="detail-bk">45</span> / <span class="detail-f">16</span> <span class="sample">(n=83)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">61</span> / <span class="detail-f">12</span> <span class="sample">(n=56)</span></td>
+<td><span class="detail-b">20</span> / <span class="detail-bk">60</span> / <span class="detail-f">20</span> <span class="sample">(n=20)</span></td>
+<td><span class="detail-b">100</span> / <span class="detail-bk">0</span> / <span class="detail-f">0</span> <span class="sample">(n=1)</span></td>
+<td><span class="detail-b">16</span> / <span class="detail-bk">50</span> / <span class="detail-f">35</span> <span class="sample">(n=141)</span></td>
+</tr>
+<tr>
+<td class="ticker">MSFT</td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">37</span> / <span class="detail-f">22</span> <span class="sample">(n=92)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">47</span> / <span class="detail-f">20</span> <span class="sample">(n=51)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">50</span> / <span class="detail-f">18</span> <span class="sample">(n=22)</span></td>
+<td><span class="detail-b">50</span> / <span class="detail-bk">50</span> / <span class="detail-f">0</span> <span class="sample">(n=4)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">41</span> / <span class="detail-f">42</span> <span class="sample">(n=144)</span></td>
+</tr>
+<tr>
+<td class="ticker">AMZN</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">53</span> / <span class="detail-f">14</span> <span class="sample">(n=91)</span></td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">52</span> / <span class="detail-f">16</span> <span class="sample">(n=64)</span></td>
+<td><span class="detail-b">44</span> / <span class="detail-bk">39</span> / <span class="detail-f">17</span> <span class="sample">(n=36)</span></td>
+<td><span class="detail-b">10</span> / <span class="detail-bk">80</span> / <span class="detail-f">10</span> <span class="sample">(n=10)</span></td>
+<td><span class="detail-b">14</span> / <span class="detail-bk">52</span> / <span class="detail-f">34</span> <span class="sample">(n=145)</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOGL</td>
+<td><span class="detail-b">37</span> / <span class="detail-bk">42</span> / <span class="detail-f">21</span> <span class="sample">(n=86)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">49</span> / <span class="detail-f">22</span> <span class="sample">(n=49)</span></td>
+<td><span class="detail-b">32</span> / <span class="detail-bk">50</span> / <span class="detail-f">18</span> <span class="sample">(n=22)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">67</span> / <span class="detail-f">17</span> <span class="sample">(n=6)</span></td>
+<td><span class="detail-b">10</span> / <span class="detail-bk">53</span> / <span class="detail-f">37</span> <span class="sample">(n=145)</span></td>
+</tr>
+<tr>
+<td class="ticker">AVGO</td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">48</span> / <span class="detail-f">22</span> <span class="sample">(n=89)</span></td>
+<td><span class="detail-b">35</span> / <span class="detail-bk">50</span> / <span class="detail-f">15</span> <span class="sample">(n=60)</span></td>
+<td><span class="detail-b">28</span> / <span class="detail-bk">56</span> / <span class="detail-f">16</span> <span class="sample">(n=25)</span></td>
+<td><span class="detail-b">0</span> / <span class="detail-bk">100</span> / <span class="detail-f">0</span> <span class="sample">(n=2)</span></td>
+<td><span class="detail-b">14</span> / <span class="detail-bk">51</span> / <span class="detail-f">35</span> <span class="sample">(n=146)</span></td>
+</tr>
+<tr>
+<td class="ticker">GOOG</td>
+<td><span class="detail-b">39</span> / <span class="detail-bk">37</span> / <span class="detail-f">24</span> <span class="sample">(n=87)</span></td>
+<td><span class="detail-b">31</span> / <span class="detail-bk">47</span> / <span class="detail-f">22</span> <span class="sample">(n=49)</span></td>
+<td><span class="detail-b">38</span> / <span class="detail-bk">50</span> / <span class="detail-f">12</span> <span class="sample">(n=24)</span></td>
+<td><span class="detail-b">17</span> / <span class="detail-bk">67</span> / <span class="detail-f">17</span> <span class="sample">(n=6)</span></td>
+<td><span class="detail-b">13</span> / <span class="detail-bk">50</span> / <span class="detail-f">37</span> <span class="sample">(n=147)</span></td>
+</tr>
+<tr>
+<td class="ticker">META</td>
+<td><span class="detail-b">36</span> / <span class="detail-bk">45</span> / <span class="detail-f">18</span> <span class="sample">(n=88)</span></td>
+<td><span class="detail-b">41</span> / <span class="detail-bk">51</span> / <span class="detail-f">8</span> <span class="sample">(n=49)</span></td>
+<td><span class="detail-b">29</span> / <span class="detail-bk">46</span> / <span class="detail-f">25</span> <span class="sample">(n=24)</span></td>
+<td><span class="detail-b">12</span> / <span class="detail-bk">75</span> / <span class="detail-f">12</span> <span class="sample">(n=8)</span></td>
+<td><span class="detail-b">15</span> / <span class="detail-bk">44</span> / <span class="detail-f">42</span> <span class="sample">(n=142)</span></td>
+</tr>
+<tr>
+<td class="ticker">TSLA</td>
+<td><span class="detail-b">33</span> / <span class="detail-bk">51</span> / <span class="detail-f">16</span> <span class="sample">(n=90)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">56</span> / <span class="detail-f">17</span> <span class="sample">(n=64)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">59</span> / <span class="detail-f">11</span> <span class="sample">(n=37)</span></td>
+<td><span class="detail-b">24</span> / <span class="detail-bk">67</span> / <span class="detail-f">10</span> <span class="sample">(n=21)</span></td>
+<td><span class="detail-b">10</span> / <span class="detail-bk">48</span> / <span class="detail-f">43</span> <span class="sample">(n=143)</span></td>
+</tr>
+<tr>
+<td class="ticker">BRK.B</td>
+<td><span class="detail-b">40</span> / <span class="detail-bk">49</span> / <span class="detail-f">12</span> <span class="sample">(n=101)</span></td>
+<td><span class="detail-b">30</span> / <span class="detail-bk">40</span> / <span class="detail-f">30</span> <span class="sample">(n=57)</span></td>
+<td><span class="detail-b">27</span> / <span class="detail-bk">51</span> / <span class="detail-f">22</span> <span class="sample">(n=37)</span></td>
+<td><span class="detail-b">0</span> / <span class="detail-bk">80</span> / <span class="detail-f">20</span> <span class="sample">(n=5)</span></td>
+<td><span class="detail-b">19</span> / <span class="detail-bk">50</span> / <span class="detail-f">32</span> <span class="sample">(n=145)</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+    <section class="notes">
+      <h2>Notes</h2>
+      <ul>
+        <li><strong>VWAP unavailable on XSP and RUT</strong> - the CBOE:XSP / TVC:RUT feed does not provide VWAP on Daily/Weekly. Marked as “—”.</li>
+        <li><strong>Insufficient sample</strong> (n &lt; 20) blocks the entry in the Best column, but the percentage is still shown with the (n=T) suffix.</li>
+        <li>Raw snapshots: <code>state/occurrence_matrix_snapshots/</code></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Regen: <code>python scripts/occurrence_matrix_report.py --format all</code><br>
+    Generated at 2026-05-04 14:15:44 Hora oficial do Brasil
+  </footer>
+</body>
+</html>

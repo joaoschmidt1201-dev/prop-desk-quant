@@ -1,0 +1,422 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Built on top of "Occurrence Scanner [ST]" v10.3 by © BigGuavaTrading
+// State machine PARITY: bit-identical to occurrence_scanner.pine — counts must match
+//@version=5
+
+indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true)
+
+string ver_num  = "v11.0"
+string ver_date = "2026-04-29"
+
+// ==========================================
+// 1. INPUTS
+// ==========================================
+g_main   = "Main"
+g_filter = "Filters"
+g_table  = "Table"
+g_idx    = "Tickers — Indices/Futures"
+g_crypto = "Tickers — Crypto"
+g_fx     = "Tickers — FX"
+g_comm   = "Tickers — Commodities/ETFs"
+g_qqq    = "Tickers — QQQ Top 10"
+
+approx   = input.float(0.1, "Zone Tolerance (+/- %)", step=0.1, group=g_main, tooltip="Close MUST break this buffer to count as a violation. Match the value used in your stand-alone Occurrence Scanner.")
+winSize  = input.int(2, "Lookahead Candles", minval=2, group=g_main)
+
+useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=g_filter)
+useDateFilter    = input.bool(true,  "Filter Start Date?", group=g_filter)
+startDate        = input.time(timestamp("01 Jan 2018 00:00 +0000"), "Start Date", group=g_filter, tooltip="Older start dates require more bars per security. If the script times out on load, push this forward (e.g. 2020).")
+
+ema_fast_p = input.int(9,   "EMA fast period",  group=g_main)
+ema_slow_p = input.int(20,  "EMA slow period",  group=g_main)
+sma_mid_p  = input.int(50,  "SMA mid period",   group=g_main)
+sma_long_p = input.int(200, "SMA long period",  group=g_main)
+
+tablePos        = input.string("middle_right", "Table Position", options=["top_right", "middle_right", "bottom_right", "top_left", "middle_left", "bottom_left"], group=g_table)
+tableTextSize   = input.string("tiny",         "Table Text Size", options=["tiny", "small", "normal"], group=g_table)
+compactMode     = input.bool(true,  "Compact Mode (hide sample size in cell)", group=g_table, tooltip="Off = '52.3%\\nn=156' (2 lines). On = '52.3%' (1 line, mais denso).")
+minSampleHL     = input.int(20, "Min sample to mark 'best' MA", minval=0, group=g_table, tooltip="Cells with fewer occurrences than this are not eligible for the green highlight (best Bounce%). Avoids noisy small-sample winners.")
+
+// Toggles por grupo de tickers — esconda o que não estiver olhando hoje
+showIdx     = input.bool(true,  "Show Indices/Futures",   group=g_table)
+showCrypto  = input.bool(true,  "Show Crypto",            group=g_table)
+showFX      = input.bool(true,  "Show FX",                group=g_table)
+showComm    = input.bool(true,  "Show Commodities/ETFs",  group=g_table)
+showQQQ     = input.bool(false, "Show QQQ Top 10",        group=g_table, tooltip="Default off — these are read-only references (zero idiosyncratic risk policy).")
+
+g_alert       = "Snapshot Export"
+printSnapshot = input.bool(true,  "Print snapshot to Pine Logs (manual mode)", group=g_alert, tooltip="Quando ligado: imprime o payload JSON no painel Pine Logs assim que o chart termina de carregar. Use pra copiar manualmente sem precisar configurar webhook. Abra View → Pine Logs no Pine Editor.")
+enableAlert   = input.bool(false, "Enable Friday Close Snapshot Alert (auto mode)", group=g_alert, tooltip="Quando ligado: dispara alert() com payload JSON no fechamento de Sexta D1. Configure 1 alert no TV (Add alert → condition 'Any alert() function call') apontando pro webhook. Use em chart D1 de SPY ou outro asset com sessão US.")
+
+// 29 tickers (universo definido com CZ)
+t01 = input.symbol("CME_MINI:ES1!",   "ES",   group=g_idx)
+t02 = input.symbol("SP:SPX",          "SPX",  group=g_idx)
+t03 = input.symbol("AMEX:SPY",        "SPY",  group=g_idx)
+t04 = input.symbol("CBOE:XSP",        "XSP",  group=g_idx)
+t05 = input.symbol("CME_MINI:NQ1!",   "NQ",   group=g_idx)
+t06 = input.symbol("NASDAQ:NDX",      "NDX",  group=g_idx)
+t07 = input.symbol("NASDAQ:QQQ",      "QQQ",  group=g_idx)
+t08 = input.symbol("CME_MINI:RTY1!",  "RTY",  group=g_idx)
+t09 = input.symbol("TVC:RUT",         "RUT",  group=g_idx)
+t10 = input.symbol("AMEX:IWM",        "IWM",  group=g_idx)
+
+t11 = input.symbol("BINANCE:BTCUSDT", "BTC",  group=g_crypto)
+t12 = input.symbol("BINANCE:ETHUSDT", "ETH",  group=g_crypto)
+
+t13 = input.symbol("FX:EURUSD",       "EURUSD", group=g_fx)
+t14 = input.symbol("FX:EURCHF",       "EURCHF", group=g_fx)
+t15 = input.symbol("FX:GBPUSD",       "GBPUSD", group=g_fx)
+
+t16 = input.symbol("AMEX:GLD",        "GLD",  group=g_comm)
+t17 = input.symbol("AMEX:SLV",        "SLV",  group=g_comm)
+t18 = input.symbol("AMEX:USO",        "USO",  group=g_comm)
+t19 = input.symbol("AMEX:EWZ",        "EWZ",  group=g_comm)
+
+t20 = input.symbol("NASDAQ:NVDA",     "NVDA", group=g_qqq)
+t21 = input.symbol("NASDAQ:AAPL",     "AAPL", group=g_qqq)
+t22 = input.symbol("NASDAQ:MSFT",     "MSFT", group=g_qqq)
+t23 = input.symbol("NASDAQ:AMZN",     "AMZN", group=g_qqq)
+t24 = input.symbol("NASDAQ:GOOGL",    "GOOGL",group=g_qqq)
+t25 = input.symbol("NASDAQ:AVGO",     "AVGO", group=g_qqq)
+t26 = input.symbol("NASDAQ:GOOG",     "GOOG", group=g_qqq)
+t27 = input.symbol("NASDAQ:META",     "META", group=g_qqq)
+t28 = input.symbol("NASDAQ:TSLA",     "TSLA", group=g_qqq)
+t29 = input.symbol("NYSE:BRK.B",      "BRK.B",group=g_qqq)
+
+// Display labels (curtos pra caber na tabela)
+n01 = "ES"
+n02 = "SPX"
+n03 = "SPY"
+n04 = "XSP"
+n05 = "NQ"
+n06 = "NDX"
+n07 = "QQQ"
+n08 = "RTY"
+n09 = "RUT"
+n10 = "IWM"
+n11 = "BTC"
+n12 = "ETH"
+n13 = "EURUSD"
+n14 = "EURCHF"
+n15 = "GBPUSD"
+n16 = "GLD"
+n17 = "SLV"
+n18 = "USO"
+n19 = "EWZ"
+n20 = "NVDA"
+n21 = "AAPL"
+n22 = "MSFT"
+n23 = "AMZN"
+n24 = "GOOGL"
+n25 = "AVGO"
+n26 = "GOOG"
+n27 = "META"
+n28 = "TSLA"
+n29 = "BRK.B"
+
+// ==========================================
+// 2. STATE MACHINE — paridade exata com Occurrence Scanner v10.3
+// ==========================================
+// Recebe a MA já calculada e o estado do squeeze do contexto atual,
+// roda a state machine bar-a-bar e retorna [Total, Bounce, Break, False].
+
+run_sm(float ma_val, bool sqz_on) =>
+    var int  cT       = 0
+    var int  cB       = 0
+    var int  cBk      = 0
+    var int  cF       = 0
+    var bool in_event = false
+    var int  timer    = 0
+    var bool ts       = false
+    var int  tr_idx   = 0
+    var int  cv       = 0
+    var bool vio      = false
+    var bool ew       = false
+
+    upper_buf = ma_val * (1 + approx / 100)
+    lower_buf = ma_val * (1 - approx / 100)
+
+    bool touched = (low <= upper_buf and high >= lower_buf)
+    bool crossed = ta.crossover(close, ma_val) or ta.crossunder(close, ma_val)
+    bool ok_date = not useDateFilter or time >= startDate
+    bool ok_vol  = not useSqueezeFilter or not sqz_on
+
+    if (touched or crossed) and not in_event and ok_date and ok_vol
+        in_event := true
+        timer    := 0
+        ts       := close[1] > ma_val[1]
+        tr_idx   := bar_index
+        vio      := false
+        ew       := false
+        bool out_strict = ts ? close < lower_buf : close > upper_buf
+        cv := out_strict ? 1 : 0
+        if cv == 1
+            vio := true
+
+    if in_event
+        if useSqueezeFilter and sqz_on
+            in_event := false
+            cv := 0
+            ew := false
+        else
+            if bar_index > tr_idx
+                timer += 1
+
+            bool ps = ts ? close < lower_buf : close > upper_buf
+            bool pr = ts ? close < ma_val    : close > ma_val
+
+            if bar_index > tr_idx
+                if cv == 0
+                    if ps
+                        cv  := cv + 1
+                        vio := true
+                else
+                    if pr
+                        cv := cv + 1
+                    else
+                        cv := 0
+
+            if cv >= 2
+                cBk := cBk + 1
+                cT  := cT  + 1
+                in_event := false
+                cv := 0
+                ew := false
+            else if timer >= winSize
+                if cv == 1 and not ew
+                    ew := true
+                else
+                    if not vio
+                        cB := cB + 1
+                        cT := cT + 1
+                    else
+                        cF := cF + 1
+                        cT := cT + 1
+                    in_event := false
+                    cv := 0
+                    ew := false
+
+    [cT, cB, cBk, cF]
+
+// ==========================================
+// 3. WRAPPER — calcula squeeze + 5 MAs no contexto do símbolo solicitado
+// ==========================================
+run_full() =>
+    // Squeeze (mesmos params do v10.3: BB 20/2.0, KC 20/1.5)
+    [_, ub, lb] = ta.bb(close, 20, 2.0)
+    bk  = ta.sma(close, 20)
+    rk  = ta.tr(true)
+    ark = ta.sma(rk, 20)
+    ukc = bk + ark * 1.5
+    lkc = bk - ark * 1.5
+    bool sqz = (ub < ukc) and (lb > lkc)
+
+    ma1 = ta.ema(close, ema_fast_p)
+    ma2 = ta.ema(close, ema_slow_p)
+    ma3 = ta.sma(close, sma_mid_p)
+    ma4 = ta.sma(close, sma_long_p)
+    ma5 = ta.vwap
+
+    [t1, b1, k1, f1] = run_sm(ma1, sqz)
+    [t2, b2, k2, f2] = run_sm(ma2, sqz)
+    [t3, b3, k3, f3] = run_sm(ma3, sqz)
+    [t4, b4, k4, f4] = run_sm(ma4, sqz)
+    [t5, b5, k5, f5] = run_sm(ma5, sqz)
+
+    [t1,b1,k1,f1, t2,b2,k2,f2, t3,b3,k3,f3, t4,b4,k4,f4, t5,b5,k5,f5]
+
+// ==========================================
+// 4. RUN PER TICKER (29 calls — within Pine's 40-security limit)
+// ==========================================
+[a01_t1,a01_b1,a01_k1,a01_f1, a01_t2,a01_b2,a01_k2,a01_f2, a01_t3,a01_b3,a01_k3,a01_f3, a01_t4,a01_b4,a01_k4,a01_f4, a01_t5,a01_b5,a01_k5,a01_f5] = request.security(t01, timeframe.period, run_full())
+[a02_t1,a02_b1,a02_k1,a02_f1, a02_t2,a02_b2,a02_k2,a02_f2, a02_t3,a02_b3,a02_k3,a02_f3, a02_t4,a02_b4,a02_k4,a02_f4, a02_t5,a02_b5,a02_k5,a02_f5] = request.security(t02, timeframe.period, run_full())
+[a03_t1,a03_b1,a03_k1,a03_f1, a03_t2,a03_b2,a03_k2,a03_f2, a03_t3,a03_b3,a03_k3,a03_f3, a03_t4,a03_b4,a03_k4,a03_f4, a03_t5,a03_b5,a03_k5,a03_f5] = request.security(t03, timeframe.period, run_full())
+[a04_t1,a04_b1,a04_k1,a04_f1, a04_t2,a04_b2,a04_k2,a04_f2, a04_t3,a04_b3,a04_k3,a04_f3, a04_t4,a04_b4,a04_k4,a04_f4, a04_t5,a04_b5,a04_k5,a04_f5] = request.security(t04, timeframe.period, run_full())
+[a05_t1,a05_b1,a05_k1,a05_f1, a05_t2,a05_b2,a05_k2,a05_f2, a05_t3,a05_b3,a05_k3,a05_f3, a05_t4,a05_b4,a05_k4,a05_f4, a05_t5,a05_b5,a05_k5,a05_f5] = request.security(t05, timeframe.period, run_full())
+[a06_t1,a06_b1,a06_k1,a06_f1, a06_t2,a06_b2,a06_k2,a06_f2, a06_t3,a06_b3,a06_k3,a06_f3, a06_t4,a06_b4,a06_k4,a06_f4, a06_t5,a06_b5,a06_k5,a06_f5] = request.security(t06, timeframe.period, run_full())
+[a07_t1,a07_b1,a07_k1,a07_f1, a07_t2,a07_b2,a07_k2,a07_f2, a07_t3,a07_b3,a07_k3,a07_f3, a07_t4,a07_b4,a07_k4,a07_f4, a07_t5,a07_b5,a07_k5,a07_f5] = request.security(t07, timeframe.period, run_full())
+[a08_t1,a08_b1,a08_k1,a08_f1, a08_t2,a08_b2,a08_k2,a08_f2, a08_t3,a08_b3,a08_k3,a08_f3, a08_t4,a08_b4,a08_k4,a08_f4, a08_t5,a08_b5,a08_k5,a08_f5] = request.security(t08, timeframe.period, run_full())
+[a09_t1,a09_b1,a09_k1,a09_f1, a09_t2,a09_b2,a09_k2,a09_f2, a09_t3,a09_b3,a09_k3,a09_f3, a09_t4,a09_b4,a09_k4,a09_f4, a09_t5,a09_b5,a09_k5,a09_f5] = request.security(t09, timeframe.period, run_full())
+[a10_t1,a10_b1,a10_k1,a10_f1, a10_t2,a10_b2,a10_k2,a10_f2, a10_t3,a10_b3,a10_k3,a10_f3, a10_t4,a10_b4,a10_k4,a10_f4, a10_t5,a10_b5,a10_k5,a10_f5] = request.security(t10, timeframe.period, run_full())
+
+[a11_t1,a11_b1,a11_k1,a11_f1, a11_t2,a11_b2,a11_k2,a11_f2, a11_t3,a11_b3,a11_k3,a11_f3, a11_t4,a11_b4,a11_k4,a11_f4, a11_t5,a11_b5,a11_k5,a11_f5] = request.security(t11, timeframe.period, run_full())
+[a12_t1,a12_b1,a12_k1,a12_f1, a12_t2,a12_b2,a12_k2,a12_f2, a12_t3,a12_b3,a12_k3,a12_f3, a12_t4,a12_b4,a12_k4,a12_f4, a12_t5,a12_b5,a12_k5,a12_f5] = request.security(t12, timeframe.period, run_full())
+
+[a13_t1,a13_b1,a13_k1,a13_f1, a13_t2,a13_b2,a13_k2,a13_f2, a13_t3,a13_b3,a13_k3,a13_f3, a13_t4,a13_b4,a13_k4,a13_f4, a13_t5,a13_b5,a13_k5,a13_f5] = request.security(t13, timeframe.period, run_full())
+[a14_t1,a14_b1,a14_k1,a14_f1, a14_t2,a14_b2,a14_k2,a14_f2, a14_t3,a14_b3,a14_k3,a14_f3, a14_t4,a14_b4,a14_k4,a14_f4, a14_t5,a14_b5,a14_k5,a14_f5] = request.security(t14, timeframe.period, run_full())
+[a15_t1,a15_b1,a15_k1,a15_f1, a15_t2,a15_b2,a15_k2,a15_f2, a15_t3,a15_b3,a15_k3,a15_f3, a15_t4,a15_b4,a15_k4,a15_f4, a15_t5,a15_b5,a15_k5,a15_f5] = request.security(t15, timeframe.period, run_full())
+
+[a16_t1,a16_b1,a16_k1,a16_f1, a16_t2,a16_b2,a16_k2,a16_f2, a16_t3,a16_b3,a16_k3,a16_f3, a16_t4,a16_b4,a16_k4,a16_f4, a16_t5,a16_b5,a16_k5,a16_f5] = request.security(t16, timeframe.period, run_full())
+[a17_t1,a17_b1,a17_k1,a17_f1, a17_t2,a17_b2,a17_k2,a17_f2, a17_t3,a17_b3,a17_k3,a17_f3, a17_t4,a17_b4,a17_k4,a17_f4, a17_t5,a17_b5,a17_k5,a17_f5] = request.security(t17, timeframe.period, run_full())
+[a18_t1,a18_b1,a18_k1,a18_f1, a18_t2,a18_b2,a18_k2,a18_f2, a18_t3,a18_b3,a18_k3,a18_f3, a18_t4,a18_b4,a18_k4,a18_f4, a18_t5,a18_b5,a18_k5,a18_f5] = request.security(t18, timeframe.period, run_full())
+[a19_t1,a19_b1,a19_k1,a19_f1, a19_t2,a19_b2,a19_k2,a19_f2, a19_t3,a19_b3,a19_k3,a19_f3, a19_t4,a19_b4,a19_k4,a19_f4, a19_t5,a19_b5,a19_k5,a19_f5] = request.security(t19, timeframe.period, run_full())
+
+[a20_t1,a20_b1,a20_k1,a20_f1, a20_t2,a20_b2,a20_k2,a20_f2, a20_t3,a20_b3,a20_k3,a20_f3, a20_t4,a20_b4,a20_k4,a20_f4, a20_t5,a20_b5,a20_k5,a20_f5] = request.security(t20, timeframe.period, run_full())
+[a21_t1,a21_b1,a21_k1,a21_f1, a21_t2,a21_b2,a21_k2,a21_f2, a21_t3,a21_b3,a21_k3,a21_f3, a21_t4,a21_b4,a21_k4,a21_f4, a21_t5,a21_b5,a21_k5,a21_f5] = request.security(t21, timeframe.period, run_full())
+[a22_t1,a22_b1,a22_k1,a22_f1, a22_t2,a22_b2,a22_k2,a22_f2, a22_t3,a22_b3,a22_k3,a22_f3, a22_t4,a22_b4,a22_k4,a22_f4, a22_t5,a22_b5,a22_k5,a22_f5] = request.security(t22, timeframe.period, run_full())
+[a23_t1,a23_b1,a23_k1,a23_f1, a23_t2,a23_b2,a23_k2,a23_f2, a23_t3,a23_b3,a23_k3,a23_f3, a23_t4,a23_b4,a23_k4,a23_f4, a23_t5,a23_b5,a23_k5,a23_f5] = request.security(t23, timeframe.period, run_full())
+[a24_t1,a24_b1,a24_k1,a24_f1, a24_t2,a24_b2,a24_k2,a24_f2, a24_t3,a24_b3,a24_k3,a24_f3, a24_t4,a24_b4,a24_k4,a24_f4, a24_t5,a24_b5,a24_k5,a24_f5] = request.security(t24, timeframe.period, run_full())
+[a25_t1,a25_b1,a25_k1,a25_f1, a25_t2,a25_b2,a25_k2,a25_f2, a25_t3,a25_b3,a25_k3,a25_f3, a25_t4,a25_b4,a25_k4,a25_f4, a25_t5,a25_b5,a25_k5,a25_f5] = request.security(t25, timeframe.period, run_full())
+[a26_t1,a26_b1,a26_k1,a26_f1, a26_t2,a26_b2,a26_k2,a26_f2, a26_t3,a26_b3,a26_k3,a26_f3, a26_t4,a26_b4,a26_k4,a26_f4, a26_t5,a26_b5,a26_k5,a26_f5] = request.security(t26, timeframe.period, run_full())
+[a27_t1,a27_b1,a27_k1,a27_f1, a27_t2,a27_b2,a27_k2,a27_f2, a27_t3,a27_b3,a27_k3,a27_f3, a27_t4,a27_b4,a27_k4,a27_f4, a27_t5,a27_b5,a27_k5,a27_f5] = request.security(t27, timeframe.period, run_full())
+[a28_t1,a28_b1,a28_k1,a28_f1, a28_t2,a28_b2,a28_k2,a28_f2, a28_t3,a28_b3,a28_k3,a28_f3, a28_t4,a28_b4,a28_k4,a28_f4, a28_t5,a28_b5,a28_k5,a28_f5] = request.security(t28, timeframe.period, run_full())
+[a29_t1,a29_b1,a29_k1,a29_f1, a29_t2,a29_b2,a29_k2,a29_f2, a29_t3,a29_b3,a29_k3,a29_f3, a29_t4,a29_b4,a29_k4,a29_f4, a29_t5,a29_b5,a29_k5,a29_f5] = request.security(t29, timeframe.period, run_full())
+
+// ==========================================
+// 5. TABLE RENDERING
+// ==========================================
+position_of(string s) =>
+    s == "top_right"     ? position.top_right     :
+      s == "middle_right"  ? position.middle_right  :
+      s == "bottom_right"  ? position.bottom_right  :
+      s == "top_left"      ? position.top_left      :
+      s == "middle_left"   ? position.middle_left   :
+      s == "bottom_left"   ? position.bottom_left   :
+                             position.middle_right
+
+text_size_of(string s) =>
+    s == "tiny" ? size.tiny : s == "small" ? size.small : size.normal
+
+// 30 rows = 1 header + 29 tickers; 6 cols = ticker name + 5 MAs
+var table tbl = table.new(position_of(tablePos), 6, 30, bgcolor=color.new(color.black, 70), border_width=1, border_color=color.new(color.gray, 60))
+
+// Renderiza uma célula (Bounce% + n=Total). Highlight verde se for o "best" da linha.
+fmt_cell(int col_idx, int row_idx, int t, float r, int best_col, string sz) =>
+    if t == 0
+        table.cell(tbl, col_idx, row_idx, "—", text_color=color.new(color.gray, 30), bgcolor=color.new(color.black, 90), text_size=sz)
+    else
+        string txt = str.tostring(math.round(r, 1)) + "%\nn=" + str.tostring(t)
+        bool is_best = col_idx == best_col
+        color bg = is_best ? color.new(color.green, 60) : color.new(color.black, 90)
+        color fg = is_best ? color.new(color.lime, 0)   : color.new(color.white, 0)
+        table.cell(tbl, col_idx, row_idx, txt, text_color=fg, bgcolor=bg, text_size=sz)
+
+// Renderiza uma linha completa, calcula o "best Bounce%" considerando minSampleHL
+render_row(int row, string name, int t1, int b1, int t2, int b2, int t3, int b3, int t4, int b4, int t5, int b5, string sz) =>
+    table.cell(tbl, 0, row, name, text_color=color.new(color.white, 0), bgcolor=color.new(color.black, 50), text_size=sz)
+
+    float r1 = t1 > 0 ? b1 * 100.0 / t1 : -1.0
+    float r2 = t2 > 0 ? b2 * 100.0 / t2 : -1.0
+    float r3 = t3 > 0 ? b3 * 100.0 / t3 : -1.0
+    float r4 = t4 > 0 ? b4 * 100.0 / t4 : -1.0
+    float r5 = t5 > 0 ? b5 * 100.0 / t5 : -1.0
+
+    int   best_col = 0
+    float best_val = -1.0
+    if t1 >= minSampleHL and r1 > best_val
+        best_val := r1
+        best_col := 1
+    if t2 >= minSampleHL and r2 > best_val
+        best_val := r2
+        best_col := 2
+    if t3 >= minSampleHL and r3 > best_val
+        best_val := r3
+        best_col := 3
+    if t4 >= minSampleHL and r4 > best_val
+        best_val := r4
+        best_col := 4
+    if t5 >= minSampleHL and r5 > best_val
+        best_val := r5
+        best_col := 5
+
+    fmt_cell(1, row, t1, r1, best_col, sz)
+    fmt_cell(2, row, t2, r2, best_col, sz)
+    fmt_cell(3, row, t3, r3, best_col, sz)
+    fmt_cell(4, row, t4, r4, best_col, sz)
+    fmt_cell(5, row, t5, r5, best_col, sz)
+
+if barstate.islast
+    string sz = tableTextSize
+
+    // Header
+    string tf_label = "[" + timeframe.period + "]"
+    table.cell(tbl, 0, 0, "Ticker " + tf_label, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 1, 0, "EMA " + str.tostring(ema_fast_p), text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 2, 0, "EMA " + str.tostring(ema_slow_p), text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 3, 0, "SMA " + str.tostring(sma_mid_p),  text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 4, 0, "SMA " + str.tostring(sma_long_p), text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 5, 0, "VWAP",                            text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+
+    // 29 ticker rows
+    render_row( 1, n01, a01_t1,a01_b1, a01_t2,a01_b2, a01_t3,a01_b3, a01_t4,a01_b4, a01_t5,a01_b5, sz)
+    render_row( 2, n02, a02_t1,a02_b1, a02_t2,a02_b2, a02_t3,a02_b3, a02_t4,a02_b4, a02_t5,a02_b5, sz)
+    render_row( 3, n03, a03_t1,a03_b1, a03_t2,a03_b2, a03_t3,a03_b3, a03_t4,a03_b4, a03_t5,a03_b5, sz)
+    render_row( 4, n04, a04_t1,a04_b1, a04_t2,a04_b2, a04_t3,a04_b3, a04_t4,a04_b4, a04_t5,a04_b5, sz)
+    render_row( 5, n05, a05_t1,a05_b1, a05_t2,a05_b2, a05_t3,a05_b3, a05_t4,a05_b4, a05_t5,a05_b5, sz)
+    render_row( 6, n06, a06_t1,a06_b1, a06_t2,a06_b2, a06_t3,a06_b3, a06_t4,a06_b4, a06_t5,a06_b5, sz)
+    render_row( 7, n07, a07_t1,a07_b1, a07_t2,a07_b2, a07_t3,a07_b3, a07_t4,a07_b4, a07_t5,a07_b5, sz)
+    render_row( 8, n08, a08_t1,a08_b1, a08_t2,a08_b2, a08_t3,a08_b3, a08_t4,a08_b4, a08_t5,a08_b5, sz)
+    render_row( 9, n09, a09_t1,a09_b1, a09_t2,a09_b2, a09_t3,a09_b3, a09_t4,a09_b4, a09_t5,a09_b5, sz)
+    render_row(10, n10, a10_t1,a10_b1, a10_t2,a10_b2, a10_t3,a10_b3, a10_t4,a10_b4, a10_t5,a10_b5, sz)
+    render_row(11, n11, a11_t1,a11_b1, a11_t2,a11_b2, a11_t3,a11_b3, a11_t4,a11_b4, a11_t5,a11_b5, sz)
+    render_row(12, n12, a12_t1,a12_b1, a12_t2,a12_b2, a12_t3,a12_b3, a12_t4,a12_b4, a12_t5,a12_b5, sz)
+    render_row(13, n13, a13_t1,a13_b1, a13_t2,a13_b2, a13_t3,a13_b3, a13_t4,a13_b4, a13_t5,a13_b5, sz)
+    render_row(14, n14, a14_t1,a14_b1, a14_t2,a14_b2, a14_t3,a14_b3, a14_t4,a14_b4, a14_t5,a14_b5, sz)
+    render_row(15, n15, a15_t1,a15_b1, a15_t2,a15_b2, a15_t3,a15_b3, a15_t4,a15_b4, a15_t5,a15_b5, sz)
+    render_row(16, n16, a16_t1,a16_b1, a16_t2,a16_b2, a16_t3,a16_b3, a16_t4,a16_b4, a16_t5,a16_b5, sz)
+    render_row(17, n17, a17_t1,a17_b1, a17_t2,a17_b2, a17_t3,a17_b3, a17_t4,a17_b4, a17_t5,a17_b5, sz)
+    render_row(18, n18, a18_t1,a18_b1, a18_t2,a18_b2, a18_t3,a18_b3, a18_t4,a18_b4, a18_t5,a18_b5, sz)
+    render_row(19, n19, a19_t1,a19_b1, a19_t2,a19_b2, a19_t3,a19_b3, a19_t4,a19_b4, a19_t5,a19_b5, sz)
+    render_row(20, n20, a20_t1,a20_b1, a20_t2,a20_b2, a20_t3,a20_b3, a20_t4,a20_b4, a20_t5,a20_b5, sz)
+    render_row(21, n21, a21_t1,a21_b1, a21_t2,a21_b2, a21_t3,a21_b3, a21_t4,a21_b4, a21_t5,a21_b5, sz)
+    render_row(22, n22, a22_t1,a22_b1, a22_t2,a22_b2, a22_t3,a22_b3, a22_t4,a22_b4, a22_t5,a22_b5, sz)
+    render_row(23, n23, a23_t1,a23_b1, a23_t2,a23_b2, a23_t3,a23_b3, a23_t4,a23_b4, a23_t5,a23_b5, sz)
+    render_row(24, n24, a24_t1,a24_b1, a24_t2,a24_b2, a24_t3,a24_b3, a24_t4,a24_b4, a24_t5,a24_b5, sz)
+    render_row(25, n25, a25_t1,a25_b1, a25_t2,a25_b2, a25_t3,a25_b3, a25_t4,a25_b4, a25_t5,a25_b5, sz)
+    render_row(26, n26, a26_t1,a26_b1, a26_t2,a26_b2, a26_t3,a26_b3, a26_t4,a26_b4, a26_t5,a26_b5, sz)
+    render_row(27, n27, a27_t1,a27_b1, a27_t2,a27_b2, a27_t3,a27_b3, a27_t4,a27_b4, a27_t5,a27_b5, sz)
+    render_row(28, n28, a28_t1,a28_b1, a28_t2,a28_b2, a28_t3,a28_b3, a28_t4,a28_b4, a28_t5,a28_b5, sz)
+    render_row(29, n29, a29_t1,a29_b1, a29_t2,a29_b2, a29_t3,a29_b3, a29_t4,a29_b4, a29_t5,a29_b5, sz)
+
+// ==========================================
+// 6. FRIDAY CLOSE SNAPSHOT ALERT
+// ==========================================
+// Empacota Total/Bounce/Break/False de 1 ticker (5 MAs = 20 ints) em CSV
+ticker_csv(int t1, int b1, int k1, int f1, int t2, int b2, int k2, int f2, int t3, int b3, int k3, int f3, int t4, int b4, int k4, int f4, int t5, int b5, int k5, int f5) =>
+    str.tostring(t1) + "," + str.tostring(b1) + "," + str.tostring(k1) + "," + str.tostring(f1) + "," + str.tostring(t2) + "," + str.tostring(b2) + "," + str.tostring(k2) + "," + str.tostring(f2) + "," + str.tostring(t3) + "," + str.tostring(b3) + "," + str.tostring(k3) + "," + str.tostring(f3) + "," + str.tostring(t4) + "," + str.tostring(b4) + "," + str.tostring(k4) + "," + str.tostring(f4) + "," + str.tostring(t5) + "," + str.tostring(b5) + "," + str.tostring(k5) + "," + str.tostring(f5)
+
+// Trigger conditions
+// - must_log: imprime no Pine Logs assim que o chart carrega (modo manual, copy/paste)
+// - must_alert: dispara webhook na Sexta D1 close (modo automatizado, requer alert configurado)
+is_friday_close = dayofweek == dayofweek.friday and timeframe.period == "D"
+must_log        = printSnapshot and barstate.islast
+must_alert      = enableAlert  and is_friday_close
+
+if must_log or must_alert
+    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"data\":{"
+    string body = ""
+    body := body + "\""+n01+"\":["+ticker_csv(a01_t1,a01_b1,a01_k1,a01_f1,a01_t2,a01_b2,a01_k2,a01_f2,a01_t3,a01_b3,a01_k3,a01_f3,a01_t4,a01_b4,a01_k4,a01_f4,a01_t5,a01_b5,a01_k5,a01_f5)+"]"
+    body := body + ",\""+n02+"\":["+ticker_csv(a02_t1,a02_b1,a02_k1,a02_f1,a02_t2,a02_b2,a02_k2,a02_f2,a02_t3,a02_b3,a02_k3,a02_f3,a02_t4,a02_b4,a02_k4,a02_f4,a02_t5,a02_b5,a02_k5,a02_f5)+"]"
+    body := body + ",\""+n03+"\":["+ticker_csv(a03_t1,a03_b1,a03_k1,a03_f1,a03_t2,a03_b2,a03_k2,a03_f2,a03_t3,a03_b3,a03_k3,a03_f3,a03_t4,a03_b4,a03_k4,a03_f4,a03_t5,a03_b5,a03_k5,a03_f5)+"]"
+    body := body + ",\""+n04+"\":["+ticker_csv(a04_t1,a04_b1,a04_k1,a04_f1,a04_t2,a04_b2,a04_k2,a04_f2,a04_t3,a04_b3,a04_k3,a04_f3,a04_t4,a04_b4,a04_k4,a04_f4,a04_t5,a04_b5,a04_k5,a04_f5)+"]"
+    body := body + ",\""+n05+"\":["+ticker_csv(a05_t1,a05_b1,a05_k1,a05_f1,a05_t2,a05_b2,a05_k2,a05_f2,a05_t3,a05_b3,a05_k3,a05_f3,a05_t4,a05_b4,a05_k4,a05_f4,a05_t5,a05_b5,a05_k5,a05_f5)+"]"
+    body := body + ",\""+n06+"\":["+ticker_csv(a06_t1,a06_b1,a06_k1,a06_f1,a06_t2,a06_b2,a06_k2,a06_f2,a06_t3,a06_b3,a06_k3,a06_f3,a06_t4,a06_b4,a06_k4,a06_f4,a06_t5,a06_b5,a06_k5,a06_f5)+"]"
+    body := body + ",\""+n07+"\":["+ticker_csv(a07_t1,a07_b1,a07_k1,a07_f1,a07_t2,a07_b2,a07_k2,a07_f2,a07_t3,a07_b3,a07_k3,a07_f3,a07_t4,a07_b4,a07_k4,a07_f4,a07_t5,a07_b5,a07_k5,a07_f5)+"]"
+    body := body + ",\""+n08+"\":["+ticker_csv(a08_t1,a08_b1,a08_k1,a08_f1,a08_t2,a08_b2,a08_k2,a08_f2,a08_t3,a08_b3,a08_k3,a08_f3,a08_t4,a08_b4,a08_k4,a08_f4,a08_t5,a08_b5,a08_k5,a08_f5)+"]"
+    body := body + ",\""+n09+"\":["+ticker_csv(a09_t1,a09_b1,a09_k1,a09_f1,a09_t2,a09_b2,a09_k2,a09_f2,a09_t3,a09_b3,a09_k3,a09_f3,a09_t4,a09_b4,a09_k4,a09_f4,a09_t5,a09_b5,a09_k5,a09_f5)+"]"
+    body := body + ",\""+n10+"\":["+ticker_csv(a10_t1,a10_b1,a10_k1,a10_f1,a10_t2,a10_b2,a10_k2,a10_f2,a10_t3,a10_b3,a10_k3,a10_f3,a10_t4,a10_b4,a10_k4,a10_f4,a10_t5,a10_b5,a10_k5,a10_f5)+"]"
+    body := body + ",\""+n11+"\":["+ticker_csv(a11_t1,a11_b1,a11_k1,a11_f1,a11_t2,a11_b2,a11_k2,a11_f2,a11_t3,a11_b3,a11_k3,a11_f3,a11_t4,a11_b4,a11_k4,a11_f4,a11_t5,a11_b5,a11_k5,a11_f5)+"]"
+    body := body + ",\""+n12+"\":["+ticker_csv(a12_t1,a12_b1,a12_k1,a12_f1,a12_t2,a12_b2,a12_k2,a12_f2,a12_t3,a12_b3,a12_k3,a12_f3,a12_t4,a12_b4,a12_k4,a12_f4,a12_t5,a12_b5,a12_k5,a12_f5)+"]"
+    body := body + ",\""+n13+"\":["+ticker_csv(a13_t1,a13_b1,a13_k1,a13_f1,a13_t2,a13_b2,a13_k2,a13_f2,a13_t3,a13_b3,a13_k3,a13_f3,a13_t4,a13_b4,a13_k4,a13_f4,a13_t5,a13_b5,a13_k5,a13_f5)+"]"
+    body := body + ",\""+n14+"\":["+ticker_csv(a14_t1,a14_b1,a14_k1,a14_f1,a14_t2,a14_b2,a14_k2,a14_f2,a14_t3,a14_b3,a14_k3,a14_f3,a14_t4,a14_b4,a14_k4,a14_f4,a14_t5,a14_b5,a14_k5,a14_f5)+"]"
+    body := body + ",\""+n15+"\":["+ticker_csv(a15_t1,a15_b1,a15_k1,a15_f1,a15_t2,a15_b2,a15_k2,a15_f2,a15_t3,a15_b3,a15_k3,a15_f3,a15_t4,a15_b4,a15_k4,a15_f4,a15_t5,a15_b5,a15_k5,a15_f5)+"]"
+    body := body + ",\""+n16+"\":["+ticker_csv(a16_t1,a16_b1,a16_k1,a16_f1,a16_t2,a16_b2,a16_k2,a16_f2,a16_t3,a16_b3,a16_k3,a16_f3,a16_t4,a16_b4,a16_k4,a16_f4,a16_t5,a16_b5,a16_k5,a16_f5)+"]"
+    body := body + ",\""+n17+"\":["+ticker_csv(a17_t1,a17_b1,a17_k1,a17_f1,a17_t2,a17_b2,a17_k2,a17_f2,a17_t3,a17_b3,a17_k3,a17_f3,a17_t4,a17_b4,a17_k4,a17_f4,a17_t5,a17_b5,a17_k5,a17_f5)+"]"
+    body := body + ",\""+n18+"\":["+ticker_csv(a18_t1,a18_b1,a18_k1,a18_f1,a18_t2,a18_b2,a18_k2,a18_f2,a18_t3,a18_b3,a18_k3,a18_f3,a18_t4,a18_b4,a18_k4,a18_f4,a18_t5,a18_b5,a18_k5,a18_f5)+"]"
+    body := body + ",\""+n19+"\":["+ticker_csv(a19_t1,a19_b1,a19_k1,a19_f1,a19_t2,a19_b2,a19_k2,a19_f2,a19_t3,a19_b3,a19_k3,a19_f3,a19_t4,a19_b4,a19_k4,a19_f4,a19_t5,a19_b5,a19_k5,a19_f5)+"]"
+    body := body + ",\""+n20+"\":["+ticker_csv(a20_t1,a20_b1,a20_k1,a20_f1,a20_t2,a20_b2,a20_k2,a20_f2,a20_t3,a20_b3,a20_k3,a20_f3,a20_t4,a20_b4,a20_k4,a20_f4,a20_t5,a20_b5,a20_k5,a20_f5)+"]"
+    body := body + ",\""+n21+"\":["+ticker_csv(a21_t1,a21_b1,a21_k1,a21_f1,a21_t2,a21_b2,a21_k2,a21_f2,a21_t3,a21_b3,a21_k3,a21_f3,a21_t4,a21_b4,a21_k4,a21_f4,a21_t5,a21_b5,a21_k5,a21_f5)+"]"
+    body := body + ",\""+n22+"\":["+ticker_csv(a22_t1,a22_b1,a22_k1,a22_f1,a22_t2,a22_b2,a22_k2,a22_f2,a22_t3,a22_b3,a22_k3,a22_f3,a22_t4,a22_b4,a22_k4,a22_f4,a22_t5,a22_b5,a22_k5,a22_f5)+"]"
+    body := body + ",\""+n23+"\":["+ticker_csv(a23_t1,a23_b1,a23_k1,a23_f1,a23_t2,a23_b2,a23_k2,a23_f2,a23_t3,a23_b3,a23_k3,a23_f3,a23_t4,a23_b4,a23_k4,a23_f4,a23_t5,a23_b5,a23_k5,a23_f5)+"]"
+    body := body + ",\""+n24+"\":["+ticker_csv(a24_t1,a24_b1,a24_k1,a24_f1,a24_t2,a24_b2,a24_k2,a24_f2,a24_t3,a24_b3,a24_k3,a24_f3,a24_t4,a24_b4,a24_k4,a24_f4,a24_t5,a24_b5,a24_k5,a24_f5)+"]"
+    body := body + ",\""+n25+"\":["+ticker_csv(a25_t1,a25_b1,a25_k1,a25_f1,a25_t2,a25_b2,a25_k2,a25_f2,a25_t3,a25_b3,a25_k3,a25_f3,a25_t4,a25_b4,a25_k4,a25_f4,a25_t5,a25_b5,a25_k5,a25_f5)+"]"
+    body := body + ",\""+n26+"\":["+ticker_csv(a26_t1,a26_b1,a26_k1,a26_f1,a26_t2,a26_b2,a26_k2,a26_f2,a26_t3,a26_b3,a26_k3,a26_f3,a26_t4,a26_b4,a26_k4,a26_f4,a26_t5,a26_b5,a26_k5,a26_f5)+"]"
+    body := body + ",\""+n27+"\":["+ticker_csv(a27_t1,a27_b1,a27_k1,a27_f1,a27_t2,a27_b2,a27_k2,a27_f2,a27_t3,a27_b3,a27_k3,a27_f3,a27_t4,a27_b4,a27_k4,a27_f4,a27_t5,a27_b5,a27_k5,a27_f5)+"]"
+    body := body + ",\""+n28+"\":["+ticker_csv(a28_t1,a28_b1,a28_k1,a28_f1,a28_t2,a28_b2,a28_k2,a28_f2,a28_t3,a28_b3,a28_k3,a28_f3,a28_t4,a28_b4,a28_k4,a28_f4,a28_t5,a28_b5,a28_k5,a28_f5)+"]"
+    body := body + ",\""+n29+"\":["+ticker_csv(a29_t1,a29_b1,a29_k1,a29_f1,a29_t2,a29_b2,a29_k2,a29_f2,a29_t3,a29_b3,a29_k3,a29_f3,a29_t4,a29_b4,a29_k4,a29_f4,a29_t5,a29_b5,a29_k5,a29_f5)+"]"
+
+    string payload = head + body + "}}"
+    if must_log
+        log.info(payload)
+    if must_alert
+        alert(payload, alert.freq_once_per_bar_close)

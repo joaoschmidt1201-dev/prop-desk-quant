@@ -1,0 +1,247 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © BigGuavaTrading
+//@version=5
+
+// Indicator Definition with Identifier [ST]
+indicator("Occurrence Scanner [ST]", shorttitle="OS [ST]", overlay=true, max_labels_count=500)
+
+// Version Control
+string ver_num  = "v10.3"
+string ver_date = "2026-04-29"
+
+// ==========================================
+// 1. INPUTS
+// ==========================================
+grp_main = "Main Configuration"
+grp_date = "Backtest Period"
+grp_sqz  = "Squeeze Filter (Anti-Chop)"
+
+// Adicionado "VWAP" nas opções abaixo:
+maType   = input.string("EMA", "MA Type", options=["SMA", "EMA", "VWAP"], group=grp_main)
+maLength = input.int(20, "MA Period", minval=1, group=grp_main)
+approx   = input.float(0.1, "Zone Tolerance (+/- %)", step=0.1, group=grp_main, tooltip="Close MUST break this buffer to count as a violation.")
+winSize  = input.int(2, "Lookahead Candles", minval=2, group=grp_main)
+
+// Label Distance is fixed internally
+
+useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=grp_sqz)
+useDateFilter    = input.bool(true, "Filter Start Date?", group=grp_date)
+startDate        = input.time(timestamp("01 Jan 2018 00:00 +0000"), "Start Date", group=grp_date)
+
+// ==========================================
+// 2. CALCULATIONS
+// ==========================================
+float ma = 0.0
+
+// Lógica atualizada para incluir o VWAP
+if maType == "SMA"
+    ma := ta.sma(close, maLength)
+else if maType == "EMA"
+    ma := ta.ema(close, maLength)
+else if maType == "VWAP"
+    ma := ta.vwap
+
+upper_buffer = ma * (1 + approx / 100)
+lower_buffer = ma * (1 - approx / 100)
+
+// Orange Color
+plot(ma, "Moving Average", color=color.orange, linewidth=2)
+
+// ATR for Offset (Fixed 0.5 internally)
+atrVal = ta.atr(14)
+float labelOffset = 0.5
+
+// Squeeze Logic
+lengthSqz = 20
+bbMult    = 2.0
+kcMult    = 1.5
+[middle, upperBB, lowerBB] = ta.bb(close, lengthSqz, bbMult)
+basisKC = ta.sma(close, lengthSqz)
+rangeKC = ta.tr(true)
+avgRangeKC = ta.sma(rangeKC, lengthSqz)
+upperKC = basisKC + (avgRangeKC * kcMult)
+lowerKC = basisKC - (avgRangeKC * kcMult)
+bool is_squeeze_on = (upperBB < upperKC) and (lowerBB > lowerKC)
+bgcolor(useSqueezeFilter and is_squeeze_on ? color.new(color.gray, 90) : na, title="Squeeze Active Zone")
+
+// ==========================================
+// 3. STATE MACHINE
+// ==========================================
+var int count_Total     = 0
+var int count_Bounce    = 0
+var int count_Break     = 0
+var int count_False     = 0
+
+var bool  in_event          = false
+var int   timer             = 0
+var bool  testing_support   = false
+var int   trigger_idx       = 0
+var float trigger_price     = 0.0
+
+var int   consecutive_viol  = 0
+var bool  violation_occurred = false
+var bool  extended_window   = false
+var int   first_viol_idx    = 0
+
+// ==========================================
+// 4. TRIGGER EVENT
+// ==========================================
+bool touched_zone = (low <= upper_buffer and high >= lower_buffer)
+bool crossed_line = ta.crossover(close, ma) or ta.crossunder(close, ma)
+bool is_date_ok   = not useDateFilter or time >= startDate
+// Entry Filter
+bool is_vol_ok    = not useSqueezeFilter or not is_squeeze_on
+
+if (touched_zone or crossed_line) and not in_event and is_date_ok and is_vol_ok
+    in_event        := true
+    timer           := 0
+
+    testing_support := close[1] > ma[1]
+
+    trigger_idx     := bar_index
+    trigger_price   := testing_support ? low : high
+    violation_occurred := false
+    extended_window    := false
+    first_viol_idx     := 0
+
+    bool closed_outside_strict = false
+    if testing_support
+        closed_outside_strict := close < lower_buffer
+    else
+        closed_outside_strict := close > upper_buffer
+
+    consecutive_viol := closed_outside_strict ? 1 : 0
+    if consecutive_viol == 1
+        violation_occurred := true
+        first_viol_idx     := bar_index
+
+// ==========================================
+// 5. DECISION ENGINE
+// ==========================================
+if in_event
+    // Abort if Squeeze appears mid-event
+    if useSqueezeFilter and is_squeeze_on
+        in_event := false
+        consecutive_viol := 0
+        extended_window := false
+        first_viol_idx := 0
+    else
+        // Normal Execution
+        if bar_index > trigger_idx
+            timer += 1
+
+        bool passes_strict = false
+        bool passes_relaxed = false
+
+        if testing_support
+            passes_strict  := close < lower_buffer
+            passes_relaxed := close < ma
+        else
+            passes_strict  := close > upper_buffer
+            passes_relaxed := close > ma
+
+        if bar_index > trigger_idx
+            if consecutive_viol == 0
+                if passes_strict
+                    consecutive_viol += 1
+                    violation_occurred := true
+                    first_viol_idx     := bar_index
+
+            else if consecutive_viol >= 1
+                if passes_relaxed
+                    consecutive_viol += 1
+                else
+                    consecutive_viol := 0
+
+        // --- TERMINATION ---
+        // Total é incrementado JUNTO com o bucket — garante invariante Total = Bounce + Break + False
+        string event_type = ""
+        color  final_col  = na
+        bool   end_now    = false
+
+        int   plot_idx   = bar_index
+        float plot_price = testing_support ? low : high
+
+        // 1. BREAKDOWN/BREAKUP
+        if consecutive_viol >= 2
+            count_Break += 1
+            count_Total += 1
+            event_type := "Break"
+            final_col  := color.red
+            end_now    := true
+            plot_idx   := bar_index
+
+        // 2. TIME LIMIT
+        else if timer >= winSize
+            if consecutive_viol == 1 and not extended_window
+                extended_window := true
+            else
+                if not violation_occurred
+                    count_Bounce += 1
+                    count_Total  += 1
+                    event_type := "Bounce"
+                    final_col  := color.green
+                    plot_idx   := trigger_idx
+                else
+                    count_False += 1
+                    count_Total += 1
+                    event_type := "False"
+                    final_col  := color.orange
+                    plot_idx   := first_viol_idx > 0 ? first_viol_idx : bar_index
+
+                end_now := true
+
+        // PLOTTING
+        if end_now
+            string sty = label.style_none
+            float offset = atrVal[bar_index - plot_idx] * labelOffset
+
+            if testing_support
+                sty        := label.style_triangleup
+                plot_price := low[bar_index - plot_idx] - offset
+            else
+                sty        := label.style_triangledown
+                plot_price := high[bar_index - plot_idx] + offset
+
+            label.new(plot_idx, plot_price, text="", color=final_col, style=sty, size=size.tiny)
+
+            in_event := false
+            consecutive_viol := 0
+            extended_window := false
+            first_viol_idx  := 0
+
+// ==========================================
+// 6. STATUS LINE INFO (Next to Name)
+// ==========================================
+// Display values next to indicator name (Top Left)
+plot(maLength, title="Period", display=display.status_line, color=color.new(color.white, 100))
+plot(approx,   title="Tol %",  display=display.status_line, color=color.new(color.white, 100))
+plot(winSize,  title="Win",    display=display.status_line, color=color.new(color.white, 100))
+
+// ==========================================
+// 7. BOTTOM RIGHT LEGEND (PRO HUD)
+// ==========================================
+
+// Light Gray Background (90)
+var table hud = table.new(position.bottom_right, 1, 6, bgcolor=color.new(color.gray, 90), border_width=0)
+
+if barstate.islast
+    float rate_bounce = count_Total > 0 ? math.round(count_Bounce * 100.0 / count_Total, 1) : 0
+    float rate_break  = count_Total > 0 ? math.round(count_Break  * 100.0 / count_Total, 1) : 0
+    // Terceira taxa fecha a conta — evita 99.9% / 100.1% por arredondamento independente
+    float rate_false  = count_Total > 0 ? math.round(100.0 - rate_bounce - rate_break, 1) : 0
+
+    string txt_bounce = str.tostring(count_Bounce) + " (" + str.tostring(rate_bounce) + "%)"
+    string txt_break  = str.tostring(count_Break)  + " (" + str.tostring(rate_break)  + "%)"
+    string txt_false  = str.tostring(count_False)  + " (" + str.tostring(rate_false)  + "%)"
+
+    // Normal Font Size
+    table.cell(hud, 0, 0, "Occurrence Stats", text_color=color.black, text_size=size.small)
+    table.cell(hud, 0, 1, "Total: " + str.tostring(count_Total), text_color=color.black, text_size=size.small)
+
+    table.cell(hud, 0, 2, "▲ Bounce: " + txt_bounce, text_color=color.green, text_size=size.normal)
+    table.cell(hud, 0, 3, "▼ Break: " + txt_break, text_color=color.red, text_size=size.normal)
+    table.cell(hud, 0, 4, "▲/▼ False: " + txt_false, text_color=color.orange, text_size=size.normal)
+
+    // Footer with Version and Date
+    table.cell(hud, 0, 5, ver_num + " • " + ver_date, text_color=color.gray, text_size=size.small)

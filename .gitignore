@@ -25,6 +25,7 @@ reports/**/*.parquet
 # ── Artefatos de sessão (Claude Code, Codex, etc) ───────────────────────────
 *-this-session-is-being-continued-*.txt
 .archive/
+.codex_runtime/
 
 # ── Python cache ─────────────────────────────────────────────────────────────
 __pycache__/
