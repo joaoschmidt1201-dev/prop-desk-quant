@@ -167,6 +167,24 @@ app.add_middleware(
 _snapshot_cache: dict[str, Any] = {"data": None, "loaded_at": 0.0, "mtime": 0.0}
 _refresh_lock = threading.Lock()
 _refresh_running = {"state": False}
+_refresh_last_status: dict[str, Any] = {
+    "state": "idle",
+    "source": None,
+    "started_at": None,
+    "finished_at": None,
+    "returncode": None,
+    "stdout_tail": "",
+    "stderr_tail": "",
+    "error": None,
+}
+
+
+def _utc_now_iso() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _text_tail(text: str, max_chars: int = 4000) -> str:
+    return text[-max_chars:] if text and len(text) > max_chars else text
 
 
 def load_snapshot(force: bool = False) -> dict[str, Any]:
@@ -444,6 +462,18 @@ def _trigger_export_script(*, source: str = "manual") -> bool:
             print(f"[snapshot refresh:{source}] skipped — already running")
             return False
         _refresh_running["state"] = True
+        _refresh_last_status.update(
+            {
+                "state": "running",
+                "source": source,
+                "started_at": _utc_now_iso(),
+                "finished_at": None,
+                "returncode": None,
+                "stdout_tail": "",
+                "stderr_tail": "",
+                "error": None,
+            }
+        )
 
     def run() -> None:
         try:
@@ -467,8 +497,36 @@ def _trigger_export_script(*, source: str = "manual") -> bool:
             if proc.stderr:
                 print(proc.stderr, end="", file=sys.stderr)
             print(f"[snapshot refresh:{source}] finished rc={proc.returncode}")
+            _refresh_last_status.update(
+                {
+                    "state": "finished" if proc.returncode == 0 else "failed",
+                    "finished_at": _utc_now_iso(),
+                    "returncode": proc.returncode,
+                    "stdout_tail": _text_tail(proc.stdout or ""),
+                    "stderr_tail": _text_tail(proc.stderr or ""),
+                    "error": None if proc.returncode == 0 else f"exporter returned {proc.returncode}",
+                }
+            )
         except subprocess.TimeoutExpired:
             print(f"[snapshot refresh:{source}] exporter timed out after 300s", file=sys.stderr)
+            _refresh_last_status.update(
+                {
+                    "state": "failed",
+                    "finished_at": _utc_now_iso(),
+                    "returncode": None,
+                    "error": "exporter timed out",
+                }
+            )
+        except Exception as e:
+            print(f"[snapshot refresh:{source}] exporter failed: {e}", file=sys.stderr)
+            _refresh_last_status.update(
+                {
+                    "state": "failed",
+                    "finished_at": _utc_now_iso(),
+                    "returncode": None,
+                    "error": str(e),
+                }
+            )
         finally:
             _snapshot_cache["data"] = None
             with _refresh_lock:
@@ -483,6 +541,14 @@ def refresh_snapshot() -> JSONResponse:
     if not _trigger_export_script(source="manual"):
         return JSONResponse({"status": "already_running"}, status_code=202)
     return JSONResponse({"status": "refresh_started"}, status_code=202)
+
+
+@app.get("/api/snapshot/refresh/status")
+def refresh_snapshot_status() -> JSONResponse:
+    with _refresh_lock:
+        payload = dict(_refresh_last_status)
+        payload["running"] = bool(_refresh_running["state"])
+    return JSONResponse(payload)
 
 
 @app.get("/api/months", response_model=MonthsResponse)
