@@ -190,6 +190,11 @@ function Header({
           <p className="mt-1 text-sm text-muted-foreground">
             {detail.meta.period ?? "no period"} · multiplier ${detail.meta.multiplier}/pt · mid-price fills
           </p>
+          {detail.meta.description && (
+            <p className="mt-2 max-w-2xl text-sm text-foreground/85 tabular">
+              {detail.meta.description}
+            </p>
+          )}
         </div>
         {hasRuleOptions && (
           <div className="flex flex-col items-end gap-1.5">

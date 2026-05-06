@@ -168,6 +168,7 @@ export type BacktestDetail = {
     underlying: string;
     strategy: string;
     horizon: string;
+    description?: string | null;
     kind: "ss42" | "ic7";
     period: string | null;
     multiplier: number;
