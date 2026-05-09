@@ -249,6 +249,70 @@ export type ForwardtestDailyPnl = {
   n_trades?: number;
 };
 
+export type ForwardtestLabHero = {
+  n_strategies: number;
+  n_trades_open: number;
+  n_trades_closed: number;
+  total_pnl: number;
+  global_win_rate: number | null;
+  median_dit_to_50mp: number | null;
+};
+
+export type ForwardtestMatrixCell = {
+  strategy_id: string;
+  name: string;
+  strategy_family: string | null;
+  structure: string | null;
+  underlying: string | null;
+  status: string;
+  n_open: number;
+  n_closed: number;
+  open_pnl: number;
+  closed_pnl: number;
+  total_pnl: number;
+  win_rate: number | null;
+  profit_factor: number | null;
+  median_dit_to_50mp: number | null;
+};
+
+export type ForwardtestStructureRow = {
+  structure: string | null;
+  n_open: number;
+  n_closed: number;
+  total_pnl: number;
+  win_rate: number | null;
+  median_dit_to_50mp: number | null;
+  underlyings: string[];
+};
+
+export type ForwardtestStructureGroup = {
+  family: string;
+  structures: ForwardtestStructureRow[];
+};
+
+export type ForwardtestRecentEntry = {
+  kind: "open" | "closed";
+  trade_name: string;
+  strategy_id: string;
+  strategy_name: string;
+  underlying: string | null;
+  structure: string | null;
+  event_date: string | null;
+  pnl: number;
+};
+
+export type ForwardtestLabPayload = {
+  hero: ForwardtestLabHero;
+  matrix: ForwardtestMatrixCell[];
+  structure_comparison: ForwardtestStructureGroup[];
+  leaderboards: {
+    top_winrate: ForwardtestMatrixCell[];
+    top_pnl: ForwardtestMatrixCell[];
+    top_speed: ForwardtestMatrixCell[];
+  };
+  recent_activity: ForwardtestRecentEntry[];
+};
+
 export type ForwardtestDetail = {
   meta: {
     strategy_id: string;
@@ -307,6 +371,7 @@ export const api = {
   },
   forwardtests: () =>
     get<{ forwardtests: ForwardtestStrategySummary[] }>("/api/forwardtests"),
+  forwardtestsLab: () => get<ForwardtestLabPayload>("/api/forwardtests/lab"),
   forwardtest: (strategyId: string) =>
     get<ForwardtestDetail>(`/api/forwardtests/${encodeURIComponent(strategyId)}`),
 

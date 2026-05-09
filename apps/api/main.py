@@ -17,6 +17,7 @@ import json
 import csv
 import os
 import re
+import statistics
 import subprocess
 import sys
 import threading
@@ -1367,6 +1368,7 @@ def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
     but no trades yet match) still appear so the empty card is visible.
     """
     metadata = _ft_metadata_index(snap)
+    global_cutoff = parse_iso_date(FORWARD_TEST_START_DATE) or datetime(2026, 5, 8)
 
     groups: dict[str, dict[str, Any]] = {}
     for t in snap.get("trades", []) or []:
@@ -1378,6 +1380,13 @@ def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
         family = strategy_family(str(t.get("name") or ""))
         structure = _ft_trade_structure(t)
         sid = _ft_strategy_id(family, structure, underlying)
+        # Skip auto-detected strategies whose only trades are pre-cutoff
+        # (e.g. legacy FOR01/02/03 with null open_date). Metadata-declared
+        # strategies still surface via the second loop below.
+        cutoff = _ft_strategy_cutoff(metadata.get(sid)) or global_cutoff
+        open_dt = _ft_open_date(t)
+        if open_dt is None or open_dt < cutoff:
+            continue
         if sid not in groups:
             groups[sid] = {
                 "strategy_family": family,
@@ -1580,6 +1589,148 @@ def list_forwardtests() -> JSONResponse:
     snap = load_snapshot()
     summaries = [_ft_summary(s, snap) for s in _ft_build_strategies(snap)]
     return JSONResponse({"forwardtests": summaries})
+
+
+def _ft_lab_cell(s: dict[str, Any], snap: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Build a single matrix cell + return its open/closed trades for downstream rollups."""
+    individual = snap.get("individual_trade_pnls") or {}
+    trades = _ft_trades_for(snap, s)
+    opens = [t for t in trades if t.get("is_active")]
+    closed = [t for t in trades if not t.get("is_active")]
+    kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
+    kpis = _backtest_kpis(kpi_rows)
+
+    dits_to_50 = []
+    for t in closed:
+        ms = _ft_milestones(t)
+        if ms.get("dit_to_50mp") is not None:
+            dits_to_50.append(ms["dit_to_50mp"])
+    median_dit = statistics.median(dits_to_50) if dits_to_50 else None
+
+    open_pnl = round(sum(trade_pnl(t, individual) for t in opens), 2)
+    cell = {
+        "strategy_id": s["strategy_id"],
+        "name": s["name"],
+        "strategy_family": s.get("strategy_family"),
+        "structure": s.get("structure"),
+        "underlying": s.get("underlying"),
+        "status": s.get("status") or "active",
+        "n_open": len(opens),
+        "n_closed": len(closed),
+        "open_pnl": open_pnl,
+        "closed_pnl": kpis["total_pnl"],
+        "total_pnl": round(open_pnl + kpis["total_pnl"], 2),
+        "win_rate": kpis["win_rate"],
+        "profit_factor": kpis["profit_factor"],
+        "median_dit_to_50mp": median_dit,
+    }
+    return cell, opens, closed
+
+
+def _weighted_winrate(entries: list[dict[str, Any]]) -> float | None:
+    weighted = [(e["win_rate"], e["n_closed"]) for e in entries if e.get("win_rate") is not None and e.get("n_closed")]
+    if not weighted:
+        return None
+    total_n = sum(n for _, n in weighted)
+    if total_n <= 0:
+        return None
+    return round(sum(w * n for w, n in weighted) / total_n, 2)
+
+
+@app.get("/api/forwardtests/lab")
+def get_forwardtest_lab() -> JSONResponse:
+    snap = load_snapshot()
+    individual = snap.get("individual_trade_pnls") or {}
+    strategies = _ft_build_strategies(snap)
+
+    matrix: list[dict[str, Any]] = []
+    open_pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    closed_pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for s in strategies:
+        cell, opens, closed = _ft_lab_cell(s, snap)
+        matrix.append(cell)
+        open_pairs.extend((t, cell) for t in opens)
+        closed_pairs.extend((t, cell) for t in closed)
+
+    closed_kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t, _ in closed_pairs]
+    global_kpis = _backtest_kpis(closed_kpi_rows)
+
+    all_dits = []
+    for t, _ in closed_pairs:
+        ms = _ft_milestones(t)
+        if ms.get("dit_to_50mp") is not None:
+            all_dits.append(ms["dit_to_50mp"])
+    median_dit_global = statistics.median(all_dits) if all_dits else None
+
+    hero = {
+        "n_strategies": len(strategies),
+        "n_trades_open": len(open_pairs),
+        "n_trades_closed": len(closed_pairs),
+        "total_pnl": round(sum(c["total_pnl"] for c in matrix), 2),
+        "global_win_rate": global_kpis["win_rate"],
+        "median_dit_to_50mp": median_dit_global,
+    }
+
+    by_family: dict[str, list[dict[str, Any]]] = {}
+    for c in matrix:
+        by_family.setdefault(c.get("strategy_family") or "Other", []).append(c)
+
+    structure_comparison: list[dict[str, Any]] = []
+    for family, cells in by_family.items():
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for c in cells:
+            key = c.get("structure") or "—"
+            groups.setdefault(key, []).append(c)
+        if len(groups) < 2:
+            continue
+        entries = []
+        for struct_label, group in groups.items():
+            dits = [g["median_dit_to_50mp"] for g in group if g.get("median_dit_to_50mp") is not None]
+            entries.append({
+                "structure": None if struct_label == "—" else struct_label,
+                "n_open": sum(g["n_open"] for g in group),
+                "n_closed": sum(g["n_closed"] for g in group),
+                "total_pnl": round(sum(g["total_pnl"] for g in group), 2),
+                "win_rate": _weighted_winrate(group),
+                "median_dit_to_50mp": statistics.median(dits) if dits else None,
+                "underlyings": sorted({str(g.get("underlying")) for g in group if g.get("underlying")}),
+            })
+        entries.sort(key=lambda x: -(x["total_pnl"] or 0))
+        structure_comparison.append({"family": family, "structures": entries})
+    structure_comparison.sort(key=lambda x: x["family"])
+
+    eligible_winrate = [c for c in matrix if c["n_closed"] >= 1 and c["win_rate"] is not None]
+    top_winrate = sorted(eligible_winrate, key=lambda c: -(c["win_rate"] or 0))[:5]
+    top_pnl = sorted(matrix, key=lambda c: -(c["total_pnl"] or 0))[:5]
+    eligible_speed = [c for c in matrix if c["median_dit_to_50mp"] is not None]
+    top_speed = sorted(eligible_speed, key=lambda c: c["median_dit_to_50mp"])[:5]
+
+    recent: list[dict[str, Any]] = []
+    for t, cell in open_pairs + closed_pairs:
+        recent.append({
+            "kind": "open" if t.get("is_active") else "closed",
+            "trade_name": t.get("name"),
+            "strategy_id": cell["strategy_id"],
+            "strategy_name": cell["name"],
+            "underlying": cell.get("underlying"),
+            "structure": cell.get("structure"),
+            "event_date": trade_pnl_event_date(t),
+            "pnl": round(trade_pnl(t, individual), 2),
+        })
+    recent.sort(key=lambda x: x["event_date"] or "", reverse=True)
+    recent = recent[:20]
+
+    return JSONResponse({
+        "hero": hero,
+        "matrix": _sanitize_records(matrix),
+        "structure_comparison": _sanitize_records(structure_comparison),
+        "leaderboards": {
+            "top_winrate": _sanitize_records(top_winrate),
+            "top_pnl": _sanitize_records(top_pnl),
+            "top_speed": _sanitize_records(top_speed),
+        },
+        "recent_activity": _sanitize_records(recent),
+    })
 
 
 @app.get("/api/forwardtests/{strategy_id}")

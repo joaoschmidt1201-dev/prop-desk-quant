@@ -1,10 +1,10 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { ForwardtestsOverview } from "@/components/forwardtests/forwardtests-overview";
+import { LabView } from "@/components/forwardtests/lab-view";
 
 export default function ForwardtestsPage() {
   return (
     <AppShell>
-      <ForwardtestsOverview />
+      <LabView />
     </AppShell>
   );
 }
