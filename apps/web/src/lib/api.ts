@@ -192,6 +192,7 @@ export type ForwardtestStrategySummary = {
   strategy_id: string;
   name: string;
   underlying: string | null;
+  structure: string | null;
   horizon: string | null;
   strategy_family: string | null;
   description: string | null;
@@ -253,6 +254,7 @@ export type ForwardtestDetail = {
     strategy_id: string;
     name: string;
     underlying: string | null;
+    structure: string | null;
     horizon: string | null;
     strategy_family: string | null;
     description: string | null;

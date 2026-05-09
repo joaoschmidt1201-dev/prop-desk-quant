@@ -320,6 +320,45 @@ def strategy_family(name: str) -> str:
     return "Other"
 
 
+_CALENDAR_DTE_RE = re.compile(r"(\d{1,2})\s*/\s*(\d{1,2})\s*DTE", re.IGNORECASE)
+_STRUCTURE_SUFFIX_RE = re.compile(
+    r"\b(?:IC|BWIC|BAT(?:MAN)?|RJL|BWB|PCS|HALF[-\s]?CALL|CALL[-\s]?HALF|"
+    r"BullPutCreditSpread|BULL\s*CALL\s*SP|BEAR\s*CALL|BW\s*IC)\s*(\d{1,2})\b",
+    re.IGNORECASE,
+)
+_STRUCTURE_PREFIX_RE = re.compile(
+    r"\b(\d{1,2})\s+(?:IC|BWIC|BAT(?:MAN)?|RJL|BWB|PCS)\b",
+    re.IGNORECASE,
+)
+
+
+def parse_strategy_structure(name: str | None, dte_open: int | None = None) -> str | None:
+    """Extract the DTE structure from a forward trade name.
+
+    Calendars return a pair like "21/28"; single-DTE strategies return a
+    number like "42". Falls back to dte_open when the name has no
+    recognizable pattern. None when even that is missing.
+    """
+    if name:
+        m = _CALENDAR_DTE_RE.search(name)
+        if m:
+            return f"{int(m.group(1))}/{int(m.group(2))}"
+        m = _STRUCTURE_SUFFIX_RE.search(name)
+        if m:
+            return str(int(m.group(1)))
+        m = _STRUCTURE_PREFIX_RE.search(name)
+        if m:
+            return str(int(m.group(1)))
+    if dte_open is not None:
+        try:
+            n = int(dte_open)
+            if n > 0:
+                return str(n)
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
 def parse_iso_date(value: Any) -> datetime | None:
     if not value:
         return None
@@ -1252,24 +1291,48 @@ FORWARDTEST_ENV = "CZ_Forward"
 FORWARD_TEST_START_DATE = os.environ.get("FORWARD_TEST_START_DATE", "2026-05-08")
 
 
-def _ft_strategy_id(family: str, underlying: str | None) -> str:
+_STRUCTURE_NONE_TOKEN = "any"
+
+
+def _ft_structure_slug(structure: str | None) -> str:
+    if not structure:
+        return _STRUCTURE_NONE_TOKEN
+    return structure.replace("/", "-").lower()
+
+
+def _ft_strategy_id(family: str, structure: str | None, underlying: str | None) -> str:
     family_slug = re.sub(r"[^a-z0-9]+", "-", family.lower()).strip("-") or "other"
     und = (underlying or "unknown").lower()
-    return f"{family_slug}_{und}"
+    return f"{family_slug}_{_ft_structure_slug(structure)}_{und}"
+
+
+def _ft_parts_from_strategy_id(sid: str) -> tuple[str, str | None, str | None]:
+    parts = sid.split("_")
+    if len(parts) >= 3:
+        family = "_".join(parts[:-2]).replace("-", " ").title()
+        structure_slug = parts[-2]
+        structure = None if structure_slug == _STRUCTURE_NONE_TOKEN else structure_slug.replace("-", "/")
+        underlying = parts[-1].upper() if parts[-1] else None
+        return family, structure, underlying
+    if len(parts) == 2:
+        return parts[0].replace("-", " ").title(), None, parts[1].upper()
+    return sid.replace("-", " ").title(), None, None
 
 
 def _family_from_strategy_id(sid: str) -> str:
-    parts = sid.rsplit("_", 1)
-    if len(parts) < 2:
-        return sid.replace("-", " ").title()
-    return parts[0].replace("-", " ").title()
+    return _ft_parts_from_strategy_id(sid)[0]
+
+
+def _structure_from_strategy_id(sid: str) -> str | None:
+    return _ft_parts_from_strategy_id(sid)[1]
 
 
 def _underlying_from_strategy_id(sid: str) -> str | None:
-    parts = sid.rsplit("_", 1)
-    if len(parts) < 2:
-        return None
-    return parts[1].upper()
+    return _ft_parts_from_strategy_id(sid)[2]
+
+
+def _ft_trade_structure(trade: dict[str, Any]) -> str | None:
+    return parse_strategy_structure(str(trade.get("name") or ""), trade.get("dte_open"))
 
 
 def _ft_open_date(trade: dict[str, Any]) -> datetime | None:
@@ -1313,21 +1376,37 @@ def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
         if not underlying or underlying == "?":
             continue
         family = strategy_family(str(t.get("name") or ""))
-        sid = _ft_strategy_id(family, underlying)
+        structure = _ft_trade_structure(t)
+        sid = _ft_strategy_id(family, structure, underlying)
         if sid not in groups:
-            groups[sid] = {"strategy_family": family, "underlying": underlying}
+            groups[sid] = {
+                "strategy_family": family,
+                "structure": structure,
+                "underlying": underlying,
+            }
+
+    def _default_name(family: str, structure: str | None, underlying: str | None) -> str:
+        suffix = f"{structure}DTE" if structure and "/" not in structure else structure
+        bits = [family]
+        if suffix:
+            bits.append(suffix)
+        if underlying:
+            bits.append(underlying)
+        return " · ".join(bits)
 
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for sid, base in groups.items():
         meta = metadata.get(sid, {})
         family = base["strategy_family"]
+        structure = base["structure"]
         underlying = base["underlying"]
         out.append({
             "strategy_id": sid,
-            "name": meta.get("name") or f"{family} · {underlying}",
+            "name": meta.get("name") or _default_name(family, structure, underlying),
             "description": meta.get("description"),
             "underlying": underlying,
+            "structure": structure,
             "horizon": meta.get("horizon"),
             "strategy_family": family,
             "legs_template": meta.get("legs_template") or [],
@@ -1341,13 +1420,13 @@ def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
     for sid, meta in metadata.items():
         if sid in seen:
             continue
-        family = _family_from_strategy_id(sid)
-        underlying = _underlying_from_strategy_id(sid)
+        family, structure, underlying = _ft_parts_from_strategy_id(sid)
         out.append({
             "strategy_id": sid,
             "name": meta.get("name") or sid,
             "description": meta.get("description"),
             "underlying": underlying,
+            "structure": structure,
             "horizon": meta.get("horizon"),
             "strategy_family": family,
             "legs_template": meta.get("legs_template") or [],
@@ -1383,7 +1462,8 @@ def _ft_trades_for(snap: dict[str, Any], strategy: dict[str, Any]) -> list[dict[
         if not underlying or underlying == "?":
             continue
         family = strategy_family(str(t.get("name") or ""))
-        if _ft_strategy_id(family, underlying) != sid:
+        structure = _ft_trade_structure(t)
+        if _ft_strategy_id(family, structure, underlying) != sid:
             continue
         open_dt = _ft_open_date(t)
         if open_dt is None or open_dt < cutoff:
@@ -1479,6 +1559,7 @@ def _ft_summary(s: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         "strategy_id": s.get("strategy_id"),
         "name": s.get("name"),
         "underlying": s.get("underlying"),
+        "structure": s.get("structure"),
         "horizon": s.get("horizon"),
         "strategy_family": s.get("strategy_family"),
         "description": s.get("description"),
@@ -1517,6 +1598,7 @@ def get_forwardtest(strategy_id: str) -> JSONResponse:
             "strategy_id": s.get("strategy_id"),
             "name": s.get("name"),
             "underlying": s.get("underlying"),
+            "structure": s.get("structure"),
             "horizon": s.get("horizon"),
             "strategy_family": s.get("strategy_family"),
             "description": s.get("description"),
