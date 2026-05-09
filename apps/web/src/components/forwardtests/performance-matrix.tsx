@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { Grid3x3 } from "lucide-react";
-import type { ForwardtestMatrixCell } from "@/lib/api";
+import type { ForwardtestEnv, ForwardtestMatrixCell } from "@/lib/api";
 import { fmtMoney, fmtPct, pnlClass } from "@/lib/format";
 
 type Props = {
   cells: ForwardtestMatrixCell[];
+  env: ForwardtestEnv;
 };
 
 type RowKey = {
@@ -17,7 +18,7 @@ type RowKey = {
   label: string;
 };
 
-export function PerformanceMatrix({ cells }: Props) {
+export function PerformanceMatrix({ cells, env }: Props) {
   const { rows, cols, byKey } = useMemo(() => buildAxes(cells), [cells]);
 
   if (cells.length === 0) {
@@ -63,7 +64,7 @@ export function PerformanceMatrix({ cells }: Props) {
                   const cell = byKey.get(`${row.id}|${u}`);
                   return (
                     <td key={u} className="p-1.5 align-middle">
-                      {cell ? <Cell cell={cell} /> : <EmptyCell />}
+                      {cell ? <Cell cell={cell} env={env} /> : <EmptyCell />}
                     </td>
                   );
                 })}
@@ -125,11 +126,11 @@ function structureLabel(s: string): string {
   return s.includes("/") ? `${s} DTE` : `${s}DTE`;
 }
 
-function Cell({ cell }: { cell: ForwardtestMatrixCell }) {
+function Cell({ cell, env }: { cell: ForwardtestMatrixCell; env: ForwardtestEnv }) {
   const tone = toneFromPnl(cell.total_pnl, cell.n_closed);
   return (
     <Link
-      href={`/forwardtests/${encodeURIComponent(cell.strategy_id)}`}
+      href={`/forwardtests/${encodeURIComponent(cell.strategy_id)}?env=${env}`}
       className={`block rounded-md border ${tone.border} ${tone.bg} px-2.5 py-2 transition hover:scale-[1.02] hover:shadow-md`}
     >
       <div className={`text-sm font-semibold tabular ${pnlClass(cell.total_pnl)}`}>

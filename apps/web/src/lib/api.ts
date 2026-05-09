@@ -188,6 +188,8 @@ export type LegSpec = {
   expiration_offset_days?: number | null;
 };
 
+export type ForwardtestEnv = "CZ_Forward" | "JS_Forward";
+
 export type ForwardtestStrategySummary = {
   strategy_id: string;
   name: string;
@@ -195,6 +197,7 @@ export type ForwardtestStrategySummary = {
   structure: string | null;
   horizon: string | null;
   strategy_family: string | null;
+  is_debit: boolean;
   description: string | null;
   status: string;
   n_open: number;
@@ -214,7 +217,9 @@ export type ForwardtestDailyPoint = {
 };
 
 export type ForwardtestMilestones = {
+  is_debit: boolean;
   max_profit_usd: number | null;
+  net_debit_usd: number | null;
   max_pnl_seen: number | null;
   min_pnl_seen: number | null;
   max_dd_from_peak: number | null;
@@ -264,6 +269,7 @@ export type ForwardtestMatrixCell = {
   strategy_family: string | null;
   structure: string | null;
   underlying: string | null;
+  is_debit: boolean;
   status: string;
   n_open: number;
   n_closed: number;
@@ -302,6 +308,7 @@ export type ForwardtestRecentEntry = {
 };
 
 export type ForwardtestLabPayload = {
+  env: ForwardtestEnv;
   hero: ForwardtestLabHero;
   matrix: ForwardtestMatrixCell[];
   structure_comparison: ForwardtestStructureGroup[];
@@ -314,6 +321,7 @@ export type ForwardtestLabPayload = {
 };
 
 export type ForwardtestDetail = {
+  env: ForwardtestEnv;
   meta: {
     strategy_id: string;
     name: string;
@@ -321,6 +329,7 @@ export type ForwardtestDetail = {
     structure: string | null;
     horizon: string | null;
     strategy_family: string | null;
+    is_debit: boolean;
     description: string | null;
     entry_rule: string | null;
     exit_rule: string | null;
@@ -369,11 +378,12 @@ export const api = {
     const q = rule && rule !== "Hold to Expiration" ? `?rule=${encodeURIComponent(rule)}` : "";
     return get<BacktestDetail>(`/api/backtests/${id}${q}`);
   },
-  forwardtests: () =>
-    get<{ forwardtests: ForwardtestStrategySummary[] }>("/api/forwardtests"),
-  forwardtestsLab: () => get<ForwardtestLabPayload>("/api/forwardtests/lab"),
-  forwardtest: (strategyId: string) =>
-    get<ForwardtestDetail>(`/api/forwardtests/${encodeURIComponent(strategyId)}`),
+  forwardtests: (env: ForwardtestEnv = "CZ_Forward") =>
+    get<{ forwardtests: ForwardtestStrategySummary[] }>(`/api/forwardtests?env=${env}`),
+  forwardtestsLab: (env: ForwardtestEnv = "CZ_Forward") =>
+    get<ForwardtestLabPayload>(`/api/forwardtests/lab?env=${env}`),
+  forwardtest: (strategyId: string, env: ForwardtestEnv = "CZ_Forward") =>
+    get<ForwardtestDetail>(`/api/forwardtests/${encodeURIComponent(strategyId)}?env=${env}`),
 
   /**
    * Streams chat tokens via SSE. Calls onDelta for each text chunk.

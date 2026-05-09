@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { Activity } from "lucide-react";
-import type { ForwardtestRecentEntry } from "@/lib/api";
+import type { ForwardtestEnv, ForwardtestRecentEntry } from "@/lib/api";
 import { fmtDate, fmtMoney, pnlClass } from "@/lib/format";
 
 type Props = {
   entries: ForwardtestRecentEntry[];
+  env: ForwardtestEnv;
 };
 
-export function RecentActivity({ entries }: Props) {
+export function RecentActivity({ entries, env }: Props) {
   return (
     <section className="rounded-2xl border border-border/60 bg-gradient-to-b from-card/70 to-card/35 p-5 shadow-2xl shadow-black/10">
       <div className="mb-4 flex items-center gap-2">
@@ -26,7 +27,7 @@ export function RecentActivity({ entries }: Props) {
           {entries.map((e, idx) => (
             <li key={`${e.trade_name}-${idx}`}>
               <Link
-                href={`/forwardtests/${encodeURIComponent(e.strategy_id)}`}
+                href={`/forwardtests/${encodeURIComponent(e.strategy_id)}?env=${env}`}
                 className="flex items-center gap-3 rounded-md px-2 py-2.5 transition hover:bg-card/40"
               >
                 <Badge kind={e.kind} />

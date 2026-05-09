@@ -1289,7 +1289,29 @@ def get_backtest(
 # entry/exit rules, per-strategy start_date override).
 
 FORWARDTEST_ENV = "CZ_Forward"
+FORWARDTEST_ENVS_ALLOWED = {"CZ_Forward", "JS_Forward"}
 FORWARD_TEST_START_DATE = os.environ.get("FORWARD_TEST_START_DATE", "2026-05-08")
+
+# Strategies whose `net_credit` field is actually a *debit* paid up-front.
+# For these, %MP milestones (DIT to 25/50/75% of credit) make no sense — the
+# stored value is max risk, not max profit.
+_DEBIT_FAMILIES = {
+    "Triple Calendar",
+    "Double Calendar",
+    "Bull Call",
+}
+
+
+def _is_debit_family(family: str | None) -> bool:
+    return bool(family) and family in _DEBIT_FAMILIES
+
+
+def _resolve_ft_env(env: str | None) -> str:
+    if env is None or env == "":
+        return FORWARDTEST_ENV
+    if env in FORWARDTEST_ENVS_ALLOWED:
+        return env
+    raise HTTPException(400, f"Unsupported forwardtest env '{env}'")
 
 
 _STRUCTURE_NONE_TOKEN = "any"
@@ -1360,8 +1382,8 @@ def _ft_metadata_index(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
-    """Union of (auto-detected groups from CZ_Forward trades) + (FT Strategies metadata).
+def _ft_build_strategies(snap: dict[str, Any], env: str = FORWARDTEST_ENV) -> list[dict[str, Any]]:
+    """Union of (auto-detected groups from forward trades for `env`) + (FT Strategies metadata).
 
     Auto-detected entries fall back to `{Family} · {Underlying}` for the display
     name when no FT Strategies row is found. Metadata-only entries (declared
@@ -1372,7 +1394,7 @@ def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
 
     groups: dict[str, dict[str, Any]] = {}
     for t in snap.get("trades", []) or []:
-        if t.get("environment") != FORWARDTEST_ENV:
+        if t.get("environment") != env:
             continue
         underlying = t.get("underlying")
         if not underlying or underlying == "?":
@@ -1449,23 +1471,23 @@ def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _ft_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
-    return _ft_build_strategies(snap)
+def _ft_strategies(snap: dict[str, Any], env: str = FORWARDTEST_ENV) -> list[dict[str, Any]]:
+    return _ft_build_strategies(snap, env=env)
 
 
-def _ft_strategy_meta(snap: dict[str, Any], strategy_id: str) -> dict[str, Any]:
-    for s in _ft_build_strategies(snap):
+def _ft_strategy_meta(snap: dict[str, Any], strategy_id: str, env: str = FORWARDTEST_ENV) -> dict[str, Any]:
+    for s in _ft_build_strategies(snap, env=env):
         if s.get("strategy_id") == strategy_id:
             return s
     raise HTTPException(404, f"Forwardtest strategy '{strategy_id}' not found")
 
 
-def _ft_trades_for(snap: dict[str, Any], strategy: dict[str, Any]) -> list[dict[str, Any]]:
+def _ft_trades_for(snap: dict[str, Any], strategy: dict[str, Any], env: str = FORWARDTEST_ENV) -> list[dict[str, Any]]:
     sid = strategy.get("strategy_id")
     cutoff = _ft_strategy_cutoff(strategy)
     out: list[dict[str, Any]] = []
     for t in snap.get("trades", []) or []:
-        if t.get("environment") != FORWARDTEST_ENV:
+        if t.get("environment") != env:
             continue
         underlying = t.get("underlying")
         if not underlying or underlying == "?":
@@ -1499,16 +1521,22 @@ def _ft_closed_trade_to_kpi_row(t: dict[str, Any], individual: dict[str, float])
 def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
     """Compute DIT-to-25/50/75% MaxProfit and path drawdown.
 
-    Max profit is only defined for credit strategies (`net_credit > 0`). Debit
-    structures still return path stats from daily marks, but the %MP milestones
-    remain null.
+    For credit strategies, the value in `net_credit` is the max profit and
+    %MP milestones are computed against it. For debit strategies (Triple/
+    Double Calendar, Bull Call), `net_credit` is actually the debit paid up-
+    front — i.e. max risk, not max profit — so %MP milestones stay null and
+    `is_debit` is reported back to the UI.
     """
     history = trade.get("daily_history") or []
-    max_profit = trade.get("net_credit")
+    family = strategy_family(str(trade.get("name") or ""))
+    is_debit = _is_debit_family(family)
+    raw_credit = trade.get("net_credit")
     open_dt = parse_iso_date(trade.get("open_date") or trade.get("visual_open_date"))
 
     result: dict[str, Any] = {
+        "is_debit": is_debit,
         "max_profit_usd": None,
+        "net_debit_usd": None,
         "max_pnl_seen": None,
         "min_pnl_seen": None,
         "max_dd_from_peak": None,
@@ -1516,6 +1544,9 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
         "dit_to_50mp": None,
         "dit_to_75mp": None,
     }
+
+    if is_debit and isinstance(raw_credit, (int, float)) and raw_credit > 0:
+        result["net_debit_usd"] = round(float(raw_credit), 2)
 
     pnls = [
         (h.get("date"), h.get("pnl"))
@@ -1536,6 +1567,7 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
         max_dd = min(max_dd, value - peak)
     result["max_dd_from_peak"] = round(max_dd, 2)
 
+    max_profit = None if is_debit else raw_credit
     if isinstance(max_profit, (int, float)) and max_profit > 0 and open_dt:
         max_profit_f = float(max_profit)
         result["max_profit_usd"] = round(max_profit_f, 2)
@@ -1557,9 +1589,9 @@ def _enrich_ft_trade(t: dict[str, Any]) -> dict[str, Any]:
     return {**t, "milestones": _ft_milestones(t)}
 
 
-def _ft_summary(s: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
+def _ft_summary(s: dict[str, Any], snap: dict[str, Any], env: str = FORWARDTEST_ENV) -> dict[str, Any]:
     individual = snap.get("individual_trade_pnls") or {}
-    trades = _ft_trades_for(snap, s)
+    trades = _ft_trades_for(snap, s, env=env)
     opens = [t for t in trades if t.get("is_active")]
     closed = [t for t in trades if not t.get("is_active")]
     kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
@@ -1571,6 +1603,7 @@ def _ft_summary(s: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
         "structure": s.get("structure"),
         "horizon": s.get("horizon"),
         "strategy_family": s.get("strategy_family"),
+        "is_debit": _is_debit_family(s.get("strategy_family")),
         "description": s.get("description"),
         "status": s.get("status") or "active",
         "n_open": len(opens),
@@ -1585,16 +1618,17 @@ def _ft_summary(s: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.get("/api/forwardtests")
-def list_forwardtests() -> JSONResponse:
+def list_forwardtests(env: str | None = Query(default=None)) -> JSONResponse:
+    resolved_env = _resolve_ft_env(env)
     snap = load_snapshot()
-    summaries = [_ft_summary(s, snap) for s in _ft_build_strategies(snap)]
-    return JSONResponse({"forwardtests": summaries})
+    summaries = [_ft_summary(s, snap, env=resolved_env) for s in _ft_build_strategies(snap, env=resolved_env)]
+    return JSONResponse({"forwardtests": summaries, "env": resolved_env})
 
 
-def _ft_lab_cell(s: dict[str, Any], snap: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+def _ft_lab_cell(s: dict[str, Any], snap: dict[str, Any], env: str = FORWARDTEST_ENV) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     """Build a single matrix cell + return its open/closed trades for downstream rollups."""
     individual = snap.get("individual_trade_pnls") or {}
-    trades = _ft_trades_for(snap, s)
+    trades = _ft_trades_for(snap, s, env=env)
     opens = [t for t in trades if t.get("is_active")]
     closed = [t for t in trades if not t.get("is_active")]
     kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
@@ -1614,6 +1648,7 @@ def _ft_lab_cell(s: dict[str, Any], snap: dict[str, Any]) -> tuple[dict[str, Any
         "strategy_family": s.get("strategy_family"),
         "structure": s.get("structure"),
         "underlying": s.get("underlying"),
+        "is_debit": _is_debit_family(s.get("strategy_family")),
         "status": s.get("status") or "active",
         "n_open": len(opens),
         "n_closed": len(closed),
@@ -1638,16 +1673,17 @@ def _weighted_winrate(entries: list[dict[str, Any]]) -> float | None:
 
 
 @app.get("/api/forwardtests/lab")
-def get_forwardtest_lab() -> JSONResponse:
+def get_forwardtest_lab(env: str | None = Query(default=None)) -> JSONResponse:
+    resolved_env = _resolve_ft_env(env)
     snap = load_snapshot()
     individual = snap.get("individual_trade_pnls") or {}
-    strategies = _ft_build_strategies(snap)
+    strategies = _ft_build_strategies(snap, env=resolved_env)
 
     matrix: list[dict[str, Any]] = []
     open_pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
     closed_pairs: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for s in strategies:
-        cell, opens, closed = _ft_lab_cell(s, snap)
+        cell, opens, closed = _ft_lab_cell(s, snap, env=resolved_env)
         matrix.append(cell)
         open_pairs.extend((t, cell) for t in opens)
         closed_pairs.extend((t, cell) for t in closed)
@@ -1721,6 +1757,7 @@ def get_forwardtest_lab() -> JSONResponse:
     recent = recent[:20]
 
     return JSONResponse({
+        "env": resolved_env,
         "hero": hero,
         "matrix": _sanitize_records(matrix),
         "structure_comparison": _sanitize_records(structure_comparison),
@@ -1734,17 +1771,19 @@ def get_forwardtest_lab() -> JSONResponse:
 
 
 @app.get("/api/forwardtests/{strategy_id}")
-def get_forwardtest(strategy_id: str) -> JSONResponse:
+def get_forwardtest(strategy_id: str, env: str | None = Query(default=None)) -> JSONResponse:
+    resolved_env = _resolve_ft_env(env)
     snap = load_snapshot()
-    s = _ft_strategy_meta(snap, strategy_id)
+    s = _ft_strategy_meta(snap, strategy_id, env=resolved_env)
     individual = snap.get("individual_trade_pnls") or {}
-    trades = _ft_trades_for(snap, s)
+    trades = _ft_trades_for(snap, s, env=resolved_env)
     opens = [t for t in trades if t.get("is_active")]
     closed = [t for t in trades if not t.get("is_active")]
     kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
     kpis = _backtest_kpis(kpi_rows)
     cutoff = _ft_strategy_cutoff(s)
     return JSONResponse({
+        "env": resolved_env,
         "meta": {
             "strategy_id": s.get("strategy_id"),
             "name": s.get("name"),
@@ -1752,6 +1791,7 @@ def get_forwardtest(strategy_id: str) -> JSONResponse:
             "structure": s.get("structure"),
             "horizon": s.get("horizon"),
             "strategy_family": s.get("strategy_family"),
+            "is_debit": _is_debit_family(s.get("strategy_family")),
             "description": s.get("description"),
             "entry_rule": s.get("entry_rule"),
             "exit_rule": s.get("exit_rule"),

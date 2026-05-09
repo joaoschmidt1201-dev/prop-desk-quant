@@ -21,6 +21,7 @@ import {
   api,
   type BacktestDetail as BacktestDetailType,
   type ForwardtestDetail as ForwardtestDetailType,
+  type ForwardtestEnv,
   type ForwardtestTrade,
   type LegSpec,
 } from "@/lib/api";
@@ -50,11 +51,11 @@ type ForwardJourneyPoint = {
 
 const DASH = "—";
 
-export function ForwardtestDetail({ strategyId }: { strategyId: string }) {
+export function ForwardtestDetail({ strategyId, env = "CZ_Forward" }: { strategyId: string; env?: ForwardtestEnv }) {
   const [selected, setSelected] = useState<ForwardSelection | null>(null);
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["forwardtest", strategyId],
-    queryFn: () => api.forwardtest(strategyId),
+    queryKey: ["forwardtest", strategyId, env],
+    queryFn: () => api.forwardtest(strategyId, env),
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
     placeholderData: (prev) => prev,
   });
@@ -107,7 +108,7 @@ export function ForwardtestDetail({ strategyId }: { strategyId: string }) {
           title="Open trades"
           subtitle={`${safe.open_trades.length} live · live mark-to-market refreshed every minute`}
         />
-        <OpenTradesTable trades={safe.open_trades} selected={selected} onSelect={setSelected} />
+        <OpenTradesTable trades={safe.open_trades} selected={selected} onSelect={setSelected} isDebit={safe.meta.is_debit} />
       </section>
 
       <section className="mt-10">
@@ -128,11 +129,11 @@ export function ForwardtestDetail({ strategyId }: { strategyId: string }) {
           </div>
         </div>
         <div className="mt-6">
-          <ClosedTradesTable trades={safe.closed_trades} selected={selected} onSelect={setSelected} />
+          <ClosedTradesTable trades={safe.closed_trades} selected={selected} onSelect={setSelected} isDebit={safe.meta.is_debit} />
         </div>
       </section>
 
-      <TradeInspector trade={selectedTrade} />
+      <TradeInspector trade={selectedTrade} isDebit={safe.meta.is_debit} />
 
       {safe.meta.legs_template.length > 0 && (
         <section className="mt-10">
@@ -244,10 +245,12 @@ function OpenTradesTable({
   trades,
   selected,
   onSelect,
+  isDebit,
 }: {
   trades: ForwardtestTrade[];
   selected: ForwardSelection | null;
   onSelect: (selection: ForwardSelection) => void;
+  isDebit: boolean;
 }) {
   if (trades.length === 0) {
     return (
@@ -265,7 +268,7 @@ function OpenTradesTable({
               <th className="px-4 py-2 text-left font-medium">Trade</th>
               <th className="px-4 py-2 text-left font-medium">Sym</th>
               <th className="px-4 py-2 text-right font-medium">DTE</th>
-              <th className="px-4 py-2 text-right font-medium">Net credit</th>
+              <th className="px-4 py-2 text-right font-medium">{isDebit ? "Net debit" : "Net credit"}</th>
               <th className="px-4 py-2 text-right font-medium">Max loss</th>
               <th className="px-4 py-2 text-right font-medium">Delta</th>
               <th className="px-4 py-2 text-right font-medium">P&L</th>
@@ -319,10 +322,12 @@ function ClosedTradesTable({
   trades,
   selected,
   onSelect,
+  isDebit,
 }: {
   trades: ForwardtestTrade[];
   selected: ForwardSelection | null;
   onSelect: (selection: ForwardSelection) => void;
+  isDebit: boolean;
 }) {
   if (trades.length === 0) {
     return (
@@ -345,7 +350,7 @@ function ClosedTradesTable({
               <th className="px-4 py-2 text-left font-medium">Open</th>
               <th className="px-4 py-2 text-left font-medium">Close</th>
               <th className="px-4 py-2 text-right font-medium">Days held</th>
-              <th className="px-4 py-2 text-right font-medium">Net credit</th>
+              <th className="px-4 py-2 text-right font-medium">{isDebit ? "Net debit" : "Net credit"}</th>
               <th className="px-4 py-2 text-right font-medium">P&L</th>
               <th className="px-4 py-2 text-right font-medium">Result</th>
             </tr>
@@ -398,7 +403,7 @@ function ClosedTradesTable({
   );
 }
 
-function TradeInspector({ trade }: { trade: ForwardtestTrade | null }) {
+function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; isDebit: boolean }) {
   if (!trade) return null;
 
   const openDate = asString(trade.open_date) ?? asString(trade.visual_open_date);
@@ -407,6 +412,7 @@ function TradeInspector({ trade }: { trade: ForwardtestTrade | null }) {
   const pnl = currentTradePnl(trade);
   const milestones = trade.milestones;
   const maxProfit = numOr(milestones?.max_profit_usd);
+  const netDebit = numOr(milestones?.net_debit_usd) ?? (isDebit ? numOr(trade.net_credit) : null);
   const pctOfMaxProfit = pnl != null && maxProfit != null && maxProfit > 0 ? pnl / maxProfit : null;
   const delta = numOr(trade.delta_current ?? trade.delta);
   const dteRemaining = numOr(trade.dte_remaining);
@@ -445,7 +451,11 @@ function TradeInspector({ trade }: { trade: ForwardtestTrade | null }) {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiBlock label="Current P&L" tone={pnl} value={fmtMoney(pnl)} />
-        <KpiBlock label="%MP" value={fmtPct(pctOfMaxProfit)} sub={maxProfit != null ? fmtMoney(maxProfit) : "credit only"} />
+        {isDebit ? (
+          <KpiBlock label="Net debit" value={fmtMoney(netDebit)} sub="paid up-front (max risk)" />
+        ) : (
+          <KpiBlock label="%MP" value={fmtPct(pctOfMaxProfit)} sub={maxProfit != null ? fmtMoney(maxProfit) : "credit only"} />
+        )}
         <KpiBlock label="Delta" tone={delta} value={fmtNum(delta)} />
         <KpiBlock label="DTE remaining" value={fmtDays(dteRemaining)} />
         <KpiBlock label="DIT" value={fmtDays(dit)} />
@@ -454,21 +464,21 @@ function TradeInspector({ trade }: { trade: ForwardtestTrade | null }) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-7">
-          <ForwardPnlJourneyChart points={journey} maxProfit={maxProfit} milestones={milestones} />
+          <ForwardPnlJourneyChart points={journey} maxProfit={isDebit ? null : maxProfit} milestones={milestones} />
         </div>
         <div className="xl:col-span-5">
           <ForwardDeltaChart points={journey} />
         </div>
       </div>
 
-      <MilestonesStrip milestones={milestones} />
+      {!isDebit && <MilestonesStrip milestones={milestones} />}
 
-      <TradeSetupCard trade={trade} />
+      <TradeSetupCard trade={trade} isDebit={isDebit} />
 
       {strikeRows.length > 0 && (
         <StrikeStructureCard
           rows={strikeRows}
-          netCredit={numOr(trade.net_credit)}
+          netCredit={isDebit ? null : numOr(trade.net_credit)}
           multiplier={100}
           rightLabel="Type"
         />
@@ -623,7 +633,7 @@ function MilestonesStrip({ milestones }: { milestones: ForwardtestTrade["milesto
   );
 }
 
-function TradeSetupCard({ trade }: { trade: ForwardtestTrade }) {
+function TradeSetupCard({ trade, isDebit }: { trade: ForwardtestTrade; isDebit: boolean }) {
   type SetupRow = { label: string; value: string; tone: number | null };
   const contracts = firstTextValue(trade, [
     "contracts",
@@ -635,8 +645,18 @@ function TradeSetupCard({ trade }: { trade: ForwardtestTrade }) {
     "quantity",
     "contratos",
   ]);
+  const netCreditValue = numOr(trade.net_credit);
+  const maxLossValue = numOr(trade.max_loss);
   const rawRows: Array<SetupRow | null> = [
     contracts ? { label: "Contracts", value: contracts, tone: null } : null,
+    netCreditValue != null
+      ? {
+          label: isDebit ? "Net debit" : "Net credit",
+          value: fmtMoney(netCreditValue),
+          tone: null,
+        }
+      : null,
+    maxLossValue != null ? { label: "Max loss", value: fmtMoney(maxLossValue), tone: null } : null,
     numOr(trade.lw_be) != null ? { label: "Lower BE", value: fmtNum(numOr(trade.lw_be)), tone: null } : null,
     numOr(trade.up_be) != null ? { label: "Upper BE", value: fmtNum(numOr(trade.up_be)), tone: null } : null,
     numOr(trade.pct_to_lw_be) != null ? { label: "% to LBE", value: fmtPctField(trade.pct_to_lw_be), tone: null } : null,

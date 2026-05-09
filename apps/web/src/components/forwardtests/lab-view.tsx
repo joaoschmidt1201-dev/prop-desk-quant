@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, DollarSign, Flame, Radar, Sparkles, Zap } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, type ForwardtestEnv } from "@/lib/api";
 import { fmtMoney, fmtNum, fmtPct, pnlClass } from "@/lib/format";
 import { DASHBOARD_REFETCH_INTERVAL_MS } from "@/lib/refresh";
 import { PerformanceMatrix } from "./performance-matrix";
@@ -10,16 +11,24 @@ import { StructureComparison } from "./structure-comparison";
 import { TopSetups } from "./top-setups";
 import { RecentActivity } from "./recent-activity";
 
+type DeskUser = "CZ" | "JS";
+const USER_TO_ENV: Record<DeskUser, ForwardtestEnv> = {
+  CZ: "CZ_Forward",
+  JS: "JS_Forward",
+};
+
 export function LabView() {
+  const [user, setUser] = useState<DeskUser>("CZ");
+  const env = USER_TO_ENV[user];
   const { data, isLoading } = useQuery({
-    queryKey: ["forwardtests", "lab"],
-    queryFn: () => api.forwardtestsLab(),
+    queryKey: ["forwardtests", "lab", env],
+    queryFn: () => api.forwardtestsLab(env),
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
   });
 
   return (
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
-      <Header />
+      <Header user={user} onUserChange={setUser} />
 
       {isLoading || !data ? (
         <SkeletonLayout />
@@ -34,19 +43,20 @@ export function LabView() {
             medianDit={data.hero.median_dit_to_50mp}
           />
 
-          <PerformanceMatrix cells={data.matrix} />
+          <PerformanceMatrix cells={data.matrix} env={env} />
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <div className="xl:col-span-2">
               <StructureComparison groups={data.structure_comparison} />
             </div>
-            <RecentActivity entries={data.recent_activity} />
+            <RecentActivity entries={data.recent_activity} env={env} />
           </div>
 
           <TopSetups
             topWinrate={data.leaderboards.top_winrate}
             topPnl={data.leaderboards.top_pnl}
             topSpeed={data.leaderboards.top_speed}
+            env={env}
           />
         </div>
       )}
@@ -54,9 +64,9 @@ export function LabView() {
   );
 }
 
-function Header() {
+function Header({ user, onUserChange }: { user: DeskUser; onUserChange: (u: DeskUser) => void }) {
   return (
-    <div className="mb-8 flex items-end justify-between">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-primary">
           <Radar className="h-3.5 w-3.5" />
@@ -67,9 +77,26 @@ function Header() {
           Cross-strategy view over every OptionStrat-fed forward trade. Hunt for the (family · structure × ticker) combos worth scaling into live with CZ.
         </p>
       </div>
-      <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-        <span className="h-1.5 w-1.5 rounded-full bg-[var(--gain)]" />
-        <span>auto-grouped from <code className="rounded bg-card/60 px-1.5 py-0.5 text-[10px]">db_cria</code> + <code className="rounded bg-card/60 px-1.5 py-0.5 text-[10px]">db_robots</code></span>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/70">User</span>
+        <div className="inline-flex overflow-hidden rounded-md border border-border/50 bg-card/20 p-0.5">
+          {(["CZ", "JS"] as const).map((u) => {
+            const active = user === u;
+            return (
+              <button
+                key={u}
+                onClick={() => onUserChange(u)}
+                className={`min-w-12 rounded px-3 py-1 text-[11px] font-semibold transition ${
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
+                }`}
+              >
+                {u}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

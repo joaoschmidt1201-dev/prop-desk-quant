@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { Trophy, DollarSign, Zap } from "lucide-react";
-import type { ForwardtestMatrixCell } from "@/lib/api";
+import type { ForwardtestEnv, ForwardtestMatrixCell } from "@/lib/api";
 import { fmtMoney, fmtPct, fmtNum, pnlClass } from "@/lib/format";
 
 type Props = {
   topWinrate: ForwardtestMatrixCell[];
   topPnl: ForwardtestMatrixCell[];
   topSpeed: ForwardtestMatrixCell[];
+  env: ForwardtestEnv;
 };
 
-export function TopSetups({ topWinrate, topPnl, topSpeed }: Props) {
+export function TopSetups({ topWinrate, topPnl, topSpeed, env }: Props) {
   return (
     <section className="rounded-2xl border border-border/60 bg-gradient-to-b from-card/70 to-card/35 p-5 shadow-2xl shadow-black/10">
       <div className="mb-4 flex items-center gap-2">
@@ -24,6 +25,7 @@ export function TopSetups({ topWinrate, topPnl, topSpeed }: Props) {
           title="Win rate"
           icon={<Trophy className="h-3.5 w-3.5" />}
           items={topWinrate}
+          env={env}
           render={(c) => (
             <span className="tabular text-sm font-semibold text-foreground">
               {c.win_rate != null ? fmtPct(c.win_rate) : "—"}
@@ -34,6 +36,7 @@ export function TopSetups({ topWinrate, topPnl, topSpeed }: Props) {
           title="Total P&L"
           icon={<DollarSign className="h-3.5 w-3.5" />}
           items={topPnl}
+          env={env}
           render={(c) => (
             <span className={`tabular text-sm font-semibold ${pnlClass(c.total_pnl)}`}>
               {fmtMoney(c.total_pnl)}
@@ -44,6 +47,7 @@ export function TopSetups({ topWinrate, topPnl, topSpeed }: Props) {
           title="Time to 50% MP"
           icon={<Zap className="h-3.5 w-3.5" />}
           items={topSpeed}
+          env={env}
           render={(c) => (
             <span className="tabular text-sm font-semibold text-foreground">
               {c.median_dit_to_50mp != null ? `${fmtNum(c.median_dit_to_50mp)}d` : "—"}
@@ -59,10 +63,11 @@ type ColumnProps = {
   title: string;
   icon: React.ReactNode;
   items: ForwardtestMatrixCell[];
+  env: ForwardtestEnv;
   render: (c: ForwardtestMatrixCell) => React.ReactNode;
 };
 
-function Column({ title, icon, items, render }: ColumnProps) {
+function Column({ title, icon, items, env, render }: ColumnProps) {
   return (
     <div className="rounded-xl border border-border/50 bg-background/30 p-4">
       <div className="mb-3 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -78,7 +83,7 @@ function Column({ title, icon, items, render }: ColumnProps) {
           {items.map((c, idx) => (
             <li key={c.strategy_id}>
               <Link
-                href={`/forwardtests/${encodeURIComponent(c.strategy_id)}`}
+                href={`/forwardtests/${encodeURIComponent(c.strategy_id)}?env=${env}`}
                 className="flex items-center gap-3 rounded-lg px-2.5 py-2 transition hover:bg-card/40"
               >
                 <span className="w-4 text-center text-[10px] font-semibold tabular text-muted-foreground">
