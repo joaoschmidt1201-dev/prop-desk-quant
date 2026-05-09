@@ -180,6 +180,96 @@ export type BacktestDetail = {
   daily: Record<string, unknown>[];
 };
 
+export type LegSpec = {
+  side: "buy" | "sell";
+  type: "call" | "put";
+  qty: number;
+  strike_offset?: string | null;
+  expiration_offset_days?: number | null;
+};
+
+export type ForwardtestStrategySummary = {
+  strategy_id: string;
+  name: string;
+  underlying: string | null;
+  horizon: string | null;
+  strategy_family: string | null;
+  description: string | null;
+  status: string;
+  n_open: number;
+  n_closed: number;
+  open_pnl: number;
+  closed_pnl: number;
+  win_rate: number | null;
+  profit_factor: number | null;
+  max_drawdown: number;
+  sharpe: number | null;
+};
+
+export type ForwardtestDailyPoint = {
+  date: string | null;
+  pnl: number | null;
+  delta: number | null;
+};
+
+export type ForwardtestMilestones = {
+  max_profit_usd: number | null;
+  max_pnl_seen: number | null;
+  min_pnl_seen: number | null;
+  max_dd_from_peak: number | null;
+  dit_to_25mp: number | null;
+  dit_to_50mp: number | null;
+  dit_to_75mp: number | null;
+};
+
+export type ForwardtestTrade = Trade & {
+  strategy_id?: string | null;
+  pnl_current?: number | null;
+  delta_current?: number | null;
+  pct_to_lw_be?: number | null;
+  pct_to_up_be?: number | null;
+  lw_be?: number | null;
+  up_be?: number | null;
+  strikes?: string | null;
+  visual_open_date?: string | null;
+  visual_exp_date?: string | null;
+  inferred_close_date?: string | null;
+  days_held?: number | null;
+  daily_history?: ForwardtestDailyPoint[];
+  milestones?: ForwardtestMilestones;
+};
+
+export type ForwardtestDailyPnl = {
+  date: string;
+  pnl?: number;
+  open_pnl?: number;
+  rlzd?: number;
+  daily_pnl?: number;
+  n_trades?: number;
+};
+
+export type ForwardtestDetail = {
+  meta: {
+    strategy_id: string;
+    name: string;
+    underlying: string | null;
+    horizon: string | null;
+    strategy_family: string | null;
+    description: string | null;
+    entry_rule: string | null;
+    exit_rule: string | null;
+    legs_template: LegSpec[];
+    status: string;
+    sheet: string | null;
+    tracking_since: string | null;
+    period: string | null;
+  };
+  kpis: BacktestKpis;
+  open_trades: ForwardtestTrade[];
+  closed_trades: ForwardtestTrade[];
+  daily_pnls: ForwardtestDailyPnl[];
+};
+
 function qs(filter: Partial<Filter>): string {
   const params = new URLSearchParams();
   if (filter.months?.length) params.set("month", filter.months.join(","));
@@ -213,6 +303,10 @@ export const api = {
     const q = rule && rule !== "Hold to Expiration" ? `?rule=${encodeURIComponent(rule)}` : "";
     return get<BacktestDetail>(`/api/backtests/${id}${q}`);
   },
+  forwardtests: () =>
+    get<{ forwardtests: ForwardtestStrategySummary[] }>("/api/forwardtests"),
+  forwardtest: (strategyId: string) =>
+    get<ForwardtestDetail>(`/api/forwardtests/${encodeURIComponent(strategyId)}`),
 
   /**
    * Streams chat tokens via SSE. Calls onDelta for each text chunk.

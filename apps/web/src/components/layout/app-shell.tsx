@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BarChart3, FlaskConical, LineChart, Sparkles } from "lucide-react";
+import { Activity, BarChart3, FlaskConical, LineChart, Radar, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "@/lib/api";
 import { fmtRelativeAge } from "@/lib/format";
@@ -27,6 +27,12 @@ const NAV: NavItem[] = [
     label: "Backtests",
     icon: <FlaskConical className="h-4 w-4" />,
     match: (p) => p.startsWith("/backtests"),
+  },
+  {
+    href: "/forwardtests",
+    label: "Forwardtests",
+    icon: <Radar className="h-4 w-4" />,
+    match: (p) => p.startsWith("/forwardtests"),
   },
 ];
 
@@ -93,7 +99,7 @@ function Sidebar({ pathname, healthAge }: { pathname: string; healthAge: number 
           Coming soon
         </div>
         <ul className="space-y-1">
-          {["GEX Levels", "Forwardtests"].map((label) => (
+          {["GEX Levels"].map((label) => (
             <li key={label}>
               <div className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/40">
                 <BarChart3 className="h-4 w-4" />

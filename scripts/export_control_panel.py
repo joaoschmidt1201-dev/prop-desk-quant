@@ -137,6 +137,11 @@ VISUAL_SHEETS = ["APR26", "MAR26", "JS APR26", "JS-FOR MAR26", "FOR Trades"]
 # Future months (MAY26, JUN26, JS MAY26, ...) are picked up automatically.
 MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
 
+# Optional metadata tab listing forward-test strategies by id (auto-derived
+# from each trade's name + underlying). Forward trades themselves live in the
+# regular `FOR Trades` tab — this sheet only enriches display.
+FT_STRATEGIES_SHEET = "FT Strategies"
+
 TRADE_UNDERLYINGS = (
     "SPX",
     "SPXW",
@@ -880,6 +885,104 @@ def load_db_cria(xlsx_path: Path) -> pd.DataFrame:
     return df
 
 
+# ─── ForwardTest readers ─────────────────────────────────────────────────────
+
+def load_ft_strategies(xlsx_path: Path) -> list[dict]:
+    """Optional metadata tab — enriches forward-test cards with descriptions, leg
+    templates, and per-strategy start_date overrides. Strategy assignment itself
+    is handled at API time by parsing each trade name (see `strategy_family`).
+
+    Schema (all columns optional except A and B):
+      A=strategy_id (e.g., `triple-calendar_iwm`),
+      B=name (display label),
+      C=description, D=horizon, E=legs_template (JSON),
+      F=entry_rule, G=exit_rule, H=start_date (YYYY-MM-DD), I=status.
+    Returns [] when the tab is missing.
+    """
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
+    if FT_STRATEGIES_SHEET not in wb.sheetnames:
+        wb.close()
+        return []
+    ws = wb[FT_STRATEGIES_SHEET]
+
+    strategies: list[dict] = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row:
+            continue
+        strategy_id = row[0] if len(row) > 0 else None
+        name = row[1] if len(row) > 1 else None
+        if not strategy_id or not str(strategy_id).strip():
+            continue
+        if not name or not str(name).strip():
+            continue
+
+        legs_raw = row[4] if len(row) > 4 else None
+        legs_template: list[dict] = []
+        if legs_raw and str(legs_raw).strip():
+            try:
+                parsed = json.loads(str(legs_raw))
+                if isinstance(parsed, list):
+                    legs_template = parsed
+            except json.JSONDecodeError as exc:
+                print(f"  [FT Strategies] {strategy_id}: legs_template JSON inválido — {exc}")
+
+        start_date_iso: str | None = None
+        if len(row) > 7 and row[7]:
+            d = _parse_sheet_date(row[7])
+            if d:
+                start_date_iso = d.isoformat()
+
+        strategies.append({
+            "strategy_id": str(strategy_id).strip(),
+            "name": str(name).strip(),
+            "description": str(row[2]).strip() if len(row) > 2 and row[2] else None,
+            "horizon": str(row[3]).strip() if len(row) > 3 and row[3] else None,
+            "legs_template": legs_template,
+            "entry_rule": str(row[5]).strip() if len(row) > 5 and row[5] else None,
+            "exit_rule": str(row[6]).strip() if len(row) > 6 and row[6] else None,
+            "start_date": start_date_iso,
+            "status": str(row[8]).strip().lower() if len(row) > 8 and row[8] else "active",
+        })
+
+    wb.close()
+    strategies.sort(key=lambda s: s["name"])
+    return strategies
+
+
+def _attach_forward_daily_history(trades: list[dict], db_robots: pd.DataFrame) -> None:
+    """Embed per-trade daily PnL/Delta series for forward trades (env=CZ_Forward).
+
+    Forward trades drive the per-trade Journey/Delta charts in the app. The
+    history is sourced from db_robots — same canonical source that powers the
+    visual sheets via formulas. Mutates `trades` in place.
+    """
+    if db_robots.empty:
+        return
+    forward_names = {t["name"] for t in trades if t.get("environment") == "CZ_Forward"}
+    if not forward_names:
+        return
+
+    rows = db_robots[db_robots["strategy"].isin(forward_names)].sort_values("date")
+    history_by_name: dict[str, list[dict]] = {}
+    for name, grp in rows.groupby("strategy"):
+        series: list[dict] = []
+        for _, r in grp.iterrows():
+            d = r.get("date")
+            date_iso = d.strftime("%Y-%m-%d") if pd.notna(d) else None
+            pnl = r.get("pnl")
+            delta = r.get("delta")
+            series.append({
+                "date": date_iso,
+                "pnl": float(pnl) if pd.notna(pnl) else None,
+                "delta": float(delta) if pd.notna(delta) else None,
+            })
+        history_by_name[str(name)] = series
+
+    for t in trades:
+        if t.get("environment") == "CZ_Forward":
+            t["daily_history"] = history_by_name.get(t["name"], [])
+
+
 # ─── Derivar estado atual dos trades ─────────────────────────────────────────
 
 def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
@@ -1184,6 +1287,10 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only
         for n in names:
             trade_to_sheet.setdefault(n, sheet_name)
 
+    print("[export] Lendo ForwardTest registry (opcional) ...")
+    ft_strategies = load_ft_strategies(xlsx_path)
+    print(f"[export] FT strategies (metadata): {len(ft_strategies)}")
+
     print("[export] Lendo status Closed das abas visuais ...")
     closed_from_sheets = {
         name
@@ -1281,6 +1388,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only
             existing_names.add(name)
 
     trades = sorted(trades, key=lambda t: (not t["is_active"], t["name"]))
+    _attach_forward_daily_history(trades, db_robots)
     kpis = compute_portfolio_kpis(trades, monthly)
 
     # ── Snapshot JSON ──
@@ -1291,6 +1399,7 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only
         "sheet_summaries":     sheet_summaries,
         "individual_trade_pnls": individual_trade_pnls,
         "sheet_daily_pnls":    sheet_daily_pnls,
+        "forwardtest_strategies": ft_strategies,
         "trades":              trades,
     }
     snap_path = REPORTS_DIR / f"trades_snapshot_{today_str}.json"

@@ -25,10 +25,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Crosshair, Layers3, Settings2, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Crosshair, Settings2, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, type BacktestDetail as BacktestDetailType } from "@/lib/api";
 import { fmtDate, fmtMoney, fmtNum, fmtPct, pnlClass } from "@/lib/format";
+import { StrikeStructureCard, type LegRow } from "@/components/shared/strike-structure-card";
 
 type BacktestTrade = {
   trade_date?: string | null;
@@ -248,7 +249,7 @@ function KpiBand({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
-function KpiBlock({ label, value, sub, tone, highlight, small, icon }: {
+export function KpiBlock({ label, value, sub, tone, highlight, small, icon }: {
   label: string;
   value: string;
   sub?: string;
@@ -269,7 +270,7 @@ function KpiBlock({ label, value, sub, tone, highlight, small, icon }: {
   );
 }
 
-function ChartCard({ title, icon, children, sub }: { title: string; icon: React.ReactNode; children: React.ReactNode; sub?: string }) {
+export function ChartCard({ title, icon, children, sub }: { title: string; icon: React.ReactNode; children: React.ReactNode; sub?: string }) {
   return (
     <section className="rounded-2xl border border-border/60 bg-gradient-to-b from-card/70 to-card/35 p-5 shadow-2xl shadow-black/10">
       <div className="mb-4 flex items-center justify-between">
@@ -284,7 +285,7 @@ function ChartCard({ title, icon, children, sub }: { title: string; icon: React.
   );
 }
 
-function EquityCurveCard({ detail }: { detail: BacktestDetailType }) {
+export function EquityCurveCard({ detail }: { detail: BacktestDetailType }) {
   const data = detail.kpis.equity.map((p) => ({ date: p.trade_date, cum: p.cumulative_pnl, pnl: p.pnl_usd }));
   const final = data.length ? data[data.length - 1].cum : 0;
   return (
@@ -309,7 +310,7 @@ function EquityCurveCard({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
-function DrawdownCard({ detail }: { detail: BacktestDetailType }) {
+export function DrawdownCard({ detail }: { detail: BacktestDetailType }) {
   const data = detail.kpis.equity.map((p) => ({ date: p.trade_date, dd: p.drawdown }));
   const max = Math.min(...data.map((d) => d.dd), 0);
   return (
@@ -333,7 +334,7 @@ function DrawdownCard({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
-function PnlDistributionCard({ detail }: { detail: BacktestDetailType }) {
+export function PnlDistributionCard({ detail }: { detail: BacktestDetailType }) {
   const buckets = useMemo(() => buildHistogram(detail.kpis.equity.map((e) => e.pnl_usd), 10), [detail]);
   return (
     <ChartCard title="P&L distribution per trade" icon={<BarChart3 className="h-4 w-4" />} sub="bucket size adapts to range">
@@ -353,7 +354,7 @@ function PnlDistributionCard({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
-function PerformanceCard({ detail }: { detail: BacktestDetailType }) {
+export function PerformanceCard({ detail }: { detail: BacktestDetailType }) {
   const k = detail.kpis;
   return (
     <section className="rounded-2xl border border-border/60 bg-gradient-to-b from-card/70 to-card/35 p-5 shadow-2xl shadow-black/10">
@@ -370,7 +371,7 @@ function PerformanceCard({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
-function RiskCard({ detail }: { detail: BacktestDetailType }) {
+export function RiskCard({ detail }: { detail: BacktestDetailType }) {
   const k = detail.kpis;
   return (
     <section className="rounded-2xl border border-border/60 bg-gradient-to-b from-card/70 to-card/35 p-5 shadow-2xl shadow-black/10">
@@ -386,7 +387,7 @@ function RiskCard({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
-function Row({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: number | null }) {
+export function Row({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: number | null }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-border/30 pb-2 last:border-0">
       <div>
@@ -599,7 +600,7 @@ function TradeInspector({
         </div>
       </div>
 
-      <StrikeStructureCard trade={trade} dailyRows={dailyRows} kind={detail.meta.kind} multiplier={detail.meta.multiplier} />
+      <BacktestStrikeStructure trade={trade} dailyRows={dailyRows} kind={detail.meta.kind} multiplier={detail.meta.multiplier} />
     </div>
   );
 }
@@ -761,7 +762,7 @@ function JourneyChart({
   );
 }
 
-function StrikeStructureCard({
+function BacktestStrikeStructure({
   trade,
   dailyRows,
   kind,
@@ -779,47 +780,16 @@ function StrikeStructureCard({
     : buildIc7LegRows(trade);
 
   return (
-    <section className="rounded-2xl border border-border/60 bg-gradient-to-b from-card/70 to-card/35 p-5 shadow-2xl shadow-black/10">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-primary"><Layers3 className="h-4 w-4" /></span>
-          <h3 className="text-sm font-semibold tracking-tight">Strike structure</h3>
-        </div>
-        <span className="text-[11px] text-muted-foreground">
-          {credit != null ? `net credit ${fmtNum(credit)} pts / ${fmtMoney(credit * multiplier)}` : `net credit ${DASH}`}
-        </span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border/40 text-[11px] uppercase tracking-wider text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Leg</th>
-              <th className="px-3 py-2 text-left font-medium">Side</th>
-              <th className="px-3 py-2 text-right font-medium">Strike</th>
-              <th className="px-3 py-2 text-right font-medium">{kind === "ss42" ? "Delta" : "Width"}</th>
-              <th className="px-3 py-2 text-right font-medium">Entry mid</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.leg} className="border-b border-border/30 last:border-0">
-                <td className="px-3 py-2.5 font-medium">{row.leg}</td>
-                <td className={`px-3 py-2.5 text-xs font-semibold uppercase tracking-wider ${row.side === "Sell" ? "text-[var(--warning)]" : "text-primary"}`}>
-                  {row.side}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular">{fmtNum(row.strike)}</td>
-                <td className="px-3 py-2.5 text-right tabular text-muted-foreground">{row.detail}</td>
-                <td className="px-3 py-2.5 text-right tabular text-muted-foreground">{fmtPoints(row.mid)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <StrikeStructureCard
+      rows={rows}
+      netCredit={credit}
+      multiplier={multiplier}
+      rightLabel={kind === "ss42" ? "Delta" : "Width"}
+    />
   );
 }
 
-function EmptyChartState({ label }: { label: string }) {
+export function EmptyChartState({ label }: { label: string }) {
   return (
     <div className="flex h-[360px] items-center justify-center rounded-xl border border-border/40 bg-card/20 text-sm text-muted-foreground">
       {label}
@@ -904,11 +874,6 @@ function fmtSigned(value: number | null | undefined, digits = 2): string {
     maximumFractionDigits: digits,
   });
   return `${value >= 0 ? "+" : "-"}${abs}`;
-}
-
-function fmtPoints(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return DASH;
-  return `${fmtNum(value)} pts`;
 }
 
 function fmtAxisMoney(value: unknown): string {
@@ -1071,14 +1036,6 @@ function payoffAtSpot(
     Math.max(0, spot - longCall)
   ) * multiplier;
 }
-
-type LegRow = {
-  leg: string;
-  side: "Buy" | "Sell";
-  strike: number | null;
-  detail: string;
-  mid: number | null;
-};
 
 function buildSs42LegRows(trade: BacktestTrade, entryDaily?: BacktestDailyRow): LegRow[] {
   return [

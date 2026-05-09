@@ -297,6 +297,10 @@ def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def strategy_family(name: str) -> str:
     n = name.upper()
+    if "TRIPLE CALENDAR" in n or "TRIPLE CAL" in n or "TRIP CAL" in n:
+        return "Triple Calendar"
+    if "DOUBLE CALENDAR" in n or "DOUBLE CAL" in n:
+        return "Double Calendar"
     if "IRON CONDOR" in n or " IC" in n or "IC7" in n or "IC8" in n:
         return "Iron Condor"
     if "RJL" in n:
@@ -1233,6 +1237,301 @@ def get_backtest(
         "kpis": kpis,
         "trades": trades_view,
         "daily": daily,
+    })
+
+
+# ─── ForwardTests ─────────────────────────────────────────────────────────────
+#
+# Forward trades live in the regular `FOR Trades` tab (env=CZ_Forward). Strategy
+# membership is inferred from each trade's name via `strategy_family()` plus the
+# trade's underlying — strategy_id = `{family-slug}_{underlying-lower}`.
+# `FT Strategies` tab is optional metadata enrichment (description, legs_template,
+# entry/exit rules, per-strategy start_date override).
+
+FORWARDTEST_ENV = "CZ_Forward"
+FORWARD_TEST_START_DATE = os.environ.get("FORWARD_TEST_START_DATE", "2026-05-08")
+
+
+def _ft_strategy_id(family: str, underlying: str | None) -> str:
+    family_slug = re.sub(r"[^a-z0-9]+", "-", family.lower()).strip("-") or "other"
+    und = (underlying or "unknown").lower()
+    return f"{family_slug}_{und}"
+
+
+def _family_from_strategy_id(sid: str) -> str:
+    parts = sid.rsplit("_", 1)
+    if len(parts) < 2:
+        return sid.replace("-", " ").title()
+    return parts[0].replace("-", " ").title()
+
+
+def _underlying_from_strategy_id(sid: str) -> str | None:
+    parts = sid.rsplit("_", 1)
+    if len(parts) < 2:
+        return None
+    return parts[1].upper()
+
+
+def _ft_open_date(trade: dict[str, Any]) -> datetime | None:
+    return parse_iso_date(trade.get("open_date") or trade.get("visual_open_date"))
+
+
+def _ft_strategy_cutoff(strategy_meta: dict[str, Any] | None) -> datetime:
+    if strategy_meta:
+        override = strategy_meta.get("start_date")
+        if override:
+            d = parse_iso_date(override)
+            if d:
+                return d
+    fallback = parse_iso_date(FORWARD_TEST_START_DATE)
+    return fallback or datetime(2026, 5, 8)
+
+
+def _ft_metadata_index(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for s in snap.get("forwardtest_strategies") or []:
+        sid = s.get("strategy_id")
+        if isinstance(sid, str) and sid:
+            out[sid] = s
+    return out
+
+
+def _ft_build_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
+    """Union of (auto-detected groups from CZ_Forward trades) + (FT Strategies metadata).
+
+    Auto-detected entries fall back to `{Family} · {Underlying}` for the display
+    name when no FT Strategies row is found. Metadata-only entries (declared
+    but no trades yet match) still appear so the empty card is visible.
+    """
+    metadata = _ft_metadata_index(snap)
+
+    groups: dict[str, dict[str, Any]] = {}
+    for t in snap.get("trades", []) or []:
+        if t.get("environment") != FORWARDTEST_ENV:
+            continue
+        underlying = t.get("underlying")
+        if not underlying or underlying == "?":
+            continue
+        family = strategy_family(str(t.get("name") or ""))
+        sid = _ft_strategy_id(family, underlying)
+        if sid not in groups:
+            groups[sid] = {"strategy_family": family, "underlying": underlying}
+
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for sid, base in groups.items():
+        meta = metadata.get(sid, {})
+        family = base["strategy_family"]
+        underlying = base["underlying"]
+        out.append({
+            "strategy_id": sid,
+            "name": meta.get("name") or f"{family} · {underlying}",
+            "description": meta.get("description"),
+            "underlying": underlying,
+            "horizon": meta.get("horizon"),
+            "strategy_family": family,
+            "legs_template": meta.get("legs_template") or [],
+            "entry_rule": meta.get("entry_rule"),
+            "exit_rule": meta.get("exit_rule"),
+            "start_date": meta.get("start_date"),
+            "status": meta.get("status") or "active",
+        })
+        seen.add(sid)
+
+    for sid, meta in metadata.items():
+        if sid in seen:
+            continue
+        family = _family_from_strategy_id(sid)
+        underlying = _underlying_from_strategy_id(sid)
+        out.append({
+            "strategy_id": sid,
+            "name": meta.get("name") or sid,
+            "description": meta.get("description"),
+            "underlying": underlying,
+            "horizon": meta.get("horizon"),
+            "strategy_family": family,
+            "legs_template": meta.get("legs_template") or [],
+            "entry_rule": meta.get("entry_rule"),
+            "exit_rule": meta.get("exit_rule"),
+            "start_date": meta.get("start_date"),
+            "status": meta.get("status") or "active",
+        })
+
+    out.sort(key=lambda s: s.get("name") or "")
+    return out
+
+
+def _ft_strategies(snap: dict[str, Any]) -> list[dict[str, Any]]:
+    return _ft_build_strategies(snap)
+
+
+def _ft_strategy_meta(snap: dict[str, Any], strategy_id: str) -> dict[str, Any]:
+    for s in _ft_build_strategies(snap):
+        if s.get("strategy_id") == strategy_id:
+            return s
+    raise HTTPException(404, f"Forwardtest strategy '{strategy_id}' not found")
+
+
+def _ft_trades_for(snap: dict[str, Any], strategy: dict[str, Any]) -> list[dict[str, Any]]:
+    sid = strategy.get("strategy_id")
+    cutoff = _ft_strategy_cutoff(strategy)
+    out: list[dict[str, Any]] = []
+    for t in snap.get("trades", []) or []:
+        if t.get("environment") != FORWARDTEST_ENV:
+            continue
+        underlying = t.get("underlying")
+        if not underlying or underlying == "?":
+            continue
+        family = strategy_family(str(t.get("name") or ""))
+        if _ft_strategy_id(family, underlying) != sid:
+            continue
+        open_dt = _ft_open_date(t)
+        if open_dt is None or open_dt < cutoff:
+            continue
+        out.append(t)
+    return out
+
+
+def _ft_closed_trade_to_kpi_row(t: dict[str, Any], individual: dict[str, float]) -> dict[str, Any]:
+    """Adapter: live-trade dict → row shape consumed by _backtest_kpis().
+
+    Active trades get exit_method='fallback_entry' so _backtest_kpis() excludes
+    them from win-rate / equity / drawdown — same convention used for backtests.
+    """
+    return {
+        "trade_date": t.get("open_date") or t.get("visual_open_date"),
+        "exp_date": t.get("exp_date") or t.get("visual_exp_date"),
+        "pnl_usd": trade_pnl(t, individual),
+        "in_range": None,
+        "exit_method": "fallback_entry" if t.get("is_active") else "rule_close",
+    }
+
+
+def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
+    """Compute DIT-to-25/50/75% MaxProfit and path drawdown.
+
+    Max profit is only defined for credit strategies (`net_credit > 0`). Debit
+    structures still return path stats from daily marks, but the %MP milestones
+    remain null.
+    """
+    history = trade.get("daily_history") or []
+    max_profit = trade.get("net_credit")
+    open_dt = parse_iso_date(trade.get("open_date") or trade.get("visual_open_date"))
+
+    result: dict[str, Any] = {
+        "max_profit_usd": None,
+        "max_pnl_seen": None,
+        "min_pnl_seen": None,
+        "max_dd_from_peak": None,
+        "dit_to_25mp": None,
+        "dit_to_50mp": None,
+        "dit_to_75mp": None,
+    }
+
+    pnls = [
+        (h.get("date"), h.get("pnl"))
+        for h in history
+        if isinstance(h, dict) and isinstance(h.get("pnl"), (int, float))
+    ]
+    if not pnls:
+        return result
+
+    values = [float(p) for _, p in pnls]
+    result["max_pnl_seen"] = round(max(values), 2)
+    result["min_pnl_seen"] = round(min(values), 2)
+
+    peak = float("-inf")
+    max_dd = 0.0
+    for value in values:
+        peak = max(peak, value)
+        max_dd = min(max_dd, value - peak)
+    result["max_dd_from_peak"] = round(max_dd, 2)
+
+    if isinstance(max_profit, (int, float)) and max_profit > 0 and open_dt:
+        max_profit_f = float(max_profit)
+        result["max_profit_usd"] = round(max_profit_f, 2)
+        targets = [(25, 0.25), (50, 0.50), (75, 0.75)]
+        for date_str, pnl in pnls:
+            row_dt = parse_iso_date(date_str)
+            if row_dt is None:
+                continue
+            dit = (row_dt - open_dt).days
+            for pct_label, mult in targets:
+                key = f"dit_to_{pct_label}mp"
+                if result[key] is None and float(pnl) >= mult * max_profit_f:
+                    result[key] = dit
+
+    return result
+
+
+def _enrich_ft_trade(t: dict[str, Any]) -> dict[str, Any]:
+    return {**t, "milestones": _ft_milestones(t)}
+
+
+def _ft_summary(s: dict[str, Any], snap: dict[str, Any]) -> dict[str, Any]:
+    individual = snap.get("individual_trade_pnls") or {}
+    trades = _ft_trades_for(snap, s)
+    opens = [t for t in trades if t.get("is_active")]
+    closed = [t for t in trades if not t.get("is_active")]
+    kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
+    kpis = _backtest_kpis(kpi_rows)
+    return {
+        "strategy_id": s.get("strategy_id"),
+        "name": s.get("name"),
+        "underlying": s.get("underlying"),
+        "horizon": s.get("horizon"),
+        "strategy_family": s.get("strategy_family"),
+        "description": s.get("description"),
+        "status": s.get("status") or "active",
+        "n_open": len(opens),
+        "n_closed": len(closed),
+        "open_pnl": round(sum(trade_pnl(t, individual) for t in opens), 2),
+        "closed_pnl": kpis["total_pnl"],
+        "win_rate": kpis["win_rate"],
+        "profit_factor": kpis["profit_factor"],
+        "max_drawdown": kpis["max_drawdown"],
+        "sharpe": kpis["sharpe"],
+    }
+
+
+@app.get("/api/forwardtests")
+def list_forwardtests() -> JSONResponse:
+    snap = load_snapshot()
+    summaries = [_ft_summary(s, snap) for s in _ft_build_strategies(snap)]
+    return JSONResponse({"forwardtests": summaries})
+
+
+@app.get("/api/forwardtests/{strategy_id}")
+def get_forwardtest(strategy_id: str) -> JSONResponse:
+    snap = load_snapshot()
+    s = _ft_strategy_meta(snap, strategy_id)
+    individual = snap.get("individual_trade_pnls") or {}
+    trades = _ft_trades_for(snap, s)
+    opens = [t for t in trades if t.get("is_active")]
+    closed = [t for t in trades if not t.get("is_active")]
+    kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
+    kpis = _backtest_kpis(kpi_rows)
+    cutoff = _ft_strategy_cutoff(s)
+    return JSONResponse({
+        "meta": {
+            "strategy_id": s.get("strategy_id"),
+            "name": s.get("name"),
+            "underlying": s.get("underlying"),
+            "horizon": s.get("horizon"),
+            "strategy_family": s.get("strategy_family"),
+            "description": s.get("description"),
+            "entry_rule": s.get("entry_rule"),
+            "exit_rule": s.get("exit_rule"),
+            "legs_template": s.get("legs_template") or [],
+            "status": s.get("status") or "active",
+            "sheet": None,
+            "tracking_since": cutoff.date().isoformat(),
+            "period": _period_label(kpi_rows),
+        },
+        "kpis": kpis,
+        "open_trades": _sanitize_records([_enrich_ft_trade(t) for t in opens]),
+        "closed_trades": _sanitize_records([_enrich_ft_trade(t) for t in closed]),
+        "daily_pnls": [],
     })
 
 
