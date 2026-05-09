@@ -298,9 +298,9 @@ def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def strategy_family(name: str) -> str:
     n = name.upper()
-    if "TRIPLE CALENDAR" in n or "TRIPLE CAL" in n or "TRIP CAL" in n:
+    if "TRIPLE CALENDAR" in n or "TRIPLECALENDAR" in n or "TRIPLE CAL" in n or "TRIP CAL" in n:
         return "Triple Calendar"
-    if "DOUBLE CALENDAR" in n or "DOUBLE CAL" in n:
+    if "DOUBLE CALENDAR" in n or "DOUBLECALENDAR" in n or "DOUBLE CAL" in n:
         return "Double Calendar"
     if "IRON CONDOR" in n or " IC" in n or "IC7" in n or "IC8" in n:
         return "Iron Condor"

@@ -1029,6 +1029,13 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
         env_norm = row["env_norm"]
         last_dt  = row["date"]
 
+        # Trade names prefixed with "JS " override env to JS_Forward, regardless
+        # of which Environment column was used in db_robots. Lets João log JS
+        # forward trades using the "FOR Trades" env tag without losing the user
+        # split downstream.
+        if isinstance(name, str) and name.upper().startswith("JS ") and env_norm in ("CZ_Forward", "CZ_Live"):
+            env_norm = "JS_Forward"
+
         manually_closed = name in all_closed
         is_active = (not manually_closed) and (last_dt >= cutoff)
         # Ainda ativo pela data? Checar se já expirou pelo DTE calculado
@@ -1087,7 +1094,7 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
             # Abertura
             "open_date":         open_date.strftime("%Y-%m-%d") if pd.notna(open_date) else None,
             "exp_date":          exp_date.strftime("%Y-%m-%d") if exp_date and pd.notna(exp_date) else None,
-            "dte_open":          int(dte_open) if dte_open else None,
+            "dte_open":          int(dte_open) if pd.notna(dte_open) and dte_open else None,
             "dte_remaining":     dte_remaining,
             "underlying_price_at_open": und_price,
             "strikes":           cria.get("strikes"),
