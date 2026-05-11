@@ -80,6 +80,27 @@ def _parse_money(val) -> float | None:
         return None
 
 
+def _parse_dte(val) -> tuple[str | None, int | None]:
+    """Parse DTE cell preserving raw string AND extracting the first integer.
+
+    João writes calendar-spread DTE as "7 / 10", "14/21" (front/back leg DTEs)
+    or as a plain number "7" for single-leg trades. _parse_money() drops the
+    spread variants — we keep both forms so the UI shows the original string
+    and downstream math (dte_remaining etc) gets the front-leg int.
+    """
+    if val is None:
+        return None, None
+    if isinstance(val, (int, float)):
+        if isinstance(val, float) and np.isnan(val):
+            return None, None
+        return str(int(val)) if float(val).is_integer() else str(val), int(val)
+    raw = str(val).strip()
+    if not raw:
+        return None, None
+    m = re.search(r"\d+", raw)
+    return raw, int(m.group()) if m else None
+
+
 def _parse_sheet_date(val) -> date | None:
     """Coerce Excel/Sheets date cells, formatted strings, or serials to date."""
     if isinstance(val, datetime):
@@ -853,10 +874,12 @@ def load_db_cria(xlsx_path: Path) -> pd.DataFrame:
         def _get(idx):
             return row[idx] if len(row) > idx else None
 
+        dte_raw, dte_int = _parse_dte(_get(2))
         rows.append({
             "scraped_date":     _get(0),
             "url":              str(_get(1)) if _get(1) else None,
-            "dte_open":         _parse_money(_get(2)),
+            "dte_open":         dte_int,
+            "dte_open_raw":     dte_raw,
             "sd":               _parse_money(_get(3)),
             "open_date":        _get(4),
             "underlying_price": _parse_money(_get(5)),
@@ -949,16 +972,20 @@ def load_ft_strategies(xlsx_path: Path) -> list[dict]:
     return strategies
 
 
-def _attach_forward_daily_history(trades: list[dict], db_robots: pd.DataFrame) -> None:
-    """Embed per-trade daily PnL/Delta series for forward trades (env=CZ_Forward).
+_FORWARD_ENVS = ("CZ_Forward", "JS_Forward")
 
-    Forward trades drive the per-trade Journey/Delta charts in the app. The
-    history is sourced from db_robots — same canonical source that powers the
-    visual sheets via formulas. Mutates `trades` in place.
+
+def _attach_forward_daily_history(trades: list[dict], db_robots: pd.DataFrame) -> None:
+    """Embed per-trade daily PnL/Delta series for forward trades.
+
+    Forward trades (CZ_Forward and JS_Forward) drive the per-trade Journey/Delta
+    charts and milestone calculations in the app. History is sourced from
+    db_robots — same canonical source that powers the visual sheets via
+    formulas. Mutates `trades` in place.
     """
     if db_robots.empty:
         return
-    forward_names = {t["name"] for t in trades if t.get("environment") == "CZ_Forward"}
+    forward_names = {t["name"] for t in trades if t.get("environment") in _FORWARD_ENVS}
     if not forward_names:
         return
 
@@ -979,7 +1006,7 @@ def _attach_forward_daily_history(trades: list[dict], db_robots: pd.DataFrame) -
         history_by_name[str(name)] = series
 
     for t in trades:
-        if t.get("environment") == "CZ_Forward":
+        if t.get("environment") in _FORWARD_ENVS:
             t["daily_history"] = history_by_name.get(t["name"], [])
 
 
@@ -1047,7 +1074,17 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
 
         net_credit = cria.get("net_credit")
         max_loss   = cria.get("max_loss")
-        dte_open   = cria.get("dte_open")
+        dte_open       = cria.get("dte_open")
+        dte_open_raw   = cria.get("dte_open_raw")
+        # Fallback: derive DTE from trade name when db_cria didn't capture it
+        # (e.g. "FOR01 RUT TripleCalendar 14/21DTE", "T03 SLV Triple Calendar 11/18DTE").
+        if not dte_open_raw and not dte_open and isinstance(name, str):
+            m = re.search(r"(\d+(?:\s*[/-]\s*\d+)?)\s*DTE", name, re.IGNORECASE)
+            if m:
+                dte_open_raw = re.sub(r"\s+", "", m.group(1))
+                first = re.search(r"\d+", dte_open_raw)
+                if first:
+                    dte_open = int(first.group())
         open_date  = cria.get("open_date")
         und_price  = cria.get("underlying_price")
         lw_be      = cria.get("ist_lw_be") or cria.get("soll_lw_be")
@@ -1095,6 +1132,7 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
             "open_date":         open_date.strftime("%Y-%m-%d") if pd.notna(open_date) else None,
             "exp_date":          exp_date.strftime("%Y-%m-%d") if exp_date and pd.notna(exp_date) else None,
             "dte_open":          int(dte_open) if pd.notna(dte_open) and dte_open else None,
+            "dte_open_raw":      dte_open_raw if isinstance(dte_open_raw, str) and dte_open_raw else None,
             "dte_remaining":     dte_remaining,
             "underlying_price_at_open": und_price,
             "strikes":           cria.get("strikes"),
