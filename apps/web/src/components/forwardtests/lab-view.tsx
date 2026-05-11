@@ -10,6 +10,7 @@ import { PerformanceMatrix } from "./performance-matrix";
 import { StructureComparison } from "./structure-comparison";
 import { TopSetups } from "./top-setups";
 import { RecentActivity } from "./recent-activity";
+import { AggregationsTable } from "./aggregations-table";
 
 type DeskUser = "CZ" | "JS";
 const USER_TO_ENV: Record<DeskUser, ForwardtestEnv> = {
@@ -44,6 +45,8 @@ export function LabView() {
           />
 
           <PerformanceMatrix cells={data.matrix} env={env} />
+
+          <AggregationsTable env={env} />
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <div className="xl:col-span-2">

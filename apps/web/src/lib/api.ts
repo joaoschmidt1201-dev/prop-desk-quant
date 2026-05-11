@@ -322,6 +322,30 @@ export type ForwardtestLabPayload = {
   recent_activity: ForwardtestRecentEntry[];
 };
 
+export type ForwardtestAggDim = "family" | "ticker" | "structure";
+
+export type ForwardtestAggregationRow = {
+  key: string;
+  n_trades_open: number;
+  n_trades_closed: number;
+  n_trades_total: number;
+  open_pnl: number;
+  closed_pnl: number;
+  total_pnl: number;
+  win_rate: number | null;
+  profit_factor: number | null;
+  avg_dit_to_10mp: number | null;
+  avg_dit_to_25mp: number | null;
+  avg_dit_to_50mp: number | null;
+  avg_dit_to_75mp: number | null;
+};
+
+export type ForwardtestAggregationsPayload = {
+  env: ForwardtestEnv;
+  dim: ForwardtestAggDim;
+  rows: ForwardtestAggregationRow[];
+};
+
 export type ForwardtestDetail = {
   env: ForwardtestEnv;
   meta: {
@@ -384,6 +408,8 @@ export const api = {
     get<{ forwardtests: ForwardtestStrategySummary[] }>(`/api/forwardtests?env=${env}`),
   forwardtestsLab: (env: ForwardtestEnv = "CZ_Forward") =>
     get<ForwardtestLabPayload>(`/api/forwardtests/lab?env=${env}`),
+  forwardtestsAggregations: (env: ForwardtestEnv = "CZ_Forward", dim: ForwardtestAggDim = "family") =>
+    get<ForwardtestAggregationsPayload>(`/api/forwardtests/aggregations?env=${env}&dim=${dim}`),
   forwardtest: (strategyId: string, env: ForwardtestEnv = "CZ_Forward") =>
     get<ForwardtestDetail>(`/api/forwardtests/${encodeURIComponent(strategyId)}?env=${env}`),
 

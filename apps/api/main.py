@@ -1792,6 +1792,84 @@ def get_forwardtest_lab(env: str | None = Query(default=None)) -> JSONResponse:
     })
 
 
+_FT_AGG_DIMS = ("family", "ticker", "structure")
+
+
+@app.get("/api/forwardtests/aggregations")
+def get_forwardtest_aggregations(
+    env: str | None = Query(default=None),
+    dim: str = Query(default="family"),
+) -> JSONResponse:
+    """Cross-strategy rollup grouped by family / underlying / structure.
+
+    Lets the Lab compare buckets (e.g. all Triple Calendars vs all ICs, or all
+    SPX trades vs all RUT, or 7/10 vs 14/21 structures). Includes avg DIT to
+    10/25/50/75% MP for performance speed comparisons.
+    """
+    if dim not in _FT_AGG_DIMS:
+        raise HTTPException(400, f"Unsupported dim '{dim}'. Use one of {_FT_AGG_DIMS}.")
+    resolved_env = _resolve_ft_env(env)
+    snap = load_snapshot()
+    individual = snap.get("individual_trade_pnls") or {}
+    strategies = _ft_build_strategies(snap, env=resolved_env)
+
+    def _key_for(s: dict[str, Any]) -> str:
+        if dim == "family":
+            return str(s.get("strategy_family") or "Other")
+        if dim == "ticker":
+            return str(s.get("underlying") or "?")
+        return str(s.get("structure") or "—")
+
+    buckets: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for s in strategies:
+        trades = _ft_trades_for(snap, s, env=resolved_env)
+        if not trades:
+            continue
+        bucket = buckets.setdefault(_key_for(s), {"opens": [], "closed": []})
+        for t in trades:
+            ("opens" if t.get("is_active") else "closed")
+            bucket["opens" if t.get("is_active") else "closed"].append(t)
+
+    rows: list[dict[str, Any]] = []
+    for key, bucket in buckets.items():
+        opens = bucket["opens"]
+        closed = bucket["closed"]
+        kpi_rows = [_ft_closed_trade_to_kpi_row(t, individual) for t in closed]
+        kpis = _backtest_kpis(kpi_rows)
+        open_pnl = round(sum(trade_pnl(t, individual) for t in opens), 2)
+
+        dits: dict[int, list[int]] = {10: [], 25: [], 50: [], 75: []}
+        for t in opens + closed:
+            ms = _ft_milestones(t)
+            for pct in dits:
+                v = ms.get(f"dit_to_{pct}mp")
+                if v is not None:
+                    dits[pct].append(int(v))
+
+        rows.append({
+            "key": key,
+            "n_trades_open": len(opens),
+            "n_trades_closed": len(closed),
+            "n_trades_total": len(opens) + len(closed),
+            "open_pnl": open_pnl,
+            "closed_pnl": kpis["total_pnl"],
+            "total_pnl": round(open_pnl + kpis["total_pnl"], 2),
+            "win_rate": kpis["win_rate"],
+            "profit_factor": kpis["profit_factor"],
+            "avg_dit_to_10mp": round(statistics.mean(dits[10]), 1) if dits[10] else None,
+            "avg_dit_to_25mp": round(statistics.mean(dits[25]), 1) if dits[25] else None,
+            "avg_dit_to_50mp": round(statistics.mean(dits[50]), 1) if dits[50] else None,
+            "avg_dit_to_75mp": round(statistics.mean(dits[75]), 1) if dits[75] else None,
+        })
+
+    rows.sort(key=lambda r: -(r["total_pnl"] or 0))
+    return JSONResponse({
+        "env": resolved_env,
+        "dim": dim,
+        "rows": _sanitize_records(rows),
+    })
+
+
 @app.get("/api/forwardtests/{strategy_id}")
 def get_forwardtest(strategy_id: str, env: str | None = Query(default=None)) -> JSONResponse:
     resolved_env = _resolve_ft_env(env)

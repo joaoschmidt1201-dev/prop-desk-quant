@@ -416,6 +416,9 @@ function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; is
   const pctOfMaxProfit = pnl != null && maxProfit != null && maxProfit > 0 ? pnl / maxProfit : null;
   const delta = numOr(trade.delta_current ?? trade.delta);
   const dteRemaining = numOr(trade.dte_remaining);
+  const dteOpenLabel =
+    (typeof trade.dte_open_raw === "string" && trade.dte_open_raw.trim()) ||
+    (trade.dte_open != null ? String(trade.dte_open) : null);
   const dit = calcTradeDit(trade, journey.at(-1)?.date ?? null);
   const maxDdSeen = numOr(milestones?.max_dd_from_peak);
   const strikeRows = buildTradeStrikeRows(trade);
@@ -449,7 +452,7 @@ function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; is
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
         <KpiBlock label="Current P&L" tone={pnl} value={fmtMoney(pnl)} />
         {isDebit ? (
           <KpiBlock label="Net debit" value={fmtMoney(netDebit)} sub="paid up-front (max risk)" />
@@ -457,6 +460,7 @@ function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; is
           <KpiBlock label="%MP" value={fmtPct(pctOfMaxProfit)} sub={maxProfit != null ? fmtMoney(maxProfit) : "credit only"} />
         )}
         <KpiBlock label="Delta" tone={delta} value={fmtNum(delta)} />
+        <KpiBlock label="DTE @ open" value={dteOpenLabel ?? "—"} sub={isDebit ? "front / back" : undefined} />
         <KpiBlock label="DTE remaining" value={fmtDays(dteRemaining)} />
         <KpiBlock label="DIT" value={fmtDays(dit)} />
         <KpiBlock label="Max DD seen" tone={maxDdSeen} value={fmtMoney(maxDdSeen)} />
@@ -464,14 +468,14 @@ function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; is
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-7">
-          <ForwardPnlJourneyChart points={journey} maxProfit={isDebit ? null : maxProfit} milestones={milestones} />
+          <ForwardPnlJourneyChart points={journey} maxProfit={maxProfit} milestones={milestones} />
         </div>
         <div className="xl:col-span-5">
           <ForwardDeltaChart points={journey} />
         </div>
       </div>
 
-      {!isDebit && <MilestonesStrip milestones={milestones} />}
+      <MilestonesStrip milestones={milestones} isDebit={isDebit} />
 
       <TradeSetupCard trade={trade} isDebit={isDebit} />
 
@@ -501,6 +505,7 @@ function ForwardPnlJourneyChart({
   const maxDit = Math.max(1, ...points.map((point) => point.dit));
   const references = maxProfit != null && maxProfit > 0
     ? [
+        { label: "10% MP", value: maxProfit * 0.1, dit: milestones?.dit_to_10mp ?? null },
         { label: "25% MP", value: maxProfit * 0.25, dit: milestones?.dit_to_25mp ?? null },
         { label: "50% MP", value: maxProfit * 0.5, dit: milestones?.dit_to_50mp ?? null },
         { label: "75% MP", value: maxProfit * 0.75, dit: milestones?.dit_to_75mp ?? null },
@@ -613,22 +618,27 @@ function ForwardDeltaChart({ points }: { points: ForwardJourneyPoint[] }) {
   );
 }
 
-function MilestonesStrip({ milestones }: { milestones: ForwardtestTrade["milestones"] }) {
+function MilestonesStrip({ milestones, isDebit }: { milestones: ForwardtestTrade["milestones"]; isDebit: boolean }) {
   const items = [
+    { label: "10% MP", value: milestones?.dit_to_10mp ?? null },
     { label: "25% MP", value: milestones?.dit_to_25mp ?? null },
     { label: "50% MP", value: milestones?.dit_to_50mp ?? null },
     { label: "75% MP", value: milestones?.dit_to_75mp ?? null },
   ];
+  const subtitle = isDebit ? "% of debit recovered" : "% of max profit";
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-      {items.map((item) => (
-        <div key={item.label} className="rounded-2xl border border-border/60 bg-card/40 p-4">
-          <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">{item.label}</div>
-          <div className="mt-2 text-lg font-semibold tabular">
-            {item.value == null ? DASH : `@ DIT ${item.value}`}
+    <div className="space-y-1">
+      <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">{subtitle}</div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-2xl border border-border/60 bg-card/40 p-4">
+            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">{item.label}</div>
+            <div className="mt-2 text-lg font-semibold tabular">
+              {item.value == null ? DASH : `@ DIT ${item.value}`}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
