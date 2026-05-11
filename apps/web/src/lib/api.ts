@@ -31,6 +31,7 @@ export type Trade = {
   open_date: string | null;
   exp_date: string | null;
   dte_open: number | null;
+  dte_open_raw: string | null;
   dte_remaining: number | null;
   net_credit: number | null;
   max_loss: number | null;
@@ -223,6 +224,7 @@ export type ForwardtestMilestones = {
   max_pnl_seen: number | null;
   min_pnl_seen: number | null;
   max_dd_from_peak: number | null;
+  dit_to_10mp: number | null;
   dit_to_25mp: number | null;
   dit_to_50mp: number | null;
   dit_to_75mp: number | null;

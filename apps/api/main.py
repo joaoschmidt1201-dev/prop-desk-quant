@@ -1537,13 +1537,15 @@ def _ft_closed_trade_to_kpi_row(t: dict[str, Any], individual: dict[str, float])
 
 
 def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
-    """Compute DIT-to-25/50/75% MaxProfit and path drawdown.
+    """Compute DIT-to-10/25/50/75% MaxProfit and path drawdown.
 
-    For credit strategies, the value in `net_credit` is the max profit and
-    %MP milestones are computed against it. For debit strategies (Triple/
-    Double Calendar, Bull Call), `net_credit` is actually the debit paid up-
-    front — i.e. max risk, not max profit — so %MP milestones stay null and
-    `is_debit` is reported back to the UI.
+    Credit strategies: `net_credit` is the max profit; %MP milestones are pct
+    of net_credit.
+    Debit strategies (Triple/Double Calendar, Bull Call): `net_credit` is the
+    debit paid up-front. Per desk convention, the milestone target = 100% of
+    the debit (i.e. "% of max profit" = % of debit recovered). The UI uses
+    `is_debit` to label the metric appropriately. `net_debit_usd` is surfaced
+    for the UI to display "Net debit" instead of "Net credit".
     """
     history = trade.get("daily_history") or []
     family = strategy_family(str(trade.get("name") or ""))
@@ -1558,6 +1560,7 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
         "max_pnl_seen": None,
         "min_pnl_seen": None,
         "max_dd_from_peak": None,
+        "dit_to_10mp": None,
         "dit_to_25mp": None,
         "dit_to_50mp": None,
         "dit_to_75mp": None,
@@ -1585,11 +1588,12 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
         max_dd = min(max_dd, value - peak)
     result["max_dd_from_peak"] = round(max_dd, 2)
 
-    max_profit = None if is_debit else raw_credit
-    if isinstance(max_profit, (int, float)) and max_profit > 0 and open_dt:
-        max_profit_f = float(max_profit)
-        result["max_profit_usd"] = round(max_profit_f, 2)
-        targets = [(25, 0.25), (50, 0.50), (75, 0.75)]
+    # Milestone target: net_credit for credit (= max profit) and for debit
+    # (= debit paid, treated as 100% recovery target per desk convention).
+    if isinstance(raw_credit, (int, float)) and raw_credit > 0 and open_dt:
+        target_usd = float(raw_credit)
+        result["max_profit_usd"] = round(target_usd, 2)
+        targets = [(10, 0.10), (25, 0.25), (50, 0.50), (75, 0.75)]
         for date_str, pnl in pnls:
             row_dt = parse_iso_date(date_str)
             if row_dt is None:
@@ -1597,7 +1601,7 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
             dit = (row_dt - open_dt).days
             for pct_label, mult in targets:
                 key = f"dit_to_{pct_label}mp"
-                if result[key] is None and float(pnl) >= mult * max_profit_f:
+                if result[key] is None and float(pnl) >= mult * target_usd:
                     result[key] = dit
 
     return result
