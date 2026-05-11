@@ -1036,6 +1036,13 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
         if isinstance(name, str) and name.upper().startswith("JS ") and env_norm in ("CZ_Forward", "CZ_Live"):
             env_norm = "JS_Forward"
 
+        # Trades sem prefixo "FOR" no nome NÃO pertencem ao ForwardTest Lab,
+        # mesmo que o Make tenha taggeado a linha como "FOR Trades" em db_robots.
+        # Convenção do desk: só nomes começando com "FOR" (ex: FOR01, FOR02)
+        # habitam o ambiente CZ_Forward.
+        if isinstance(name, str) and env_norm == "CZ_Forward" and not name.upper().startswith("FOR"):
+            env_norm = "CZ_Live"
+
         manually_closed = name in all_closed
         is_active = (not manually_closed) and (last_dt >= cutoff)
         # Ainda ativo pela data? Checar se já expirou pelo DTE calculado
