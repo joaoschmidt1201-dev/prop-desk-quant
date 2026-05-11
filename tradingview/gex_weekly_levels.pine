@@ -3,8 +3,8 @@
 // GEX Weekly Levels [TradingLitt Style] — SPX + NDX + SPY + QQQ + IWM — AUTO-GENERATED
 // DO NOT EDIT MANUALLY. Regenerate via:
 //   python scripts/gex_csv_parser.py <csv_path> --week YYYY-MM-DD
-// Last updated : 2026-05-04
-// Weeks stored : 22
+// Last updated : 2026-05-11
+// Weeks stored : 23
 // =======================================================================
 indicator("GEX Weekly Levels [TradingLitt]", overlay=true, max_lines_count=500, max_labels_count=500, shorttitle="GEX Levels")
 
@@ -84,7 +84,7 @@ SH_AGG   = input.bool(true, "Aggregate",  group=_GSL)
 // and uses the next Monday's open as the week-end boundary, so 4-day holiday
 // weeks terminate naturally at next Monday's pre-open.
 int DAY_MS = 86400000
-string _update_date = "2026-05-04"
+string _update_date = "2026-05-11"
 
 // --- HELPERS --------------------------------------------------------
 f_style(s) =>
@@ -761,6 +761,62 @@ f_draw_week_21() =>
         f_draw_level(_t1, _t2, 270.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(270.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
         f_draw_level(_t1, _t2, 269.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(269.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
 
+f_draw_week_22() =>
+    // --- Week 22: 2026-05-11 ---
+    int _t1 = 1778506200000
+    int _t2 = 1779110999999
+    if _is_spx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 7150.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(7150.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7400.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(7400.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7500.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(7500.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7350.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(7350.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7225.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(7225.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7155.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(7155.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 7165.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(7165.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_ndx
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 27675.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(27675.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 28800.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(28800.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 29000.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(29000.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 29200.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(29200.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27800.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(27800.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 27975.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(27975.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 28770.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(28770.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_qqq
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 682.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP or SH_P3), (SHORT_NAME ? "g-flip + p3" : "Gamma Flip + Pos p3") + " " + str.tostring(math.round(682.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 700.0, C_P1, STY_P1, LW_P1, (SH_P1), (SHORT_NAME ? "p1" : "Pos p1") + " " + str.tostring(math.round(700.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 691.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(691.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 690.0, C_N1, STY_N1, LW_N1, (SH_N1 or SH_AGG), (SHORT_NAME ? "n1 + agg" : "Neg n1 + Aggregate") + " " + str.tostring(math.round(690.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 685.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(685.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 696.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(696.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+    if _is_iwm
+        f_draw_sep(_t1, C_SEP_W, STY_SEP_W, LW_SEP_W)
+        f_draw_sep(_t1 + DAY_MS, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 2, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 3, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_sep(_t1 + DAY_MS * 4, C_SEP_D, STY_SEP_D, LW_SEP_D)
+        f_draw_level(_t1, _t2, 282.0, C_GFLIP, STY_GFLIP, LW_GFLIP, (SH_GFLIP), (SHORT_NAME ? "g-flip" : "Gamma Flip") + " " + str.tostring(math.round(282.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 285.0, C_P1, STY_P1, LW_P1, (SH_P1 or SH_AGG), (SHORT_NAME ? "p1 + agg" : "Pos p1 + Aggregate") + " " + str.tostring(math.round(285.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 280.0, C_P2, STY_P2, LW_P2, (SH_P2), (SHORT_NAME ? "p2" : "Pos p2") + " " + str.tostring(math.round(280.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 290.0, C_P3, STY_P3, LW_P3, (SH_P3), (SHORT_NAME ? "p3" : "Pos p3") + " " + str.tostring(math.round(290.0)) + "" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 266.0, C_N1, STY_N1, LW_N1, (SH_N1), (SHORT_NAME ? "n1" : "Neg n1") + " " + str.tostring(math.round(266.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 264.0, C_N2, STY_N2, LW_N2, (SH_N2), (SHORT_NAME ? "n2" : "Neg n2") + " " + str.tostring(math.round(264.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+        f_draw_level(_t1, _t2, 273.0, C_N3, STY_N3, LW_N3, (SH_N3), (SHORT_NAME ? "n3" : "Neg n3") + " " + str.tostring(math.round(273.0)) + " ★" + (SHOW_TS ? " [" + _update_date + "]" : ""))
+
 if barstate.islast and _valid
     f_redraw_all()
     f_draw_week_0()
@@ -785,3 +841,4 @@ if barstate.islast and _valid
     f_draw_week_19()
     f_draw_week_20()
     f_draw_week_21()
+    f_draw_week_22()

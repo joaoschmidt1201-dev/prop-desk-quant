@@ -73,5 +73,44 @@
       287
     ],
     "source_file": "IWM-gamma-levels-exp-20260508-weekly.csv"
+  },
+  {
+    "week": "2026-05-11",
+    "ticker": "IWM",
+    "expiry": "2026-05-15",
+    "gflip": 282,
+    "pos": [
+      285,
+      280,
+      290
+    ],
+    "neg": [
+      266,
+      264,
+      273
+    ],
+    "coi": [
+      275,
+      285
+    ],
+    "poi": [
+      264,
+      266
+    ],
+    "agg": 285,
+    "pos_zone": 283,
+    "neg_zone": 281,
+    "conf": [
+      264,
+      266,
+      273,
+      275,
+      280,
+      281,
+      282,
+      283,
+      285
+    ],
+    "source_file": "IWM-gamma-levels-exp-20260515-monthly.csv"
   }
 ]
