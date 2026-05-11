@@ -1317,6 +1317,20 @@ def _resolve_ft_env(env: str | None) -> str:
 _STRUCTURE_NONE_TOKEN = "any"
 
 
+def _ft_is_forward_named(name: str | None) -> bool:
+    """ForwardTest convention: name must start with "FOR" (optionally after
+    "JS " prefix). Live trades like "T03 SLV ..." sometimes get tagged as
+    CZ_Forward / JS_Forward in db_robots by the Make bot — enforcing the
+    prefix here keeps them out of the ForwardTest Lab.
+    """
+    if not name:
+        return False
+    upper = str(name).upper().strip()
+    if upper.startswith("JS "):
+        upper = upper[3:].lstrip()
+    return upper.startswith("FOR")
+
+
 def _ft_structure_slug(structure: str | None) -> str:
     if not structure:
         return _STRUCTURE_NONE_TOKEN
@@ -1395,6 +1409,8 @@ def _ft_build_strategies(snap: dict[str, Any], env: str = FORWARDTEST_ENV) -> li
     groups: dict[str, dict[str, Any]] = {}
     for t in snap.get("trades", []) or []:
         if t.get("environment") != env:
+            continue
+        if not _ft_is_forward_named(t.get("name")):
             continue
         underlying = t.get("underlying")
         if not underlying or underlying == "?":
@@ -1488,6 +1504,8 @@ def _ft_trades_for(snap: dict[str, Any], strategy: dict[str, Any], env: str = FO
     out: list[dict[str, Any]] = []
     for t in snap.get("trades", []) or []:
         if t.get("environment") != env:
+            continue
+        if not _ft_is_forward_named(t.get("name")):
             continue
         underlying = t.get("underlying")
         if not underlying or underlying == "?":
