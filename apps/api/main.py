@@ -945,6 +945,41 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
     },
 ]
 
+# Triple Calendar — combined PP+CC synthetic from tastytrade split backtest
+# (4-leg + 2-leg). See scripts/triplecal_export_app.py for the data pipeline.
+# Each entry references trades.csv + daily.csv with combined premium/PnL and
+# per-trade daily MTM, enriched with VIX entry (Cboe close-of-day).
+_TRIPLECAL_CONFIGS = [
+    ("7-10",  "7/10 DTE",  16, "PPC"),
+    ("7-14",  "7/14 DTE",  16, "PPC"),
+    ("14-21", "14/21 DTE", 16, "PPC"),
+    ("21-28", "21/28 DTE", 16, "PPC"),
+    ("7-10",  "7/10 DTE",  16, "PCC"),
+    ("7-14",  "7/14 DTE",  16, "PCC"),
+    ("14-21", "14/21 DTE", 16, "PCC"),
+    ("21-28", "21/28 DTE", 16, "PCC"),
+]
+for _dte, _horizon, _delta, _struct in _TRIPLECAL_CONFIGS:
+    _legs_desc = (
+        "2 Put Calendars + 1 Call Calendar Δ16" if _struct == "PPC"
+        else "1 Put Calendar + 2 Call Calendars Δ16"
+    )
+    BACKTESTS_REGISTRY.append({
+        "id": f"triplecal-{_struct.lower()}-spx-{_dte}",
+        "name": f"Triple Calendar {_struct} {_horizon}",
+        "underlying": "SPX",
+        "strategy": f"Triple Calendar {_struct}",
+        "horizon": _horizon,
+        "description": (
+            f"Triple Calendar {_struct} · SPX · {_horizon} · {_legs_desc} · "
+            "Friday entry, 3 active trades parallel, mid-price fills 15min before close"
+        ),
+        "trades_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct}_d{_delta}/trades.csv",
+        "daily_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct}_d{_delta}/daily.csv",
+        "kind": "triplecal",
+        "multiplier": 1,  # premium already in USD in trades.csv
+    })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
@@ -1031,6 +1066,50 @@ IC7_RULES = [
     "4 DTE",
     "Stop: 1× Max Profit",
 ]
+TRIPLECAL_RULES = [
+    "Hold to Expiration",
+    "10% Profit Target",
+    "20% Profit Target",
+    "25% Profit Target",
+    "50% Profit Target",
+]
+VIX_FILTERS = [
+    "All",
+    "VIX < 15",
+    "VIX < 20",
+    "VIX 15-25",
+    "VIX >= 20",
+    "VIX >= 25",
+]
+
+
+def _filter_by_vix(trades: list[dict[str, Any]], vix_filter: str) -> list[dict[str, Any]]:
+    """Filter trades by VIX entry bucket. Trades missing vix_entry are dropped unless filter is All."""
+    if not vix_filter or vix_filter == "All":
+        return trades
+    out: list[dict[str, Any]] = []
+    for t in trades:
+        v = t.get("vix_entry")
+        if v is None:
+            continue
+        try:
+            vf = float(v)
+        except (TypeError, ValueError):
+            continue
+        keep = False
+        if vix_filter == "VIX < 15" and vf < 15:
+            keep = True
+        elif vix_filter == "VIX < 20" and vf < 20:
+            keep = True
+        elif vix_filter == "VIX 15-25" and 15 <= vf < 25:
+            keep = True
+        elif vix_filter == "VIX >= 20" and vf >= 20:
+            keep = True
+        elif vix_filter == "VIX >= 25" and vf >= 25:
+            keep = True
+        if keep:
+            out.append(t)
+    return out
 
 
 def _scan_close_rule(
@@ -1063,7 +1142,11 @@ def _scan_close_rule(
     dit_target = None
     dte_target = None
 
-    if rule == "25% Profit Target":
+    if rule == "10% Profit Target":
+        tp_pct = 0.10
+    elif rule == "20% Profit Target":
+        tp_pct = 0.20
+    elif rule == "25% Profit Target":
         tp_pct = 0.25
     elif rule == "50% Profit Target":
         tp_pct = 0.50
@@ -1235,15 +1318,26 @@ def list_backtests() -> JSONResponse:
 def get_backtest(
     bt_id: str,
     rule: str = Query("Hold to Expiration", description="Close management rule"),
+    vix_filter: str = Query("All", description="VIX entry filter bucket"),
 ) -> JSONResponse:
     meta = _backtest_meta(bt_id)
     raw_trades = _read_backtest_trades(meta)
     daily = _read_backtest_daily(meta)
 
-    available_rules = SS42_RULES if meta["kind"] == "ss42" else IC7_RULES
+    if meta["kind"] == "ss42":
+        available_rules = SS42_RULES
+    elif meta["kind"] == "triplecal":
+        available_rules = TRIPLECAL_RULES
+    else:
+        available_rules = IC7_RULES
     rule_to_use = rule if rule in available_rules else "Hold to Expiration"
+    vix_filter_to_use = vix_filter if vix_filter in VIX_FILTERS else "All"
+    # Triple calendar is the only family currently carrying VIX entry; for others
+    # VIX filter is a no-op (trades lacking vix_entry would all be dropped).
+    available_vix_filters = VIX_FILTERS if meta["kind"] in ("triplecal", "ss42") else ["All"]
 
-    trades_with_rule = _apply_rule(raw_trades, daily, rule_to_use, meta["multiplier"])
+    filtered_trades = _filter_by_vix(raw_trades, vix_filter_to_use)
+    trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"])
     kpis = _backtest_kpis(trades_with_rule)
 
     display_cols_ss42 = [
@@ -1258,7 +1352,17 @@ def get_backtest(
         "spot_exit", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "max_risk_usd", "in_range", "result", "exit_method",
     ]
-    cols = display_cols_ss42 if meta["kind"] == "ss42" else display_cols_ic7
+    display_cols_triplecal = [
+        "trade_date", "exp_date", "underlying", "dte_entry", "total_credit", "vix_entry",
+        "pnl_usd", "pnl_usd_at_exp", "effective_close_date", "effective_dit_at_close",
+        "in_range", "result", "exit_method",
+    ]
+    if meta["kind"] == "ss42":
+        cols = display_cols_ss42
+    elif meta["kind"] == "triplecal":
+        cols = display_cols_triplecal
+    else:
+        cols = display_cols_ic7
     trades_view = [{c: t.get(c) for c in cols} for t in trades_with_rule]
     return JSONResponse({
         "meta": {
@@ -1273,6 +1377,8 @@ def get_backtest(
             "multiplier": meta["multiplier"],
             "rule": rule_to_use,
             "available_rules": available_rules,
+            "vix_filter": vix_filter_to_use,
+            "available_vix_filters": available_vix_filters,
         },
         "kpis": kpis,
         "trades": trades_view,

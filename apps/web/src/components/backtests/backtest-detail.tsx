@@ -110,10 +110,11 @@ const DASH = "\u2014";
 
 export function BacktestDetail({ id }: { id: string }) {
   const [rule, setRule] = useState<string>("Hold to Expiration");
+  const [vixFilter, setVixFilter] = useState<string>("All");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(0);
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["backtest", id, rule],
-    queryFn: () => api.backtest(id, rule),
+    queryKey: ["backtest", id, rule, vixFilter],
+    queryFn: () => api.backtest(id, rule, vixFilter),
     placeholderData: (prev) => prev,
   });
 
@@ -128,6 +129,8 @@ export function BacktestDetail({ id }: { id: string }) {
       ...data.meta,
       rule: data.meta.rule ?? "Hold to Expiration",
       available_rules: data.meta.available_rules ?? ["Hold to Expiration"],
+      vix_filter: data.meta.vix_filter ?? "All",
+      available_vix_filters: data.meta.available_vix_filters ?? ["All"],
     },
     kpis: { ...data.kpis, equity: data.kpis.equity ?? [] },
     trades: data.trades ?? [],
@@ -136,7 +139,14 @@ export function BacktestDetail({ id }: { id: string }) {
 
   return (
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
-      <Header detail={safeData} rule={rule} onRuleChange={setRule} loading={isFetching} />
+      <Header
+        detail={safeData}
+        rule={rule}
+        onRuleChange={setRule}
+        vixFilter={vixFilter}
+        onVixFilterChange={setVixFilter}
+        loading={isFetching}
+      />
       <KpiBand detail={safeData} />
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8 space-y-6">
@@ -161,15 +171,22 @@ function Header({
   detail,
   rule,
   onRuleChange,
+  vixFilter,
+  onVixFilterChange,
   loading,
 }: {
   detail: BacktestDetailType;
   rule: string;
   onRuleChange: (r: string) => void;
+  vixFilter: string;
+  onVixFilterChange: (v: string) => void;
   loading: boolean;
 }) {
   const isOverridden = rule !== "Hold to Expiration";
   const hasRuleOptions = detail.meta.available_rules.length > 1;
+  const availableVixFilters = detail.meta.available_vix_filters ?? ["All"];
+  const hasVixOptions = availableVixFilters.length > 1;
+  const vixApplied = vixFilter !== "All";
   return (
     <div className="mb-6 flex flex-col gap-3">
       <Link
@@ -197,37 +214,68 @@ function Header({
             </p>
           )}
         </div>
-        {hasRuleOptions && (
-          <div className="flex flex-col items-end gap-1.5">
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Close rule</span>
+        <div className="flex flex-wrap items-end gap-4">
+          {hasVixOptions && (
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-2">
+                <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">VIX entry filter</span>
+              </div>
+              <Select value={vixFilter} onValueChange={(v) => v && onVixFilterChange(v)}>
+                <SelectTrigger className="h-9 min-w-[160px] border-border/60 bg-card/50 text-sm focus:border-primary/60">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableVixFilters.map((v) => (
+                    <SelectItem key={v} value={v} className="text-sm">
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2 text-[11px]">
+                {vixApplied ? (
+                  <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
+                    regime filter
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">all regimes</span>
+                )}
+              </div>
             </div>
-            <Select value={rule} onValueChange={(v) => v && onRuleChange(v)}>
-              <SelectTrigger className="h-9 min-w-[220px] border-border/60 bg-card/50 text-sm focus:border-primary/60">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {detail.meta.available_rules.map((r) => (
-                  <SelectItem key={r} value={r} className="text-sm">
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-2 text-[11px]">
-              {loading && <span className="text-muted-foreground">Re-simulating…</span>}
-              {!loading && isOverridden && (
-                <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--warning)]">
-                  rule applied
-                </span>
-              )}
-              {!loading && !isOverridden && (
-                <span className="text-muted-foreground">expiration P&L (raw)</span>
-              )}
+          )}
+          {hasRuleOptions && (
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Close rule</span>
+              </div>
+              <Select value={rule} onValueChange={(v) => v && onRuleChange(v)}>
+                <SelectTrigger className="h-9 min-w-[220px] border-border/60 bg-card/50 text-sm focus:border-primary/60">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {detail.meta.available_rules.map((r) => (
+                    <SelectItem key={r} value={r} className="text-sm">
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-2 text-[11px]">
+                {loading && <span className="text-muted-foreground">Re-simulating…</span>}
+                {!loading && isOverridden && (
+                  <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[var(--warning)]">
+                    rule applied
+                  </span>
+                )}
+                {!loading && !isOverridden && (
+                  <span className="text-muted-foreground">expiration P&L (raw)</span>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

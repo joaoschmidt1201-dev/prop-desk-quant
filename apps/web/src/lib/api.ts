@@ -170,11 +170,13 @@ export type BacktestDetail = {
     strategy: string;
     horizon: string;
     description?: string | null;
-    kind: "ss42" | "ic7";
+    kind: "ss42" | "ic7" | "triplecal";
     period: string | null;
     multiplier: number;
     rule: string;
     available_rules: string[];
+    vix_filter?: string;
+    available_vix_filters?: string[];
   };
   kpis: BacktestKpis;
   trades: Record<string, unknown>[];
@@ -400,8 +402,11 @@ export const api = {
   kpis: (filter: Partial<Filter> = {}) => get<Kpis>(`/api/kpis${qs(filter)}`),
   analytics: (filter: Partial<Filter> = {}) => get<Analytics>(`/api/analytics${qs(filter)}`),
   backtests: () => get<{ backtests: BacktestSummary[] }>("/api/backtests"),
-  backtest: (id: string, rule?: string) => {
-    const q = rule && rule !== "Hold to Expiration" ? `?rule=${encodeURIComponent(rule)}` : "";
+  backtest: (id: string, rule?: string, vixFilter?: string) => {
+    const params: string[] = [];
+    if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);
+    if (vixFilter && vixFilter !== "All") params.push(`vix_filter=${encodeURIComponent(vixFilter)}`);
+    const q = params.length ? `?${params.join("&")}` : "";
     return get<BacktestDetail>(`/api/backtests/${id}${q}`);
   },
   forwardtests: (env: ForwardtestEnv = "CZ_Forward") =>
