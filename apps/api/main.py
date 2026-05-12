@@ -950,37 +950,30 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
 # references trades.csv + daily.csv with combined premium/PnL and per-trade
 # daily MTM, enriched with VIX entry (Cboe close-of-day).
 #
-# Structure label: PUT-PUT-CALL = 2 Put Calendars (ATM Δ50 + OTM Δ16) + 1 Call
-# Calendar (OTM Δ16). PUT-CALL-CALL = 1 Put Calendar (OTM Δ16) + 2 Call
-# Calendars (ATM Δ50 + OTM Δ16).
+# Canonical structure: 2 Put Calendars (ATM Δ50 + OTM Δ16) + 1 Call Calendar
+# (OTM Δ16). PCC variants (PUT-CALL-CALL) live in reports/ as acervo but are
+# intentionally not registered here.
 _TRIPLECAL_CONFIGS = [
-    ("7-10",  "7/10 DTE",  16, "PPC", "PUT-PUT-CALL"),
-    ("7-14",  "7/14 DTE",  16, "PPC", "PUT-PUT-CALL"),
-    ("14-21", "14/21 DTE", 16, "PPC", "PUT-PUT-CALL"),
-    ("21-28", "21/28 DTE", 16, "PPC", "PUT-PUT-CALL"),
-    ("7-10",  "7/10 DTE",  16, "PCC", "PUT-CALL-CALL"),
-    ("7-14",  "7/14 DTE",  16, "PCC", "PUT-CALL-CALL"),
-    ("14-21", "14/21 DTE", 16, "PCC", "PUT-CALL-CALL"),
-    ("21-28", "21/28 DTE", 16, "PCC", "PUT-CALL-CALL"),
+    ("7-10",  "7/10 DTE",  16),
+    ("7-14",  "7/14 DTE",  16),
+    ("14-21", "14/21 DTE", 16),
+    ("21-28", "21/28 DTE", 16),
 ]
-for _dte, _horizon, _delta, _struct_short, _struct_long in _TRIPLECAL_CONFIGS:
-    if _struct_short == "PPC":
-        _legs_desc = "2 Put Calendars (1 ATM Δ50 + 1 OTM Δ16) + 1 Call Calendar (OTM Δ16)"
-    else:
-        _legs_desc = "1 Put Calendar (OTM Δ16) + 2 Call Calendars (1 ATM Δ50 + 1 OTM Δ16)"
+for _dte, _horizon, _delta in _TRIPLECAL_CONFIGS:
+    _legs_desc = "2 Put Calendars (1 ATM Δ50 + 1 OTM Δ16) + 1 Call Calendar (OTM Δ16)"
     BACKTESTS_REGISTRY.append({
-        "id": f"triplecal-{_struct_short.lower()}-spx-{_dte}",
-        "name": f"Triple Calendar {_struct_long} {_horizon}",
+        "id": f"triplecal-spx-{_dte}",
+        "name": f"Triple Calendar {_horizon}",
         "underlying": "SPX",
-        "strategy": f"Triple Calendar {_struct_long}",
+        "strategy": "Triple Calendar",
         "horizon": _horizon,
         "description": (
-            f"Triple Calendar {_struct_long} · SPX · {_horizon} · {_legs_desc} · "
+            f"Triple Calendar · SPX · {_horizon} · {_legs_desc} · "
             "Friday entry, 3 active trades parallel, mid-price fills 15min before close · "
             "$100k starting capital"
         ),
-        "trades_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct_short}_d{_delta}/trades.csv",
-        "daily_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct_short}_d{_delta}/daily.csv",
+        "trades_csv": f"triplecal_backtest_app/SPX_{_dte}_PPC_d{_delta}/trades.csv",
+        "daily_csv": f"triplecal_backtest_app/SPX_{_dte}_PPC_d{_delta}/daily.csv",
         "kind": "triplecal",
         "multiplier": 1,  # premium already in USD in trades.csv
     })
