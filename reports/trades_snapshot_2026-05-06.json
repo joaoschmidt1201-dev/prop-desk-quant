@@ -1,41 +1,41 @@
 {
-  "generated_at": "2026-05-11T18:41:29+00:00",
+  "generated_at": "2026-05-06T18:00:33+00:00",
   "source_file": "OP Control Panel.xlsx",
   "portfolio": {
-    "open_pnl_total": -70173.56,
-    "delta_total": 37.31,
-    "max_loss_exposed": 52908.61,
-    "n_active_trades": 13,
-    "n_closed_trades": 48,
+    "open_pnl_total": -70090.56,
+    "delta_total": -183.1,
+    "max_loss_exposed": 110968.0,
+    "n_active_trades": 10,
+    "n_closed_trades": 46,
     "rlzd_by_env": {
-      "CZ_Forward": -46712.06,
-      "CZ_Live": -51983.0,
-      "JS_Forward": -3072.5,
+      "CZ_Forward": -46892.06,
+      "CZ_Live": -34083.5,
+      "JS_Forward": -1829.0,
       "URL Não Cadastrada": 7275.0
     },
-    "win_rate": 63.2,
+    "win_rate": 65.4,
     "alerts": [
-      "DTE CRÍTICO: JS FOR01 XSP TripleCalendar 7/10DTE com 4 DTE",
-      "DTE CRÍTICO: JS FOR03 QQQ TripleCalendar 4/7 DTE com 4 DTE",
-      "DTE CRÍTICO: T03 XLF IC10 com 4 DTE",
-      "50% TARGET: T03 XLF IC10 @ 70% do Max Profit",
-      "STOP ATINGIDO: T45 RUT RJL42 @ -189% do Max Profit"
+      "STOP ATINGIDO: T45 RUT RJL42 @ -227% do Max Profit",
+      "DTE CRÍTICO: T51 RUT BullPutCreditSpread7 (PCS7) com 3 DTE",
+      "50% TARGET: T51 RUT BullPutCreditSpread7 (PCS7) @ 96% do Max Profit",
+      "DTE CRÍTICO: T52 NDX BWIC7 com 3 DTE",
+      "50% TARGET: T52 NDX BWIC7 @ 144% do Max Profit"
     ]
   },
   "sheet_summaries": {
     "CZ_Live": [
       {
         "month": "MAY26",
-        "open_pnl": -996.0,
-        "rlzd": -14709.0,
-        "delta": 29.73,
-        "max_profit": 10229.0
+        "open_pnl": 3766.5,
+        "rlzd": -400.0,
+        "delta": -1.959999999999997,
+        "max_profit": 13409.0
       },
       {
         "month": "APR26",
-        "open_pnl": -22437.0,
+        "open_pnl": -26950.0,
         "rlzd": -10662.51,
-        "delta": 0.805,
+        "delta": -171.0,
         "max_profit": 11850.0
       },
       {
@@ -49,10 +49,10 @@
     "JS_Forward": [
       {
         "month": "JS MAY26",
-        "open_pnl": -28.5,
+        "open_pnl": -15.0,
         "rlzd": 0.0,
-        "delta": 0.6690000000000005,
-        "max_profit": 217.0
+        "delta": -10.14,
+        "max_profit": 73.0
       },
       {
         "month": "JS APR26",
@@ -72,20 +72,20 @@
     "CZ_Forward": [
       {
         "month": "FOR Trades",
-        "open_pnl": 0.0,
-        "rlzd": -46892.06,
+        "open_pnl": -46892.06,
+        "rlzd": 0.0,
         "delta": 0.0,
         "max_profit": 32760.0
       }
     ]
   },
   "individual_trade_pnls": {
-    "T49 SPX BWIC42": -3150.0,
-    "T53 RUT BullPutCreditSpread7 (PCS7)": 2154.0,
+    "T49 SPX BWIC42": -2250.0,
     "T50 NDX BWIC7": -400.0,
-    "T51 RUT BullPutCreditSpread7 (PCS7)": 1416.0,
-    "T52 NDX BWIC7": -15725.0,
-    "T45 RUT RJL42": -22437.0,
+    "T51 RUT BullPutCreditSpread7 (PCS7)": 1432.5,
+    "T52 NDX BWIC7": 2445.0,
+    "T53 RUT BullPutCreditSpread7 (PCS7)": 2139.0,
+    "T45 RUT RJL42": -26950.0,
     "T42 RUT CALL BEAR + SP 28": -4000.0,
     "T41 RUT CALL BEAR + SP 7": -7250.0,
     "T43 SPX BW IC 7": -7650.51,
@@ -111,9 +111,8 @@
     "T38 NDX BULL CALL SP7": 3625.0,
     "T39 NDX BEAR CALL 7": 1600.0,
     "T40 RUT CALL BEAR + SP 7": -7674.0,
-    "T02 XSP IC42": -48.0,
-    "T03 SLV Triple Calendar 11/18DTE": 5.5,
-    "T03 XLF IC10": 14.0,
+    "T02 XSP IC42": -20.0,
+    "T03 XLF IC10": 5.0,
     "T01 XLE IC8": 30.0
   },
   "sheet_daily_pnls": {
@@ -188,11 +187,6 @@
             "bucket": "open"
           },
           {
-            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": -1761.0,
-            "bucket": "open"
-          },
-          {
             "name": "T50 NDX BWIC7",
             "pnl": -400.0,
             "bucket": "rlzd"
@@ -205,6 +199,11 @@
           {
             "name": "T52 NDX BWIC7",
             "pnl": 1170.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
+            "pnl": -1761.0,
             "bucket": "open"
           }
         ]
@@ -225,11 +224,6 @@
             "bucket": "open"
           },
           {
-            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 699.0,
-            "bucket": "open"
-          },
-          {
             "name": "T50 NDX BWIC7",
             "pnl": -400.0,
             "bucket": "rlzd"
@@ -243,27 +237,27 @@
             "name": "T52 NDX BWIC7",
             "pnl": 735.0,
             "bucket": "open"
+          },
+          {
+            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
+            "pnl": 699.0,
+            "bucket": "open"
           }
         ]
       },
       {
         "date": "2026-05-06",
         "row": 22,
-        "pnl": 1770.0,
-        "open_pnl": 754.0,
-        "rlzd": 1016.0,
-        "daily_pnl": 681.0,
+        "pnl": 3366.5,
+        "open_pnl": 3766.5,
+        "rlzd": -400.0,
+        "daily_pnl": 2277.5,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 5,
         "trades": [
           {
             "name": "T49 SPX BWIC42",
-            "pnl": -3590.0,
-            "bucket": "open"
-          },
-          {
-            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1899.0,
+            "pnl": -2250.0,
             "bucket": "open"
           },
           {
@@ -273,12 +267,17 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
-            "bucket": "rlzd"
+            "pnl": 1432.5,
+            "bucket": "open"
           },
           {
             "name": "T52 NDX BWIC7",
             "pnl": 2445.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
+            "pnl": 2139.0,
             "bucket": "open"
           }
         ]
@@ -286,36 +285,16 @@
       {
         "date": "2026-05-07",
         "row": 23,
-        "pnl": -16850.0,
-        "open_pnl": -2141.0,
-        "rlzd": -14709.0,
-        "daily_pnl": -18620.0,
+        "pnl": -400.0,
+        "open_pnl": 0.0,
+        "rlzd": -400.0,
+        "daily_pnl": -3766.5,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 1,
         "trades": [
-          {
-            "name": "T49 SPX BWIC42",
-            "pnl": -3980.0,
-            "bucket": "open"
-          },
-          {
-            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1839.0,
-            "bucket": "open"
-          },
           {
             "name": "T50 NDX BWIC7",
             "pnl": -400.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
             "bucket": "rlzd"
           }
         ]
@@ -323,36 +302,16 @@
       {
         "date": "2026-05-08",
         "row": 24,
-        "pnl": -16415.0,
-        "open_pnl": -1706.0,
-        "rlzd": -14709.0,
-        "daily_pnl": 435.0,
+        "pnl": -400.0,
+        "open_pnl": 0.0,
+        "rlzd": -400.0,
+        "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 1,
         "trades": [
-          {
-            "name": "T49 SPX BWIC42",
-            "pnl": -3170.0,
-            "bucket": "open"
-          },
-          {
-            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1464.0,
-            "bucket": "open"
-          },
           {
             "name": "T50 NDX BWIC7",
             "pnl": -400.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
             "bucket": "rlzd"
           }
         ]
@@ -360,23 +319,13 @@
       {
         "date": "2026-05-11",
         "row": 25,
-        "pnl": -15705.0,
-        "open_pnl": -996.0,
-        "rlzd": -14709.0,
-        "daily_pnl": 710.0,
+        "pnl": 3477.5,
+        "open_pnl": 0.0,
+        "rlzd": 3477.5,
+        "daily_pnl": 3877.5,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 3,
         "trades": [
-          {
-            "name": "T49 SPX BWIC42",
-            "pnl": -3150.0,
-            "bucket": "open"
-          },
-          {
-            "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 2154.0,
-            "bucket": "open"
-          },
           {
             "name": "T50 NDX BWIC7",
             "pnl": -400.0,
@@ -384,12 +333,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -397,10 +346,10 @@
       {
         "date": "2026-05-12",
         "row": 26,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
-        "daily_pnl": 996.0,
+        "rlzd": 3477.5,
+        "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
         "trades": [
@@ -411,12 +360,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -424,9 +373,9 @@
       {
         "date": "2026-05-13",
         "row": 27,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -438,12 +387,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -451,9 +400,9 @@
       {
         "date": "2026-05-14",
         "row": 28,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -465,12 +414,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -478,9 +427,9 @@
       {
         "date": "2026-05-15",
         "row": 29,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -492,12 +441,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -505,9 +454,9 @@
       {
         "date": "2026-05-18",
         "row": 30,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -519,12 +468,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -532,9 +481,9 @@
       {
         "date": "2026-05-19",
         "row": 31,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -546,12 +495,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -559,9 +508,9 @@
       {
         "date": "2026-05-20",
         "row": 32,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -573,12 +522,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -586,9 +535,9 @@
       {
         "date": "2026-05-21",
         "row": 33,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -600,12 +549,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -613,9 +562,9 @@
       {
         "date": "2026-05-22",
         "row": 34,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -627,12 +576,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -640,9 +589,9 @@
       {
         "date": "2026-05-26",
         "row": 35,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -654,12 +603,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -667,9 +616,9 @@
       {
         "date": "2026-05-27",
         "row": 36,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -681,12 +630,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -694,9 +643,9 @@
       {
         "date": "2026-05-28",
         "row": 37,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -708,12 +657,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -721,9 +670,9 @@
       {
         "date": "2026-05-29",
         "row": 38,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -735,12 +684,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -748,9 +697,9 @@
       {
         "date": "2026-06-01",
         "row": 39,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -762,12 +711,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -775,9 +724,9 @@
       {
         "date": "2026-06-02",
         "row": 40,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -789,12 +738,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -802,9 +751,9 @@
       {
         "date": "2026-06-03",
         "row": 41,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -816,12 +765,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -829,9 +778,9 @@
       {
         "date": "2026-06-04",
         "row": 42,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -843,12 +792,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -856,9 +805,9 @@
       {
         "date": "2026-06-05",
         "row": 43,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -870,12 +819,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -883,9 +832,9 @@
       {
         "date": "2026-06-08",
         "row": 44,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -897,12 +846,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -910,9 +859,9 @@
       {
         "date": "2026-06-09",
         "row": 45,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -924,12 +873,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -937,9 +886,9 @@
       {
         "date": "2026-06-10",
         "row": 46,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -951,12 +900,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -964,9 +913,9 @@
       {
         "date": "2026-06-11",
         "row": 47,
-        "pnl": -14709.0,
+        "pnl": 3477.5,
         "open_pnl": 0.0,
-        "rlzd": -14709.0,
+        "rlzd": 3477.5,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 3,
@@ -978,12 +927,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -991,16 +940,16 @@
       {
         "date": "2026-06-12",
         "row": 48,
-        "pnl": -17859.0,
+        "pnl": 1227.5,
         "open_pnl": 0.0,
-        "rlzd": -17859.0,
-        "daily_pnl": -3150.0,
+        "rlzd": 1227.5,
+        "daily_pnl": -2250.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 4,
         "trades": [
           {
             "name": "T49 SPX BWIC42",
-            "pnl": -3150.0,
+            "pnl": -2250.0,
             "bucket": "rlzd"
           },
           {
@@ -1010,12 +959,12 @@
           },
           {
             "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-            "pnl": 1416.0,
+            "pnl": 1432.5,
             "bucket": "rlzd"
           },
           {
             "name": "T52 NDX BWIC7",
-            "pnl": -15725.0,
+            "pnl": 2445.0,
             "bucket": "rlzd"
           }
         ]
@@ -1909,16 +1858,16 @@
       {
         "date": "2026-05-06",
         "row": 42,
-        "pnl": -33125.01,
-        "open_pnl": -22462.5,
+        "pnl": -37612.51,
+        "open_pnl": -26950.0,
         "rlzd": -10662.51,
-        "daily_pnl": -2962.5,
+        "daily_pnl": -7450.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 8,
         "trades": [
           {
             "name": "T45 RUT RJL42",
-            "pnl": -22462.5,
+            "pnl": -26950.0,
             "bucket": "open"
           },
           {
@@ -1961,18 +1910,13 @@
       {
         "date": "2026-05-07",
         "row": 43,
-        "pnl": -33129.51,
-        "open_pnl": -22467.0,
+        "pnl": -10662.51,
+        "open_pnl": 0.0,
         "rlzd": -10662.51,
-        "daily_pnl": -4.5,
+        "daily_pnl": 26950.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 7,
         "trades": [
-          {
-            "name": "T45 RUT RJL42",
-            "pnl": -22467.0,
-            "bucket": "open"
-          },
           {
             "name": "T42 RUT CALL BEAR + SP 28",
             "pnl": -4000.0,
@@ -2013,18 +1957,13 @@
       {
         "date": "2026-05-08",
         "row": 44,
-        "pnl": -33099.51,
-        "open_pnl": -22437.0,
+        "pnl": -10662.51,
+        "open_pnl": 0.0,
         "rlzd": -10662.51,
-        "daily_pnl": 30.0,
+        "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 7,
         "trades": [
-          {
-            "name": "T45 RUT RJL42",
-            "pnl": -22437.0,
-            "bucket": "open"
-          },
           {
             "name": "T42 RUT CALL BEAR + SP 28",
             "pnl": -4000.0,
@@ -2065,18 +2004,13 @@
       {
         "date": "2026-05-11",
         "row": 45,
-        "pnl": -33099.51,
-        "open_pnl": -22437.0,
+        "pnl": -10662.51,
+        "open_pnl": 0.0,
         "rlzd": -10662.51,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 7,
         "trades": [
-          {
-            "name": "T45 RUT RJL42",
-            "pnl": -22437.0,
-            "bucket": "open"
-          },
           {
             "name": "T42 RUT CALL BEAR + SP 28",
             "pnl": -4000.0,
@@ -2120,7 +2054,7 @@
         "pnl": -10662.51,
         "open_pnl": 0.0,
         "rlzd": -10662.51,
-        "daily_pnl": 22437.0,
+        "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 7,
         "trades": [
@@ -5407,92 +5341,21 @@
       {
         "date": "2026-05-06",
         "row": 22,
-        "pnl": -32.5,
-        "open_pnl": -32.5,
+        "pnl": -15.0,
+        "open_pnl": -15.0,
         "rlzd": 0.0,
-        "daily_pnl": -23.5,
+        "daily_pnl": -6.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -35.5,
+            "pnl": -20.0,
             "bucket": "open"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 3.0,
-            "bucket": "open"
-          }
-        ]
-      },
-      {
-        "date": "2026-05-07",
-        "row": 23,
-        "pnl": -30.5,
-        "open_pnl": -30.5,
-        "rlzd": 0.0,
-        "daily_pnl": 2.0,
-        "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
-        "trades": [
-          {
-            "name": "T02 XSP IC42",
-            "pnl": -39.5,
-            "bucket": "open"
-          },
-          {
-            "name": "T03 XLF IC10",
-            "pnl": 9.0,
-            "bucket": "open"
-          }
-        ]
-      },
-      {
-        "date": "2026-05-08",
-        "row": 24,
-        "pnl": -37.05,
-        "open_pnl": -37.05,
-        "rlzd": 0.0,
-        "daily_pnl": -6.55,
-        "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
-        "trades": [
-          {
-            "name": "T02 XSP IC42",
-            "pnl": -42.55,
-            "bucket": "open"
-          },
-          {
-            "name": "T03 XLF IC10",
-            "pnl": 5.5,
-            "bucket": "open"
-          }
-        ]
-      },
-      {
-        "date": "2026-05-11",
-        "row": 25,
-        "pnl": -28.5,
-        "open_pnl": -28.5,
-        "rlzd": 0.0,
-        "daily_pnl": 8.55,
-        "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
-        "trades": [
-          {
-            "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "open"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "open"
-          },
-          {
-            "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "open"
           }
         ]
@@ -5500,16 +5363,16 @@
       {
         "date": "2026-05-15",
         "row": 29,
-        "pnl": 14.0,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 14.0,
-        "daily_pnl": 42.5,
+        "rlzd": 5.0,
+        "daily_pnl": 20.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 1,
         "trades": [
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5517,16 +5380,16 @@
       {
         "date": "2026-05-18",
         "row": 30,
-        "pnl": 14.0,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 14.0,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 1,
         "trades": [
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5534,16 +5397,16 @@
       {
         "date": "2026-05-19",
         "row": 31,
-        "pnl": 14.0,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 14.0,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 1,
         "trades": [
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5551,16 +5414,16 @@
       {
         "date": "2026-05-20",
         "row": 32,
-        "pnl": 14.0,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 14.0,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 1,
         "trades": [
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5568,16 +5431,16 @@
       {
         "date": "2026-05-21",
         "row": 33,
-        "pnl": 14.0,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 14.0,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 1,
         "trades": [
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5585,21 +5448,16 @@
       {
         "date": "2026-05-22",
         "row": 34,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
-        "daily_pnl": 5.5,
+        "rlzd": 5.0,
+        "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5607,21 +5465,16 @@
       {
         "date": "2026-05-26",
         "row": 35,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5629,21 +5482,16 @@
       {
         "date": "2026-05-27",
         "row": 36,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5651,21 +5499,16 @@
       {
         "date": "2026-05-28",
         "row": 37,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5673,21 +5516,16 @@
       {
         "date": "2026-05-29",
         "row": 38,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5695,21 +5533,16 @@
       {
         "date": "2026-06-01",
         "row": 39,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5717,21 +5550,16 @@
       {
         "date": "2026-06-02",
         "row": 40,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5739,21 +5567,16 @@
       {
         "date": "2026-06-03",
         "row": 41,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5761,21 +5584,16 @@
       {
         "date": "2026-06-04",
         "row": 42,
-        "pnl": 19.5,
+        "pnl": 5.0,
         "open_pnl": 0.0,
-        "rlzd": 19.5,
+        "rlzd": 5.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 2,
+        "n_trades": 1,
         "trades": [
           {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
-            "bucket": "rlzd"
-          },
-          {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5783,26 +5601,21 @@
       {
         "date": "2026-06-05",
         "row": 43,
-        "pnl": -28.5,
+        "pnl": -15.0,
         "open_pnl": 0.0,
-        "rlzd": -28.5,
-        "daily_pnl": -48.0,
+        "rlzd": -15.0,
+        "daily_pnl": -20.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
+            "pnl": -20.0,
             "bucket": "rlzd"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5810,26 +5623,21 @@
       {
         "date": "2026-06-08",
         "row": 44,
-        "pnl": -28.5,
+        "pnl": -15.0,
         "open_pnl": 0.0,
-        "rlzd": -28.5,
+        "rlzd": -15.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
+            "pnl": -20.0,
             "bucket": "rlzd"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5837,26 +5645,21 @@
       {
         "date": "2026-06-09",
         "row": 45,
-        "pnl": -28.5,
+        "pnl": -15.0,
         "open_pnl": 0.0,
-        "rlzd": -28.5,
+        "rlzd": -15.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
+            "pnl": -20.0,
             "bucket": "rlzd"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5864,26 +5667,21 @@
       {
         "date": "2026-06-10",
         "row": 46,
-        "pnl": -28.5,
+        "pnl": -15.0,
         "open_pnl": 0.0,
-        "rlzd": -28.5,
+        "rlzd": -15.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
+            "pnl": -20.0,
             "bucket": "rlzd"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5891,26 +5689,21 @@
       {
         "date": "2026-06-11",
         "row": 47,
-        "pnl": -28.5,
+        "pnl": -15.0,
         "open_pnl": 0.0,
-        "rlzd": -28.5,
+        "rlzd": -15.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
+            "pnl": -20.0,
             "bucket": "rlzd"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -5918,26 +5711,21 @@
       {
         "date": "2026-06-12",
         "row": 48,
-        "pnl": -28.5,
+        "pnl": -15.0,
         "open_pnl": 0.0,
-        "rlzd": -28.5,
+        "rlzd": -15.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T02 XSP IC42",
-            "pnl": -48.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T03 SLV Triple Calendar 11/18DTE",
-            "pnl": 5.5,
+            "pnl": -20.0,
             "bucket": "rlzd"
           },
           {
             "name": "T03 XLF IC10",
-            "pnl": 14.0,
+            "pnl": 5.0,
             "bucket": "rlzd"
           }
         ]
@@ -6235,7 +6023,6 @@
       }
     ]
   },
-  "forwardtest_strategies": [],
   "trades": [
     {
       "name": "FOR01 RUT FULL BAT42",
@@ -6243,11 +6030,10 @@
       "environment": "CZ_Forward",
       "underlying": "RUT",
       "is_active": true,
-      "last_update": "2026-05-08",
+      "last_update": "2026-05-06",
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -6265,601 +6051,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-18",
-          "pnl": 355.0,
-          "delta": -17.2
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 700.0,
-          "delta": -12.9
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 745.0,
-          "delta": -12.8
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 762.5,
-          "delta": -12.7
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 217.5,
-          "delta": -19.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 827.5,
-          "delta": -11.9
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 612.5,
-          "delta": -11.8
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 665.0,
-          "delta": -8.01
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 595.0,
-          "delta": -10.5
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 205.0,
-          "delta": -20.2
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 65.0,
-          "delta": -18.6
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 40.0,
-          "delta": -19.2
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 72.5,
-          "delta": -18.4
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 212.5,
-          "delta": -17.4
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": -45.0,
-          "delta": -20.4
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 400.0,
-          "delta": -14.2
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -132.5,
-          "delta": -20.1
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -240.0,
-          "delta": -21.3
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -735.0,
-          "delta": -25.5
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -387.5,
-          "delta": -22.0
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -687.5,
-          "delta": -25.0
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": -862.5,
-          "delta": -26.4
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": -935.0,
-          "delta": -28.1
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -392.5,
-          "delta": -22.8
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -110.0,
-          "delta": -19.6
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -652.5,
-          "delta": -24.5
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -32.5,
-          "delta": -18.3
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -167.5,
-          "delta": -20.5
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 465.0,
-          "delta": -13.2
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 352.5,
-          "delta": -14.9
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 745.0,
-          "delta": -8.84
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 1055.0,
-          "delta": -6.22
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 1095.0,
-          "delta": -5.45
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 1257.5,
-          "delta": -0.731
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1167.5,
-          "delta": -7.85
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1232.5,
-          "delta": -3.98
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1257.5,
-          "delta": -11.2
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1215.0,
-          "delta": -9.43
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1265.0,
-          "delta": -11.1
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 1330.0,
-          "delta": -13.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 842.5,
-          "delta": -18.7
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 915.0,
-          "delta": -17.9
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 1290.0,
-          "delta": -14.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 1245.0,
-          "delta": -14.4
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 1550.0,
-          "delta": -14.5
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 1695.0,
-          "delta": -6.18
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": null,
-          "delta": null
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 1575.0,
-          "delta": -14.0
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 1575.0,
-          "delta": -14.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1622.5,
-          "delta": -14.9
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1880.0,
-          "delta": -12.5
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1652.5,
-          "delta": -14.2
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1892.5,
-          "delta": -12.4
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1797.5,
-          "delta": -14.8
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1832.5,
-          "delta": -13.5
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1780.0,
-          "delta": -14.8
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 1782.5,
-          "delta": -10.7
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 1197.5,
-          "delta": -19.7
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": null,
-          "delta": null
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -542.5,
-          "delta": -48.1
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -562.5,
-          "delta": -47.4
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -272.5,
-          "delta": -45.7
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -112.5,
-          "delta": -44.6
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 702.5,
-          "delta": -35.1
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 750.0,
-          "delta": -35.9
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 247.5,
-          "delta": -43.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -275.0,
-          "delta": -52.2
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 140.0,
-          "delta": -50.1
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 595.0,
-          "delta": -45.4
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 522.5,
-          "delta": -46.1
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 372.5,
-          "delta": -50.4
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": -1342.5,
-          "delta": -67.5
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": -152.5,
-          "delta": -56.2
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": -3095.0,
-          "delta": -83.1
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": -4162.5,
-          "delta": -89.5
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": -4342.5,
-          "delta": -96.0
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": -3665.0,
-          "delta": -91.2
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": -3675.0,
-          "delta": -92.8
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": -4640.0,
-          "delta": -106.0
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": -9342.5,
-          "delta": -123.0
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": -11385.0,
-          "delta": -124.0
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": -13515.0,
-          "delta": -120.0
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": -11790.0,
-          "delta": -122.0
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": -15817.5,
-          "delta": -112.0
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": -9920.0,
-          "delta": -120.0
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": -13675.0,
-          "delta": -135.0
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": -11750.0,
-          "delta": -150.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -5700.0,
-          "delta": -142.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -12155.0,
-          "delta": -149.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -10915.0,
-          "delta": -162.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -10087.5,
-          "delta": -169.0
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -12532.5,
-          "delta": 13.2
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-01",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-04",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-05",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-07",
-          "pnl": -13505.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": -13505.02,
-          "delta": 0.0
-        }
-      ]
-    },
-    {
-      "name": "FOR01 RUT TripleCalendar 14/21DTE",
-      "environment_raw": "FOR Trades",
-      "environment": "CZ_Forward",
-      "underlying": "RUT",
-      "is_active": true,
-      "last_update": "2026-05-11",
-      "open_date": "2026-05-08",
-      "exp_date": "2026-05-22",
-      "dte_open": 14,
-      "dte_open_raw": "14 / 21",
-      "dte_remaining": 11,
-      "underlying_price_at_open": 2855.0,
-      "strikes": "2765 | 2855 | 2945",
-      "net_credit": 2440.0,
-      "max_loss": 2890.8,
-      "sd": 0.04,
-      "lw_be": 2747.0,
-      "up_be": 2974.0,
-      "pct_to_lw_be": -3.78,
-      "pct_to_up_be": 4.17,
-      "pnl_current": 155.0,
-      "pnl_pct_max": 6.4,
-      "delta_current": -0.433,
-      "alert_dte": false,
-      "alert_profit_50": false,
-      "alert_stop": false,
-      "tent_status": "profit",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-05-08",
-          "pnl": 155.0,
-          "delta": 1.27
-        },
-        {
-          "date": "2026-05-11",
-          "pnl": 155.0,
-          "delta": -0.433
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "FOR02 SPX FULL BAT42",
@@ -6867,11 +6059,10 @@
       "environment": "CZ_Forward",
       "underlying": "SPX",
       "is_active": true,
-      "last_update": "2026-05-08",
+      "last_update": "2026-05-06",
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -6889,559 +6080,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-18",
-          "pnl": 1287.5,
-          "delta": -22.2
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 2335.0,
-          "delta": -17.4
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 2670.0,
-          "delta": -15.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 3337.5,
-          "delta": -12.5
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 3215.0,
-          "delta": -13.3
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 2800.0,
-          "delta": -15.5
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 3465.0,
-          "delta": -10.6
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 3435.0,
-          "delta": -7.73
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 3462.5,
-          "delta": -8.82
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 3437.5,
-          "delta": -14.5
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 3457.5,
-          "delta": -12.5
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 3410.0,
-          "delta": -12.2
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 3677.5,
-          "delta": -11.7
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 3712.5,
-          "delta": -11.6
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 3500.0,
-          "delta": -13.0
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3930.0,
-          "delta": -8.66
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3770.0,
-          "delta": -10.9
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3860.0,
-          "delta": -10.4
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3942.5,
-          "delta": -10.5
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 4115.0,
-          "delta": -9.04
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3830.0,
-          "delta": -10.8
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 3997.5,
-          "delta": -11.3
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 4165.0,
-          "delta": -10.6
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 4530.0,
-          "delta": -4.55
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 4527.5,
-          "delta": -6.67
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 4295.0,
-          "delta": -9.09
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 4540.0,
-          "delta": -2.69
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 3997.5,
-          "delta": -3.36
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 4527.5,
-          "delta": -0.8
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 4357.5,
-          "delta": -0.857
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 4297.5,
-          "delta": 1.48
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 4745.0,
-          "delta": 3.29
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 4662.5,
-          "delta": 3.12
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 4472.5,
-          "delta": 4.44
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 4782.5,
-          "delta": 4.53
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 5107.5,
-          "delta": 2.17
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 5250.0,
-          "delta": 1.14
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 5460.0,
-          "delta": -0.326
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 5542.5,
-          "delta": -0.0487
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 5550.0,
-          "delta": -2.89
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 5617.5,
-          "delta": -2.94
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 5647.5,
-          "delta": -2.88
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 5627.5,
-          "delta": -2.26
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 5647.5,
-          "delta": -2.81
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 5682.5,
-          "delta": 1.26
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 5927.5,
-          "delta": -1.07
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 5950.0,
-          "delta": -1.09
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 5962.5,
-          "delta": -1.19
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 5962.5,
-          "delta": -1.19
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 5892.5,
-          "delta": -2.03
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 5880.0,
-          "delta": -2.33
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 5880.0,
-          "delta": -1.59
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 6172.5,
-          "delta": -2.23
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 6182.5,
-          "delta": -1.88
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 6182.5,
-          "delta": -1.64
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 6185.0,
-          "delta": -1.77
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 5877.5,
-          "delta": -0.195
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 5830.0,
-          "delta": -4.06
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4995.0,
-          "delta": -22.2
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4987.5,
-          "delta": -22.5
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 5045.0,
-          "delta": -21.3
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4510.0,
-          "delta": -24.6
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4192.5,
-          "delta": -26.1
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 5097.5,
-          "delta": -23.1
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 4962.5,
-          "delta": -22.9
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 3845.0,
-          "delta": -33.1
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 4842.5,
-          "delta": -22.9
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 4077.5,
-          "delta": -32.3
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 4310.0,
-          "delta": -31.3
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 4570.0,
-          "delta": -30.4
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 4705.0,
-          "delta": -30.4
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 4120.0,
-          "delta": -34.5
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 2042.5,
-          "delta": -47.4
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": 382.5,
-          "delta": -55.5
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": -2912.5,
-          "delta": -65.1
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": -6612.5,
-          "delta": -75.2
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": -3072.5,
-          "delta": -68.4
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": -6172.5,
-          "delta": -72.7
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": -7685.0,
-          "delta": -82.3
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": -13195.0,
-          "delta": -84.5
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": -14620.0,
-          "delta": -83.2
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": -13380.0,
-          "delta": -83.2
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": -14445.0,
-          "delta": -79.7
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": -15315.0,
-          "delta": -81.3
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": -9210.0,
-          "delta": -85.4
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": -14280.0,
-          "delta": -93.7
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": -14952.5,
-          "delta": 3.73
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -14405.0,
-          "delta": -96.2
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -12687.5,
-          "delta": 95.8
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -12222.5,
-          "delta": 0.685
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -7445.0,
-          "delta": -89.8
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -16332.5,
-          "delta": 0.858
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-01",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-04",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-05",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-07",
-          "pnl": -18511.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": -18511.02,
-          "delta": 0.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "FOR03 SPX HYB BAT42",
@@ -7449,11 +6088,10 @@
       "environment": "CZ_Forward",
       "underlying": "SPX",
       "is_active": true,
-      "last_update": "2026-05-08",
+      "last_update": "2026-05-06",
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -7471,675 +6109,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-18",
-          "pnl": 1085.0,
-          "delta": -19.3
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 1835.0,
-          "delta": -14.6
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 2075.0,
-          "delta": -12.3
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 2575.0,
-          "delta": -10.6
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 2650.0,
-          "delta": -9.85
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 2315.0,
-          "delta": -12.5
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 2655.0,
-          "delta": -6.8
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 2700.0,
-          "delta": -8.16
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 2595.0,
-          "delta": -5.78
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 2790.0,
-          "delta": -10.5
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 2800.0,
-          "delta": -11.6
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 2650.0,
-          "delta": -9.82
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 2660.0,
-          "delta": -9.9
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 2995.0,
-          "delta": -8.86
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 2975.0,
-          "delta": -8.79
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3090.0,
-          "delta": -6.6
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3025.0,
-          "delta": -8.31
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3070.0,
-          "delta": -7.91
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3155.0,
-          "delta": -7.8
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3295.0,
-          "delta": -6.36
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 3215.0,
-          "delta": -7.66
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 3140.0,
-          "delta": -7.97
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 3390.0,
-          "delta": -7.66
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 3590.0,
-          "delta": -4.36
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 3415.0,
-          "delta": -6.51
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 3520.0,
-          "delta": -2.51
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 3465.0,
-          "delta": -1.0
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 2950.0,
-          "delta": -1.64
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 3095.0,
-          "delta": 0.124
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 3080.0,
-          "delta": 2.4
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 3380.0,
-          "delta": 0.457
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 3380.0,
-          "delta": 3.83
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 3485.0,
-          "delta": 3.95
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 3185.0,
-          "delta": 4.87
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 3485.0,
-          "delta": 5.07
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 4105.0,
-          "delta": 1.89
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 3820.0,
-          "delta": 3.05
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 4265.0,
-          "delta": 0.815
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 4315.0,
-          "delta": 1.07
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 4465.0,
-          "delta": -1.25
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 4415.0,
-          "delta": -1.3
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 4485.0,
-          "delta": -0.686
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 4510.0,
-          "delta": -1.09
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 4505.0,
-          "delta": -1.01
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 4415.0,
-          "delta": 2.21
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 4735.0,
-          "delta": 0.626
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": null,
-          "delta": null
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 4765.0,
-          "delta": 0.452
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 4765.0,
-          "delta": 0.454
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 4725.0,
-          "delta": -0.28
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 4925.0,
-          "delta": -0.426
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 4940.0,
-          "delta": -0.514
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 4730.0,
-          "delta": -0.473
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 4975.0,
-          "delta": -0.0421
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 5005.0,
-          "delta": -0.0657
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 4985.0,
-          "delta": -0.0276
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 4660.0,
-          "delta": 1.1
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 4750.0,
-          "delta": -1.57
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4400.0,
-          "delta": -16.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4445.0,
-          "delta": -15.6
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4405.0,
-          "delta": -16.6
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 3865.0,
-          "delta": -19.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4050.0,
-          "delta": -18.1
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": null,
-          "delta": null
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 4395.0,
-          "delta": -16.4
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 4310.0,
-          "delta": -16.6
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 3680.0,
-          "delta": -24.4
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 3840.0,
-          "delta": -24.2
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 4270.0,
-          "delta": -21.6
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 4060.0,
-          "delta": -22.8
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 4375.0,
-          "delta": -21.7
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 3970.0,
-          "delta": -25.0
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 2525.0,
-          "delta": -36.1
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": 1155.0,
-          "delta": -44.6
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": -1542.5,
-          "delta": -56.0
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": -4717.5,
-          "delta": -68.8
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": -1635.0,
-          "delta": -59.0
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": -4380.0,
-          "delta": -66.1
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": -5540.0,
-          "delta": -74.1
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": -10765.0,
-          "delta": -87.3
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": -12245.0,
-          "delta": -89.7
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": -10855.0,
-          "delta": -85.0
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": -12005.0,
-          "delta": -85.6
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": -12625.0,
-          "delta": -89.4
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": -6800.0,
-          "delta": -78.9
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": -11075.0,
-          "delta": -91.9
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": -11587.5,
-          "delta": 0.0334
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -10730.0,
-          "delta": -95.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -4800.0,
-          "delta": -79.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -9172.5,
-          "delta": -0.11
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": -8895.0,
-          "delta": 0.0021
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -12745.0,
-          "delta": 0.0033
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-01",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-04",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-05",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-07",
-          "pnl": -14876.02,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": -14876.02,
-          "delta": 0.0
-        }
-      ]
-    },
-    {
-      "name": "JS FOR01 XSP TripleCalendar 7/10DTE",
-      "environment_raw": "FOR Trades",
-      "environment": "JS_Forward",
-      "underlying": "XSP",
-      "is_active": true,
-      "last_update": "2026-05-11",
-      "open_date": "2026-05-08",
-      "exp_date": "2026-05-15",
-      "dte_open": 7,
-      "dte_open_raw": "7 / 10",
-      "dte_remaining": 4,
-      "underlying_price_at_open": 740.0,
-      "strikes": "725 | 740 | 750 ",
-      "net_credit": 181.5,
-      "max_loss": 230.31,
-      "sd": 0.017,
-      "lw_be": 721.0,
-      "up_be": 753.0,
-      "pct_to_lw_be": -2.57,
-      "pct_to_up_be": 1.76,
-      "pnl_current": 23.5,
-      "pnl_pct_max": 12.9,
-      "delta_current": 1.45,
-      "alert_dte": true,
-      "alert_profit_50": false,
-      "alert_stop": false,
-      "tent_status": "profit",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-05-08",
-          "pnl": 8.5,
-          "delta": 1.96
-        },
-        {
-          "date": "2026-05-11",
-          "pnl": 23.5,
-          "delta": 1.45
-        }
-      ]
-    },
-    {
-      "name": "JS FOR02 IWM TripleCalendar 14/21 DTE",
-      "environment_raw": "FOR Trades",
-      "environment": "JS_Forward",
-      "underlying": "IWM",
-      "is_active": true,
-      "last_update": "2026-05-11",
-      "open_date": "2026-05-11",
-      "exp_date": "2026-05-22",
-      "dte_open": 11,
-      "dte_open_raw": "11 / 18",
-      "dte_remaining": 11,
-      "underlying_price_at_open": 286.0,
-      "strikes": "275P | 288P | 300C",
-      "net_credit": 227.0,
-      "max_loss": 227.0,
-      "sd": 0.039,
-      "lw_be": 271.95,
-      "up_be": 303.12,
-      "pct_to_lw_be": -4.91,
-      "pct_to_up_be": 5.99,
-      "pnl_current": 1.5,
-      "pnl_pct_max": 0.7,
-      "delta_current": 3.31,
-      "alert_dte": false,
-      "alert_profit_50": false,
-      "alert_stop": false,
-      "tent_status": "profit",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-05-11",
-          "pnl": 1.5,
-          "delta": 3.31
-        }
-      ]
-    },
-    {
-      "name": "JS FOR03 QQQ TripleCalendar 4/7 DTE",
-      "environment_raw": "FOR Trades",
-      "environment": "JS_Forward",
-      "underlying": "QQQ",
-      "is_active": true,
-      "last_update": "2026-05-11",
-      "open_date": "2026-05-11",
-      "exp_date": "2026-05-15",
-      "dte_open": 4,
-      "dte_open_raw": "4 / 7",
-      "dte_remaining": 4,
-      "underlying_price_at_open": 714.0,
-      "strikes": "695P | 715P | 730P",
-      "net_credit": 268.5,
-      "max_loss": 268.5,
-      "sd": 0.024,
-      "lw_be": 688.0,
-      "up_be": 736.0,
-      "pct_to_lw_be": -3.64,
-      "pct_to_up_be": 3.08,
-      "pnl_current": 0.0,
-      "pnl_pct_max": 0.0,
-      "delta_current": 1.78,
-      "alert_dte": true,
-      "alert_profit_50": false,
-      "alert_stop": false,
-      "tent_status": "profit",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-05-11",
-          "pnl": 0.0,
-          "delta": 1.78
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T02 XSP IC42",
@@ -8147,12 +6117,11 @@
       "environment": "JS_Forward",
       "underlying": "XSP",
       "is_active": true,
-      "last_update": "2026-05-11",
+      "last_update": "2026-05-06",
       "open_date": "2026-04-30",
       "exp_date": "2026-06-05",
       "dte_open": 36,
-      "dte_open_raw": "36",
-      "dte_remaining": 25,
+      "dte_remaining": 30,
       "underlying_price_at_open": 720.0,
       "strikes": "669P | 671P | 748C | 750C",
       "net_credit": 53.0,
@@ -8162,133 +6131,29 @@
       "up_be": 748.53,
       "pct_to_lw_be": -6.88,
       "pct_to_up_be": 3.96,
-      "pnl_current": -48.0,
-      "pnl_pct_max": -90.6,
-      "delta_current": -2.63,
+      "pnl_current": -20.0,
+      "pnl_pct_max": -37.7,
+      "delta_current": -2.08,
       "alert_dte": false,
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "loss",
       "sheet": "JS MAY26",
-      "visual_pnl": -48.0,
+      "visual_pnl": -20.0,
       "dte_bucket": "35/42 DTE",
       "visual_status": "Active",
       "visual_open_date": "2026-04-30",
       "visual_exp_date": "2026-06-05",
       "visual_dte_open": 36,
       "visual_open_price": 720.0,
-      "visual_last_pnl": -48.0,
-      "visual_last_pnl_date": "2026-05-11",
-      "visual_last_pnl_weekday": "Mon",
-      "visual_last_pnl_row": 25,
+      "visual_last_pnl": -20.0,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 22,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 11,
-      "daily_history": [
-        {
-          "date": "2026-04-30",
-          "pnl": -3.0,
-          "delta": -1.49
-        },
-        {
-          "date": "2026-05-01",
-          "pnl": -10.0,
-          "delta": -1.92
-        },
-        {
-          "date": "2026-05-04",
-          "pnl": 1.5,
-          "delta": -1.36
-        },
-        {
-          "date": "2026-05-05",
-          "pnl": -8.5,
-          "delta": -2.11
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -20.0,
-          "delta": -2.08
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": -35.5,
-          "delta": -2.47
-        },
-        {
-          "date": "2026-05-07",
-          "pnl": -39.5,
-          "delta": -2.57
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": -42.55,
-          "delta": -2.73
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": -41.5,
-          "delta": -2.63
-        },
-        {
-          "date": "2026-05-11",
-          "pnl": -48.0,
-          "delta": -2.63
-        }
-      ]
-    },
-    {
-      "name": "T03 SLV Triple Calendar 11/18DTE",
-      "environment_raw": "FOR JS",
-      "environment": "JS_Forward",
-      "underlying": "SLV",
-      "is_active": true,
-      "last_update": "2026-05-11",
-      "open_date": "2026-05-11",
-      "exp_date": "2026-05-22",
-      "dte_open": 11,
-      "dte_open_raw": "11",
-      "dte_remaining": 11,
-      "underlying_price_at_open": 76.9,
-      "strikes": "67P | 75P | 85C",
-      "net_credit": 144.0,
-      "max_loss": 144.0,
-      "sd": 0.11,
-      "lw_be": 65.53,
-      "up_be": 89.37,
-      "pct_to_lw_be": -14.79,
-      "pct_to_up_be": 16.22,
-      "pnl_current": 5.5,
-      "pnl_pct_max": 3.8,
-      "delta_current": 0.559,
-      "alert_dte": false,
-      "alert_profit_50": false,
-      "alert_stop": false,
-      "tent_status": "profit",
-      "sheet": "JS MAY26",
-      "visual_pnl": 5.5,
-      "dte_bucket": "14 / 21 DTE",
-      "visual_status": "Active",
-      "visual_open_date": "2026-05-11",
-      "visual_exp_date": "2026-05-22",
-      "visual_dte_open": 11,
-      "visual_open_price": 76.9,
-      "visual_last_pnl": 5.5,
-      "visual_last_pnl_date": "2026-05-11",
-      "visual_last_pnl_weekday": "Mon",
-      "visual_last_pnl_row": 25,
-      "inferred_close_date": null,
-      "inferred_close_weekday": null,
-      "days_held": null,
-      "days_open_as_of_last_pnl": 0,
-      "daily_history": [
-        {
-          "date": "2026-05-11",
-          "pnl": 5.5,
-          "delta": 0.559
-        }
-      ]
+      "days_open_as_of_last_pnl": 6
     },
     {
       "name": "T03 XLF IC10",
@@ -8296,12 +6161,11 @@
       "environment": "JS_Forward",
       "underlying": "XLF",
       "is_active": true,
-      "last_update": "2026-05-11",
+      "last_update": "2026-05-06",
       "open_date": "2026-05-05",
       "exp_date": "2026-05-15",
       "dte_open": 10,
-      "dte_open_raw": "10",
-      "dte_remaining": 4,
+      "dte_remaining": 9,
       "underlying_price_at_open": 51.56,
       "strikes": "49P | 50P | 53C | 54C",
       "net_credit": 20.0,
@@ -8311,66 +6175,29 @@
       "up_be": 53.2,
       "pct_to_lw_be": -3.41,
       "pct_to_up_be": 3.18,
-      "pnl_current": 14.0,
-      "pnl_pct_max": 70.0,
-      "delta_current": 2.74,
-      "alert_dte": true,
-      "alert_profit_50": true,
+      "pnl_current": 5.0,
+      "pnl_pct_max": 25.0,
+      "delta_current": -8.06,
+      "alert_dte": false,
+      "alert_profit_50": false,
       "alert_stop": false,
-      "tent_status": "profit_target",
+      "tent_status": "profit",
       "sheet": "JS MAY26",
-      "visual_pnl": 14.0,
+      "visual_pnl": 5.0,
       "dte_bucket": "7 DTE",
       "visual_status": "Active",
       "visual_open_date": "2026-05-05",
       "visual_exp_date": "2026-05-15",
       "visual_dte_open": 10,
       "visual_open_price": 51.56,
-      "visual_last_pnl": 14.0,
-      "visual_last_pnl_date": "2026-05-11",
-      "visual_last_pnl_weekday": "Mon",
-      "visual_last_pnl_row": 25,
+      "visual_last_pnl": 5.0,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 22,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 6,
-      "daily_history": [
-        {
-          "date": "2026-05-05",
-          "pnl": -0.5,
-          "delta": -5.03
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": 5.0,
-          "delta": -8.06
-        },
-        {
-          "date": "2026-05-06",
-          "pnl": 3.0,
-          "delta": -7.43
-        },
-        {
-          "date": "2026-05-07",
-          "pnl": 9.0,
-          "delta": -4.51
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": 5.5,
-          "delta": -2.25
-        },
-        {
-          "date": "2026-05-08",
-          "pnl": 13.0,
-          "delta": 3.68
-        },
-        {
-          "date": "2026-05-11",
-          "pnl": 14.0,
-          "delta": 2.74
-        }
-      ]
+      "days_open_as_of_last_pnl": 1
     },
     {
       "name": "T45 RUT RJL42",
@@ -8378,12 +6205,11 @@
       "environment": "CZ_Live",
       "underlying": "RUT",
       "is_active": true,
-      "last_update": "2026-05-11",
+      "last_update": "2026-05-06",
       "open_date": "2026-04-13",
       "exp_date": "2026-05-22",
       "dte_open": 39,
-      "dte_open_raw": "39",
-      "dte_remaining": 11,
+      "dte_remaining": 16,
       "underlying_price_at_open": 2645.0,
       "strikes": "2400P | 2450P | 2750C",
       "net_credit": 11850.0,
@@ -8393,29 +6219,29 @@
       "up_be": 2789.5,
       "pct_to_lw_be": -8.87,
       "pct_to_up_be": 5.46,
-      "pnl_current": -22437.0,
-      "pnl_pct_max": -189.3,
-      "delta_current": 0.805,
+      "pnl_current": -26950.0,
+      "pnl_pct_max": -227.4,
+      "delta_current": -171.0,
       "alert_dte": false,
       "alert_profit_50": false,
       "alert_stop": true,
       "tent_status": "stop_loss",
       "sheet": "APR26",
-      "visual_pnl": -22437.0,
+      "visual_pnl": -26950.0,
       "dte_bucket": "35/42 DTE",
       "visual_status": "Active",
       "visual_open_date": "2026-04-13",
       "visual_exp_date": "2026-05-22",
       "visual_dte_open": 39,
       "visual_open_price": 2645.0,
-      "visual_last_pnl": -22437.0,
-      "visual_last_pnl_date": "2026-05-11",
-      "visual_last_pnl_weekday": "Mon",
-      "visual_last_pnl_row": 45,
+      "visual_last_pnl": -26950.0,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 42,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 28
+      "days_open_as_of_last_pnl": 23
     },
     {
       "name": "T49 SPX BWIC42",
@@ -8423,12 +6249,11 @@
       "environment": "CZ_Live",
       "underlying": "SPX",
       "is_active": true,
-      "last_update": "2026-05-11",
+      "last_update": "2026-05-06",
       "open_date": "2026-04-30",
       "exp_date": "2026-06-12",
       "dte_open": 43,
-      "dte_open_raw": "43",
-      "dte_remaining": 32,
+      "dte_remaining": 37,
       "underlying_price_at_open": 7165.0,
       "strikes": "6750P | 6800P | 7500C | 7600C",
       "net_credit": 3920.0,
@@ -8438,29 +6263,117 @@
       "up_be": 7519.6,
       "pct_to_lw_be": -5.37,
       "pct_to_up_be": 4.95,
-      "pnl_current": -3150.0,
-      "pnl_pct_max": -80.4,
-      "delta_current": 2.03,
+      "pnl_current": -2250.0,
+      "pnl_pct_max": -57.4,
+      "delta_current": -18.2,
       "alert_dte": false,
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "loss",
       "sheet": "MAY26",
-      "visual_pnl": -3150.0,
+      "visual_pnl": -2250.0,
       "dte_bucket": "35/42 DTE",
       "visual_status": "Active",
       "visual_open_date": "2026-04-30",
       "visual_exp_date": "2026-06-12",
       "visual_dte_open": 43,
       "visual_open_price": 7165.0,
-      "visual_last_pnl": -3150.0,
-      "visual_last_pnl_date": "2026-05-11",
-      "visual_last_pnl_weekday": "Mon",
-      "visual_last_pnl_row": 25,
+      "visual_last_pnl": -2250.0,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 22,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 11
+      "days_open_as_of_last_pnl": 6
+    },
+    {
+      "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "RUT",
+      "is_active": true,
+      "last_update": "2026-05-06",
+      "open_date": "2026-05-01",
+      "exp_date": "2026-05-09",
+      "dte_open": 8,
+      "dte_remaining": 3,
+      "underlying_price_at_open": 2813.0,
+      "strikes": "2550P | 2700P",
+      "net_credit": 1485.0,
+      "max_loss": 43515.0,
+      "sd": 0.027,
+      "lw_be": 2695.05,
+      "up_be": NaN,
+      "pct_to_lw_be": -4.19,
+      "pct_to_up_be": NaN,
+      "pnl_current": 1432.5,
+      "pnl_pct_max": 96.5,
+      "delta_current": 2.14,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "MAY26",
+      "visual_pnl": 1432.5,
+      "dte_bucket": "7 DTE",
+      "visual_status": "Active",
+      "visual_open_date": "2026-05-01",
+      "visual_exp_date": "2026-05-09",
+      "visual_dte_open": 8,
+      "visual_open_price": 2813.0,
+      "visual_last_pnl": 1432.5,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 22,
+      "inferred_close_date": null,
+      "inferred_close_weekday": null,
+      "days_held": null,
+      "days_open_as_of_last_pnl": 5
+    },
+    {
+      "name": "T52 NDX BWIC7",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "NDX",
+      "is_active": true,
+      "last_update": "2026-05-06",
+      "open_date": "2026-05-01",
+      "exp_date": "2026-05-09",
+      "dte_open": 8,
+      "dte_remaining": 3,
+      "underlying_price_at_open": 27744.0,
+      "strikes": "26300P | 26450P | 28600C | 28800C",
+      "net_credit": 1695.0,
+      "max_loss": 18305.0,
+      "sd": 0.024,
+      "lw_be": 26433.05,
+      "up_be": 28616.95,
+      "pct_to_lw_be": -4.73,
+      "pct_to_up_be": 3.15,
+      "pnl_current": 2445.0,
+      "pnl_pct_max": 144.2,
+      "delta_current": -12.5,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "MAY26",
+      "visual_pnl": 2445.0,
+      "dte_bucket": "7 DTE",
+      "visual_status": "Active",
+      "visual_open_date": "2026-05-01",
+      "visual_exp_date": "2026-05-09",
+      "visual_dte_open": 8,
+      "visual_open_price": 27744.0,
+      "visual_last_pnl": 2445.0,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 22,
+      "inferred_close_date": null,
+      "inferred_close_weekday": null,
+      "days_held": null,
+      "days_open_as_of_last_pnl": 5
     },
     {
       "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
@@ -8468,12 +6381,11 @@
       "environment": "CZ_Live",
       "underlying": "RUT",
       "is_active": true,
-      "last_update": "2026-05-11",
+      "last_update": "2026-05-06",
       "open_date": "2026-05-04",
       "exp_date": "2026-06-18",
       "dte_open": 45,
-      "dte_open_raw": "45",
-      "dte_remaining": 38,
+      "dte_remaining": 43,
       "underlying_price_at_open": 2823.0,
       "strikes": "2580P | 2700P",
       "net_credit": 6309.0,
@@ -8483,29 +6395,29 @@
       "up_be": NaN,
       "pct_to_lw_be": -5.1,
       "pct_to_up_be": NaN,
-      "pnl_current": 2154.0,
-      "pnl_pct_max": 34.1,
-      "delta_current": 27.7,
+      "pnl_current": 2139.0,
+      "pnl_pct_max": 33.9,
+      "delta_current": 26.6,
       "alert_dte": false,
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "profit",
       "sheet": "MAY26",
-      "visual_pnl": 2154.0,
-      "dte_bucket": "35/42 DTE",
+      "visual_pnl": 2139.0,
+      "dte_bucket": "7 DTE",
       "visual_status": "Active",
       "visual_open_date": "2026-05-04",
       "visual_exp_date": "2026-06-18",
       "visual_dte_open": 45,
       "visual_open_price": 2823.0,
-      "visual_last_pnl": 2154.0,
-      "visual_last_pnl_date": "2026-05-11",
-      "visual_last_pnl_weekday": "Mon",
-      "visual_last_pnl_row": 25,
+      "visual_last_pnl": 2139.0,
+      "visual_last_pnl_date": "2026-05-06",
+      "visual_last_pnl_weekday": "Wed",
+      "visual_last_pnl_row": 22,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 7
+      "days_open_as_of_last_pnl": 2
     },
     {
       "name": "HALF BAT7 (CALL)",
@@ -8517,7 +6429,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "2560, 2570, 2700",
@@ -8562,7 +6473,6 @@
       "open_date": "2026-04-23",
       "exp_date": "2026-05-01",
       "dte_open": 8,
-      "dte_open_raw": "8",
       "dte_remaining": 0,
       "underlying_price_at_open": 57.0,
       "strikes": "52.5P | 54P | 59C | 60.5C",
@@ -8595,79 +6505,7 @@
       "inferred_close_date": "2026-05-01",
       "inferred_close_weekday": "Fri",
       "days_held": 8,
-      "days_open_as_of_last_pnl": 8,
-      "daily_history": [
-        {
-          "date": "2026-04-23",
-          "pnl": -4.0,
-          "delta": -6.45
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": 2.5,
-          "delta": -0.347
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": 8.5,
-          "delta": -1.64
-        },
-        {
-          "date": "2026-04-24",
-          "pnl": 9.0,
-          "delta": -4.44
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": 9.5,
-          "delta": -10.7
-        },
-        {
-          "date": "2026-04-27",
-          "pnl": 14.0,
-          "delta": -4.86
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": 5.0,
-          "delta": -13.4
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": 11.0,
-          "delta": -12.2
-        },
-        {
-          "date": "2026-04-28",
-          "pnl": 13.0,
-          "delta": -13.2
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -2.0,
-          "delta": -25.0
-        },
-        {
-          "date": "2026-04-29",
-          "pnl": -20.0,
-          "delta": -33.7
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -17.5,
-          "delta": -34.8
-        },
-        {
-          "date": "2026-04-30",
-          "pnl": -30.5,
-          "delta": -46.5
-        },
-        {
-          "date": "2026-05-01",
-          "pnl": 20.5,
-          "delta": -32.5
-        }
-      ]
+      "days_open_as_of_last_pnl": 8
     },
     {
       "name": "T03 IRON CONDOR",
@@ -8679,7 +6517,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -8697,29 +6534,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-17",
-          "pnl": 525.0,
-          "delta": 147.0
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 500.0,
-          "delta": 373.0
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 325.0,
-          "delta": 414.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 500.0,
-          "delta": 410.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T03 IRON CONDOR - XLF",
@@ -8731,7 +6546,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -8749,29 +6563,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-19",
-          "pnl": 500.0,
-          "delta": 417.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 450.0,
-          "delta": 487.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 550.0,
-          "delta": 295.0
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 775.0,
-          "delta": -133.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T04 IRON CONDOR",
@@ -8783,7 +6575,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -8801,39 +6592,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-17",
-          "pnl": 590.0,
-          "delta": 21.7
-        },
-        {
-          "date": "2026-03-17",
-          "pnl": 810.0,
-          "delta": 18.3
-        },
-        {
-          "date": "2026-03-17",
-          "pnl": 810.0,
-          "delta": 18.4
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 705.0,
-          "delta": 18.1
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 515.0,
-          "delta": 34.8
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 570.0,
-          "delta": 68.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T04 IRON CONDOR - BRK.B",
@@ -8845,7 +6604,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -8863,19 +6621,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-19",
-          "pnl": 310.0,
-          "delta": 59.4
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 335.0,
-          "delta": 61.3
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T05 Put Broken Wing",
@@ -8887,7 +6633,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -8905,39 +6650,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-17",
-          "pnl": 284.0,
-          "delta": 14.7
-        },
-        {
-          "date": "2026-03-17",
-          "pnl": 244.0,
-          "delta": 23.4
-        },
-        {
-          "date": "2026-03-17",
-          "pnl": 246.0,
-          "delta": 22.6
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 276.0,
-          "delta": 20.3
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 258.0,
-          "delta": 20.5
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 316.0,
-          "delta": 13.5
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T05 Put Broken Wing - JPM",
@@ -8949,7 +6662,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -8967,29 +6679,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-19",
-          "pnl": 316.0,
-          "delta": 12.1
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 346.0,
-          "delta": 7.01
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 360.0,
-          "delta": 3.16
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": 362.0,
-          "delta": 0.809
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T06 Put Broken Wing",
@@ -9001,7 +6691,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -9019,29 +6708,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-17",
-          "pnl": 391.5,
-          "delta": 28.7
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 130.5,
-          "delta": 56.0
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": -49.5,
-          "delta": 74.7
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": -31.5,
-          "delta": 94.1
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T06 Put Broken Wing - DIA",
@@ -9053,7 +6720,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -9071,34 +6737,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-19",
-          "pnl": -22.5,
-          "delta": 123.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": -382.5,
-          "delta": 141.0
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 126.0,
-          "delta": 106.0
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": -297.0,
-          "delta": 339.0
-        },
-        {
-          "date": "2026-03-20",
-          "pnl": -1368.0,
-          "delta": 0.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T07 Put Broken Wing",
@@ -9110,7 +6749,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -9128,29 +6766,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-18",
-          "pnl": 246.0,
-          "delta": 75.9
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 246.0,
-          "delta": 73.3
-        },
-        {
-          "date": "2026-03-18",
-          "pnl": 390.0,
-          "delta": 50.7
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 342.0,
-          "delta": 36.1
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T07 Put Broken Wing - QCOM",
@@ -9162,7 +6778,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
@@ -9180,19 +6795,7 @@
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "unknown",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-19",
-          "pnl": 372.0,
-          "delta": 28.1
-        },
-        {
-          "date": "2026-03-19",
-          "pnl": 336.0,
-          "delta": 43.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T08 GLD PUT-HALF BAT7",
@@ -9204,7 +6807,6 @@
       "open_date": "2026-03-23",
       "exp_date": "2026-04-22",
       "dte_open": 30,
-      "dte_open_raw": "30",
       "dte_remaining": 0,
       "underlying_price_at_open": 413.0,
       "strikes": "355P | 380P | 385P",
@@ -9222,164 +6824,7 @@
       "alert_profit_50": true,
       "alert_stop": false,
       "tent_status": "profit_target",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-23",
-          "pnl": -360.0,
-          "delta": 81.7
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": -440.0,
-          "delta": 82.9
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": -400.0,
-          "delta": 82.5
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 80.0,
-          "delta": 76.1
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": -380.0,
-          "delta": 81.2
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -60.0,
-          "delta": 80.8
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 40.0,
-          "delta": 78.9
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -100.0,
-          "delta": 82.0
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -140.0,
-          "delta": 81.8
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -120.0,
-          "delta": 81.5
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -120.0,
-          "delta": 81.5
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 944.0,
-          "delta": 58.0
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 1016.0,
-          "delta": 57.0
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -160.0,
-          "delta": 79.4
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 384.0,
-          "delta": 72.1
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 980.0,
-          "delta": 57.5
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -40.0,
-          "delta": 79.6
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -540.0,
-          "delta": 83.8
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 220.0,
-          "delta": 70.6
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 756.0,
-          "delta": 56.4
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": 420.0,
-          "delta": 61.7
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 928.0,
-          "delta": 57.3
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 884.0,
-          "delta": 58.8
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 836.0,
-          "delta": 59.7
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 824.0,
-          "delta": 59.6
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1500.0,
-          "delta": 43.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1676.0,
-          "delta": 37.7
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1764.0,
-          "delta": 34.2
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1744.0,
-          "delta": 34.7
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 1972.0,
-          "delta": 27.7
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 2012.0,
-          "delta": 26.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T09 META PUT-HALF BAT7",
@@ -9391,7 +6836,6 @@
       "open_date": "2026-03-23",
       "exp_date": "2026-04-02",
       "dte_open": 10,
-      "dte_open_raw": "10",
       "dte_remaining": 0,
       "underlying_price_at_open": 603.0,
       "strikes": "570P | 585P | 587.5P",
@@ -9409,154 +6853,7 @@
       "alert_profit_50": false,
       "alert_stop": true,
       "tent_status": "stop_loss",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-23",
-          "pnl": 0.0,
-          "delta": 42.8
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 0.0,
-          "delta": 42.8
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": 0.0,
-          "delta": 43.8
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -362.5,
-          "delta": 53.9
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -387.5,
-          "delta": 56.0
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -462.5,
-          "delta": 57.5
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -512.5,
-          "delta": 58.2
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -512.5,
-          "delta": 58.2
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -512.5,
-          "delta": 58.2
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": -212.5,
-          "delta": 53.9
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": -362.5,
-          "delta": 58.5
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -362.5,
-          "delta": 58.6
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -3100.0,
-          "delta": 71.7
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -3925.0,
-          "delta": 51.6
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -3787.5,
-          "delta": 50.2
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -3925.0,
-          "delta": 51.6
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -5462.5,
-          "delta": -11.7
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -5012.5,
-          "delta": 482.0
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -5775.0,
-          "delta": -17.8
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -5125.0,
-          "delta": 6.39
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -3525.0,
-          "delta": -909.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -5212.5,
-          "delta": -1.4
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -3525.0,
-          "delta": -909.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -2750.0,
-          "delta": 123.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -4375.0,
-          "delta": 555.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -2250.0,
-          "delta": 136.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -2250.0,
-          "delta": 136.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": -1675.0,
-          "delta": 166.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": -1337.5,
-          "delta": 152.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T10 NVDA PUT-HALF BAT7",
@@ -9568,7 +6865,6 @@
       "open_date": "2026-03-23",
       "exp_date": "2026-04-02",
       "dte_open": 10,
-      "dte_open_raw": "10",
       "dte_remaining": 0,
       "underlying_price_at_open": 177.0,
       "strikes": "175P | 190C",
@@ -9586,149 +6882,7 @@
       "alert_profit_50": true,
       "alert_stop": false,
       "tent_status": "profit_target",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-23",
-          "pnl": -90.0,
-          "delta": 32.9
-        },
-        {
-          "date": "2026-03-23",
-          "pnl": -90.0,
-          "delta": 32.9
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -55.0,
-          "delta": 45.9
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": -10.0,
-          "delta": 46.7
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 17.5,
-          "delta": 43.9
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 35.0,
-          "delta": 47.2
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 35.0,
-          "delta": 47.2
-        },
-        {
-          "date": "2026-03-24",
-          "pnl": 35.0,
-          "delta": 47.2
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 240.0,
-          "delta": -13.9
-        },
-        {
-          "date": "2026-03-25",
-          "pnl": 332.5,
-          "delta": -23.3
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 332.5,
-          "delta": -23.2
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 177.5,
-          "delta": 70.3
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -295.0,
-          "delta": 127.0
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": 32.5,
-          "delta": 92.5
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -295.0,
-          "delta": 127.0
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -710.0,
-          "delta": 190.0
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -380.0,
-          "delta": 185.0
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -875.0,
-          "delta": 224.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -1002.5,
-          "delta": 295.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -847.5,
-          "delta": 299.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -1392.5,
-          "delta": 333.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -1392.5,
-          "delta": 334.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 130.0,
-          "delta": 238.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 705.0,
-          "delta": 118.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 910.0,
-          "delta": 64.9
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 910.0,
-          "delta": 64.9
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 1057.5,
-          "delta": 16.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 1080.0,
-          "delta": 7.44
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T11 GOOGL BAT15",
@@ -9740,7 +6894,6 @@
       "open_date": "2026-03-26",
       "exp_date": "2026-04-10",
       "dte_open": 15,
-      "dte_open_raw": "15",
       "dte_remaining": 0,
       "underlying_price_at_open": 284.0,
       "strikes": "255P | 270P | 275P | 305C",
@@ -9758,229 +6911,7 @@
       "alert_profit_50": false,
       "alert_stop": true,
       "tent_status": "stop_loss",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-26",
-          "pnl": -75.0,
-          "delta": 25.9
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -140.0,
-          "delta": 42.3
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -140.0,
-          "delta": 42.3
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -280.0,
-          "delta": 74.2
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -30.0,
-          "delta": 63.4
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -330.0,
-          "delta": 93.6
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -115.0,
-          "delta": 105.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -70.0,
-          "delta": 110.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 120.0,
-          "delta": 122.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 120.0,
-          "delta": 122.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 870.0,
-          "delta": 76.3
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 760.0,
-          "delta": -20.5
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 760.0,
-          "delta": -20.5
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 605.0,
-          "delta": -19.2
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 110.0,
-          "delta": -129.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 155.0,
-          "delta": -133.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": -80.0,
-          "delta": -155.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 20.0,
-          "delta": -139.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": -80.0,
-          "delta": -155.0
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 485.0,
-          "delta": -97.5
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 635.0,
-          "delta": -117.0
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 635.0,
-          "delta": -117.0
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 635.0,
-          "delta": -117.0
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 635.0,
-          "delta": -117.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 635.0,
-          "delta": -116.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 635.0,
-          "delta": -116.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 660.0,
-          "delta": -140.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 675.0,
-          "delta": -141.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 775.0,
-          "delta": -125.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 430.0,
-          "delta": -176.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 430.0,
-          "delta": -176.0
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 480.0,
-          "delta": -166.0
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": -1240.0,
-          "delta": -319.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -4175.0,
-          "delta": -450.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -5660.0,
-          "delta": -384.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -5925.0,
-          "delta": -419.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -4890.0,
-          "delta": -426.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -5925.0,
-          "delta": -419.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -5925.0,
-          "delta": -416.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -5925.0,
-          "delta": -416.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -4000.0,
-          "delta": -587.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -6880.0,
-          "delta": -427.0
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": -7775.0,
-          "delta": 1657.0
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": -8513.0,
-          "delta": 0.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T12 JPM PUT-HALF BAT15",
@@ -9992,7 +6923,6 @@
       "open_date": "2026-03-26",
       "exp_date": "2026-04-10",
       "dte_open": 15,
-      "dte_open_raw": "15",
       "dte_remaining": 0,
       "underlying_price_at_open": 292.0,
       "strikes": "265P | 280P | 320C | 325C",
@@ -10003,236 +6933,14 @@
       "up_be": NaN,
       "pct_to_lw_be": -6.18,
       "pct_to_up_be": NaN,
-      "pnl_current": 1045.0,
-      "pnl_pct_max": 100.0,
-      "delta_current": 0.0,
+      "pnl_current": 450.0,
+      "pnl_pct_max": 43.1,
+      "delta_current": 73.6,
       "alert_dte": true,
-      "alert_profit_50": true,
+      "alert_profit_50": false,
       "alert_stop": false,
-      "tent_status": "profit_target",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-26",
-          "pnl": 60.0,
-          "delta": 78.7
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -5.0,
-          "delta": 81.3
-        },
-        {
-          "date": "2026-03-26",
-          "pnl": -5.0,
-          "delta": 81.3
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -485.0,
-          "delta": 109.0
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -855.0,
-          "delta": 121.0
-        },
-        {
-          "date": "2026-03-27",
-          "pnl": -1670.0,
-          "delta": 145.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -450.0,
-          "delta": 120.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -1060.0,
-          "delta": 137.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -330.0,
-          "delta": 120.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -175.0,
-          "delta": 95.3
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -1060.0,
-          "delta": 137.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 170.0,
-          "delta": 76.8
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 400.0,
-          "delta": 65.1
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 400.0,
-          "delta": 65.1
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 465.0,
-          "delta": 56.3
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 540.0,
-          "delta": 51.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 455.0,
-          "delta": 64.4
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 560.0,
-          "delta": 55.6
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 560.0,
-          "delta": 55.6
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 385.0,
-          "delta": 74.4
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 615.0,
-          "delta": 54.4
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 615.0,
-          "delta": 54.4
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 615.0,
-          "delta": 54.4
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": 615.0,
-          "delta": 54.4
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 875.0,
-          "delta": 30.8
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 615.0,
-          "delta": 54.6
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 615.0,
-          "delta": 54.6
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 905.0,
-          "delta": 26.1
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 940.0,
-          "delta": 21.7
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 985.0,
-          "delta": 16.6
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 985.0,
-          "delta": 16.6
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 895.0,
-          "delta": 28.7
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 900.0,
-          "delta": 27.3
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 960.0,
-          "delta": 14.4
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 980.0,
-          "delta": 12.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 960.0,
-          "delta": 13.9
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 990.0,
-          "delta": 9.72
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 960.0,
-          "delta": 13.9
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 960.0,
-          "delta": 13.9
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 960.0,
-          "delta": 13.9
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 1010.0,
-          "delta": 7.02
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 1040.0,
-          "delta": 1.58
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 450.0,
-          "delta": 73.6
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 1045.0,
-          "delta": 0.0
-        }
-      ]
+      "tent_status": "profit",
+      "sheet": null
     },
     {
       "name": "T13 XLV RJL14",
@@ -10244,7 +6952,6 @@
       "open_date": "2026-03-27",
       "exp_date": "2026-04-10",
       "dte_open": 14,
-      "dte_open_raw": "14",
       "dte_remaining": 0,
       "underlying_price_at_open": 144.0,
       "strikes": "136P | 140P | 152C",
@@ -10262,139 +6969,7 @@
       "alert_profit_50": true,
       "alert_stop": false,
       "tent_status": "profit_target",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-03-27",
-          "pnl": -720.0,
-          "delta": -77.0
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 135.0,
-          "delta": 8.57
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": 150.0,
-          "delta": 6.48
-        },
-        {
-          "date": "2026-03-30",
-          "pnl": -1310.0,
-          "delta": -226.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": -1310.0,
-          "delta": -226.0
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 165.0,
-          "delta": -9.34
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 675.0,
-          "delta": 10.5
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 1060.0,
-          "delta": -60.3
-        },
-        {
-          "date": "2026-03-31",
-          "pnl": 925.0,
-          "delta": -43.1
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 435.0,
-          "delta": -151.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 435.0,
-          "delta": -153.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": 435.0,
-          "delta": -154.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": -980.0,
-          "delta": -248.0
-        },
-        {
-          "date": "2026-04-01",
-          "pnl": -1310.0,
-          "delta": -317.0
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": 950.0,
-          "delta": -187.0
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": -315.0,
-          "delta": 29.9
-        },
-        {
-          "date": "2026-04-02",
-          "pnl": -315.0,
-          "delta": 29.8
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": -315.0,
-          "delta": 30.0
-        },
-        {
-          "date": "2026-04-03",
-          "pnl": -315.0,
-          "delta": 30.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": -315.0,
-          "delta": 30.8
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": -315.0,
-          "delta": 30.8
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 880.0,
-          "delta": -56.2
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 875.0,
-          "delta": -57.1
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 885.0,
-          "delta": -51.0
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1060.0,
-          "delta": -36.1
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 1050.0,
-          "delta": -33.1
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T14 PUT-HALF BAT13",
@@ -10406,7 +6981,6 @@
       "open_date": "2026-04-02",
       "exp_date": "2026-04-15",
       "dte_open": 13,
-      "dte_open_raw": "13",
       "dte_remaining": 0,
       "underlying_price_at_open": 427.0,
       "strikes": "395P | 403P | 404P",
@@ -10424,219 +6998,7 @@
       "alert_profit_50": true,
       "alert_stop": false,
       "tent_status": "profit_target",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-04-02",
-          "pnl": 230.0,
-          "delta": 44.4
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 330.0,
-          "delta": 41.5
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 570.0,
-          "delta": 36.4
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 330.0,
-          "delta": 41.5
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 550.0,
-          "delta": 37.2
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 590.0,
-          "delta": 36.2
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 415.0,
-          "delta": 45.1
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 450.0,
-          "delta": 43.7
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 125.0,
-          "delta": 53.7
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": 735.0,
-          "delta": 29.6
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 910.0,
-          "delta": 18.5
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 920.0,
-          "delta": 17.7
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 965.0,
-          "delta": 15.6
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 890.0,
-          "delta": 22.1
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 905.0,
-          "delta": 21.3
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 905.0,
-          "delta": 21.3
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": null,
-          "delta": null
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 1015.0,
-          "delta": 12.5
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 985.0,
-          "delta": 14.7
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 1045.0,
-          "delta": 9.63
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 1005.0,
-          "delta": 13.6
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 1000.0,
-          "delta": 14.1
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 1055.0,
-          "delta": 9.98
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 1145.0,
-          "delta": -0.284
-        },
-        {
-          "date": "2026-04-13",
-          "pnl": 915.0,
-          "delta": 26.3
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": 1165.0,
-          "delta": -5.35
-        },
-        {
-          "date": "2026-04-14",
-          "pnl": 1115.0,
-          "delta": 0.152
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-15",
-          "pnl": 1110.0,
-          "delta": 1.29
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-16",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-17",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-20",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-21",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-22",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": 1115.0,
-          "delta": 0.0
-        },
-        {
-          "date": "2026-04-23",
-          "pnl": 1115.0,
-          "delta": 0.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T15 DIA CALL BEAR + SP 7",
@@ -10648,7 +7010,6 @@
       "open_date": "2026-04-06",
       "exp_date": "2026-04-10",
       "dte_open": 4,
-      "dte_open_raw": "4",
       "dte_remaining": 0,
       "underlying_price_at_open": 465.0,
       "strikes": "452P | 479C | 482.5C",
@@ -10666,89 +7027,7 @@
       "alert_profit_50": true,
       "alert_stop": false,
       "tent_status": "profit_target",
-      "sheet": null,
-      "daily_history": [
-        {
-          "date": "2026-04-06",
-          "pnl": 5.0,
-          "delta": 48.4
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 120.0,
-          "delta": 23.4
-        },
-        {
-          "date": "2026-04-06",
-          "pnl": 150.0,
-          "delta": 27.2
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": -345.0,
-          "delta": 130.0
-        },
-        {
-          "date": "2026-04-07",
-          "pnl": -200.0,
-          "delta": 77.3
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -1360.0,
-          "delta": -373.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -1420.0,
-          "delta": -387.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -1560.0,
-          "delta": -396.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -1750.0,
-          "delta": -389.0
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": -895.0,
-          "delta": -348.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -1560.0,
-          "delta": -394.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -1560.0,
-          "delta": -394.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -955.0,
-          "delta": -525.0
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": -2890.0,
-          "delta": -548.0
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": -1135.0,
-          "delta": -928.0
-        },
-        {
-          "date": "2026-04-10",
-          "pnl": 1270.02,
-          "delta": 0.0
-        }
-      ]
+      "sheet": null
     },
     {
       "name": "T21 IC7, 50/100 width",
@@ -10895,7 +7174,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "2320, 2400, 2440",
@@ -10985,7 +7263,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "2340",
@@ -11030,7 +7307,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "6250, 6350, 6390",
@@ -11075,7 +7351,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "23400",
@@ -11120,7 +7395,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "2350",
@@ -11165,7 +7439,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "6420",
@@ -11210,7 +7483,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": "24850C | 24900C | 25400C",
@@ -11255,7 +7527,6 @@
       "open_date": "2026-03-23",
       "exp_date": "2026-03-27",
       "dte_open": 4,
-      "dte_open_raw": "4",
       "dte_remaining": 0,
       "underlying_price_at_open": 2511.0,
       "strikes": "2570C | 2575C | 2700C",
@@ -11300,7 +7571,6 @@
       "open_date": "2026-03-24",
       "exp_date": "2026-04-02",
       "dte_open": 9,
-      "dte_open_raw": "9",
       "dte_remaining": 0,
       "underlying_price_at_open": 2490.0,
       "strikes": "2550C | 2555C | 2650C",
@@ -11345,7 +7615,6 @@
       "open_date": "2026-03-25",
       "exp_date": "2026-05-01",
       "dte_open": 37,
-      "dte_open_raw": "37",
       "dte_remaining": 0,
       "underlying_price_at_open": 6590.0,
       "strikes": "6300P | 6700C | 7000C",
@@ -11390,7 +7659,6 @@
       "open_date": "2026-03-26",
       "exp_date": "2026-04-02",
       "dte_open": 7,
-      "dte_open_raw": "7",
       "dte_remaining": 0,
       "underlying_price_at_open": 23644.0,
       "strikes": "24500C | 24950C",
@@ -11435,7 +7703,6 @@
       "open_date": "2026-03-30",
       "exp_date": "2026-04-02",
       "dte_open": 3,
-      "dte_open_raw": "3",
       "dte_remaining": 0,
       "underlying_price_at_open": 23175.0,
       "strikes": "24100C | 24500C",
@@ -11480,7 +7747,6 @@
       "open_date": "2026-03-30",
       "exp_date": "2026-04-10",
       "dte_open": 11,
-      "dte_open_raw": "11",
       "dte_remaining": 0,
       "underlying_price_at_open": 2411.0,
       "strikes": "2300P | 2575C | 2685C",
@@ -11525,7 +7791,6 @@
       "open_date": "2026-04-06",
       "exp_date": "2026-04-10",
       "dte_open": 4,
-      "dte_open_raw": "4",
       "dte_remaining": 0,
       "underlying_price_at_open": 2532.0,
       "strikes": "2430P | 2575C | 2800C",
@@ -11570,7 +7835,6 @@
       "open_date": "2026-04-06",
       "exp_date": "2026-05-01",
       "dte_open": 25,
-      "dte_open_raw": "25",
       "dte_remaining": 0,
       "underlying_price_at_open": 2537.0,
       "strikes": "2400P | 2550C | 2700C",
@@ -11615,7 +7879,6 @@
       "open_date": "2026-04-07",
       "exp_date": "2026-04-10",
       "dte_open": 3,
-      "dte_open_raw": "3",
       "dte_remaining": 0,
       "underlying_price_at_open": 6588.0,
       "strikes": "5800P | 6350P | 6700C | 7000C",
@@ -11660,7 +7923,6 @@
       "open_date": "2026-04-10",
       "exp_date": "2026-04-17",
       "dte_open": 7,
-      "dte_open_raw": "7",
       "dte_remaining": 0,
       "underlying_price_at_open": 2631.0,
       "strikes": "2525P | 2550P | 2700C | 2725C",
@@ -11705,7 +7967,6 @@
       "open_date": "2026-04-21",
       "exp_date": "2026-04-24",
       "dte_open": 3,
-      "dte_open_raw": "3",
       "dte_remaining": 0,
       "underlying_price_at_open": 2779.0,
       "strikes": "2600P | 2700P | 2710P",
@@ -11750,7 +8011,6 @@
       "open_date": "2026-04-23",
       "exp_date": "2026-05-01",
       "dte_open": 8,
-      "dte_open_raw": "8",
       "dte_remaining": 0,
       "underlying_price_at_open": 2767.0,
       "strikes": "2500P | 2670P",
@@ -11761,9 +8021,9 @@
       "up_be": NaN,
       "pct_to_lw_be": -3.96,
       "pct_to_up_be": NaN,
-      "pnl_current": 5970.0,
-      "pnl_pct_max": 75.4,
-      "delta_current": 48.3,
+      "pnl_current": 5790.0,
+      "pnl_pct_max": 73.1,
+      "delta_current": 53.0,
       "alert_dte": true,
       "alert_profit_50": true,
       "alert_stop": false,
@@ -11795,8 +8055,7 @@
       "open_date": "2026-04-28",
       "exp_date": "2026-05-08",
       "dte_open": 10,
-      "dte_open_raw": "10",
-      "dte_remaining": 0,
+      "dte_remaining": 2,
       "underlying_price_at_open": 2760.0,
       "strikes": "2590P | 2675P",
       "net_credit": 3225.0,
@@ -11840,8 +8099,7 @@
       "open_date": "2026-04-30",
       "exp_date": "2026-05-08",
       "dte_open": 8,
-      "dte_open_raw": "8",
-      "dte_remaining": 0,
+      "dte_remaining": 2,
       "underlying_price_at_open": 27330.0,
       "strikes": "26150P | 26200P | 28000C | 28040C",
       "net_credit": 1200.0,
@@ -11876,96 +8134,6 @@
       "days_open_as_of_last_pnl": 1
     },
     {
-      "name": "T51 RUT BullPutCreditSpread7 (PCS7)",
-      "environment_raw": "Live",
-      "environment": "CZ_Live",
-      "underlying": "RUT",
-      "is_active": false,
-      "last_update": "2026-05-06",
-      "open_date": "2026-05-01",
-      "exp_date": "2026-05-09",
-      "dte_open": 8,
-      "dte_open_raw": "8",
-      "dte_remaining": 0,
-      "underlying_price_at_open": 2813.0,
-      "strikes": "2550P | 2700P",
-      "net_credit": 1485.0,
-      "max_loss": 43515.0,
-      "sd": 0.027,
-      "lw_be": 2695.05,
-      "up_be": NaN,
-      "pct_to_lw_be": -4.19,
-      "pct_to_up_be": NaN,
-      "pnl_current": 1440.0,
-      "pnl_pct_max": 97.0,
-      "delta_current": 1.94,
-      "alert_dte": true,
-      "alert_profit_50": true,
-      "alert_stop": false,
-      "tent_status": "profit_target",
-      "sheet": "MAY26",
-      "visual_pnl": 1416.0,
-      "dte_bucket": "7 DTE",
-      "visual_status": "Closed",
-      "visual_open_date": "2026-05-01",
-      "visual_exp_date": "2026-05-09",
-      "visual_dte_open": 8,
-      "visual_open_price": 2813.0,
-      "visual_last_pnl": 1416.0,
-      "visual_last_pnl_date": "2026-05-06",
-      "visual_last_pnl_weekday": "Wed",
-      "visual_last_pnl_row": 22,
-      "inferred_close_date": "2026-05-06",
-      "inferred_close_weekday": "Wed",
-      "days_held": 5,
-      "days_open_as_of_last_pnl": 5
-    },
-    {
-      "name": "T52 NDX BWIC7",
-      "environment_raw": "Live",
-      "environment": "CZ_Live",
-      "underlying": "NDX",
-      "is_active": false,
-      "last_update": "2026-05-07",
-      "open_date": "2026-05-01",
-      "exp_date": "2026-05-09",
-      "dte_open": 8,
-      "dte_open_raw": "8",
-      "dte_remaining": 0,
-      "underlying_price_at_open": 27744.0,
-      "strikes": "26300P | 26450P | 28600C | 28800C",
-      "net_credit": 1695.0,
-      "max_loss": 18305.0,
-      "sd": 0.024,
-      "lw_be": 26433.05,
-      "up_be": 28616.95,
-      "pct_to_lw_be": -4.73,
-      "pct_to_up_be": 3.15,
-      "pnl_current": -19057.5,
-      "pnl_pct_max": -1124.3,
-      "delta_current": -20.0,
-      "alert_dte": true,
-      "alert_profit_50": false,
-      "alert_stop": true,
-      "tent_status": "stop_loss",
-      "sheet": "MAY26",
-      "visual_pnl": -15725.0,
-      "dte_bucket": "7 DTE",
-      "visual_status": "Closed",
-      "visual_open_date": "2026-05-01",
-      "visual_exp_date": "2026-05-09",
-      "visual_dte_open": 8,
-      "visual_open_price": 27744.0,
-      "visual_last_pnl": -15725.0,
-      "visual_last_pnl_date": "2026-05-07",
-      "visual_last_pnl_weekday": "Thu",
-      "visual_last_pnl_row": 23,
-      "inferred_close_date": "2026-05-07",
-      "inferred_close_weekday": "Thu",
-      "days_held": 6,
-      "days_open_as_of_last_pnl": 6
-    },
-    {
       "name": "URL Não Cadastrada",
       "environment_raw": "URL Não Cadastrada",
       "environment": "URL Não Cadastrada",
@@ -11975,7 +8143,6 @@
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
-      "dte_open_raw": null,
       "dte_remaining": null,
       "underlying_price_at_open": null,
       "strikes": null,
