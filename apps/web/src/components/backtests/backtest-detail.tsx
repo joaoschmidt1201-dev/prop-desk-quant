@@ -286,11 +286,29 @@ function KpiBand({ detail }: { detail: BacktestDetailType }) {
   const positive = k.total_pnl >= 0;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
-      <KpiBlock label="Total P&L" tone={k.total_pnl} value={fmtMoney(k.total_pnl)} highlight icon={positive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />} />
+      <KpiBlock
+        label="Total P&L"
+        tone={k.total_pnl}
+        value={fmtMoney(k.total_pnl)}
+        sub={
+          k.total_pnl_pct != null && k.starting_capital
+            ? `${fmtPct(k.total_pnl_pct)} on ${fmtMoney(k.starting_capital)}`
+            : k.total_pnl_pct != null
+            ? `${fmtPct(k.total_pnl_pct)} return`
+            : undefined
+        }
+        highlight
+        icon={positive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+      />
       <KpiBlock label="Win rate" value={fmtPct(k.win_rate)} sub={`${k.wins}W · ${k.losses}L`} />
       <KpiBlock label="Profit factor" value={fmtNum(k.profit_factor)} />
       <KpiBlock label="Expectancy / trade" tone={k.expectancy} value={fmtMoney(k.expectancy)} />
-      <KpiBlock label="Max drawdown" tone={k.max_drawdown} value={fmtMoney(k.max_drawdown)} />
+      <KpiBlock
+        label="Max drawdown"
+        tone={k.max_drawdown}
+        value={fmtMoney(k.max_drawdown)}
+        sub={k.max_drawdown_pct != null ? `${fmtPct(k.max_drawdown_pct)} of base` : undefined}
+      />
       <KpiBlock label="Best / Worst" value={`${fmtMoney(k.best_trade)} / ${fmtMoney(k.worst_trade)}`} sub="USD per trade" small />
       <KpiBlock label="Sharpe (raw)" value={fmtNum(k.sharpe)} sub={`streak ${k.max_consecutive_losses}L`} />
     </div>

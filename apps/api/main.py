@@ -945,37 +945,42 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
     },
 ]
 
-# Triple Calendar — combined PP+CC synthetic from tastytrade split backtest
-# (4-leg + 2-leg). See scripts/triplecal_export_app.py for the data pipeline.
-# Each entry references trades.csv + daily.csv with combined premium/PnL and
-# per-trade daily MTM, enriched with VIX entry (Cboe close-of-day).
+# Triple Calendar — combined synthetic from tastytrade split backtest (4-leg +
+# 2-leg). See scripts/triplecal_export_app.py for the data pipeline. Each entry
+# references trades.csv + daily.csv with combined premium/PnL and per-trade
+# daily MTM, enriched with VIX entry (Cboe close-of-day).
+#
+# Structure label: PUT-PUT-CALL = 2 Put Calendars (ATM Δ50 + OTM Δ16) + 1 Call
+# Calendar (OTM Δ16). PUT-CALL-CALL = 1 Put Calendar (OTM Δ16) + 2 Call
+# Calendars (ATM Δ50 + OTM Δ16).
 _TRIPLECAL_CONFIGS = [
-    ("7-10",  "7/10 DTE",  16, "PPC"),
-    ("7-14",  "7/14 DTE",  16, "PPC"),
-    ("14-21", "14/21 DTE", 16, "PPC"),
-    ("21-28", "21/28 DTE", 16, "PPC"),
-    ("7-10",  "7/10 DTE",  16, "PCC"),
-    ("7-14",  "7/14 DTE",  16, "PCC"),
-    ("14-21", "14/21 DTE", 16, "PCC"),
-    ("21-28", "21/28 DTE", 16, "PCC"),
+    ("7-10",  "7/10 DTE",  16, "PPC", "PUT-PUT-CALL"),
+    ("7-14",  "7/14 DTE",  16, "PPC", "PUT-PUT-CALL"),
+    ("14-21", "14/21 DTE", 16, "PPC", "PUT-PUT-CALL"),
+    ("21-28", "21/28 DTE", 16, "PPC", "PUT-PUT-CALL"),
+    ("7-10",  "7/10 DTE",  16, "PCC", "PUT-CALL-CALL"),
+    ("7-14",  "7/14 DTE",  16, "PCC", "PUT-CALL-CALL"),
+    ("14-21", "14/21 DTE", 16, "PCC", "PUT-CALL-CALL"),
+    ("21-28", "21/28 DTE", 16, "PCC", "PUT-CALL-CALL"),
 ]
-for _dte, _horizon, _delta, _struct in _TRIPLECAL_CONFIGS:
-    _legs_desc = (
-        "2 Put Calendars + 1 Call Calendar Δ16" if _struct == "PPC"
-        else "1 Put Calendar + 2 Call Calendars Δ16"
-    )
+for _dte, _horizon, _delta, _struct_short, _struct_long in _TRIPLECAL_CONFIGS:
+    if _struct_short == "PPC":
+        _legs_desc = "2 Put Calendars (1 ATM Δ50 + 1 OTM Δ16) + 1 Call Calendar (OTM Δ16)"
+    else:
+        _legs_desc = "1 Put Calendar (OTM Δ16) + 2 Call Calendars (1 ATM Δ50 + 1 OTM Δ16)"
     BACKTESTS_REGISTRY.append({
-        "id": f"triplecal-{_struct.lower()}-spx-{_dte}",
-        "name": f"Triple Calendar {_struct} {_horizon}",
+        "id": f"triplecal-{_struct_short.lower()}-spx-{_dte}",
+        "name": f"Triple Calendar {_struct_long} {_horizon}",
         "underlying": "SPX",
-        "strategy": f"Triple Calendar {_struct}",
+        "strategy": f"Triple Calendar {_struct_long}",
         "horizon": _horizon,
         "description": (
-            f"Triple Calendar {_struct} · SPX · {_horizon} · {_legs_desc} · "
-            "Friday entry, 3 active trades parallel, mid-price fills 15min before close"
+            f"Triple Calendar {_struct_long} · SPX · {_horizon} · {_legs_desc} · "
+            "Friday entry, 3 active trades parallel, mid-price fills 15min before close · "
+            "$100k starting capital"
         ),
-        "trades_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct}_d{_delta}/trades.csv",
-        "daily_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct}_d{_delta}/daily.csv",
+        "trades_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct_short}_d{_delta}/trades.csv",
+        "daily_csv": f"triplecal_backtest_app/SPX_{_dte}_{_struct_short}_d{_delta}/daily.csv",
         "kind": "triplecal",
         "multiplier": 1,  # premium already in USD in trades.csv
     })
@@ -1209,6 +1214,13 @@ def _apply_rule(
     return out
 
 
+# Starting capital used by tastytrade backtester for all our backtest configs.
+# Surfaced as `total_pnl_pct` so the dashboard can show return on initial cap
+# alongside the absolute P&L (useful since dollar totals can mislead when comparing
+# filters that change trade counts).
+BACKTEST_STARTING_CAPITAL = 100_000.0
+
+
 def _backtest_kpis(trades: list[dict[str, Any]]) -> dict[str, Any]:
     closed = [t for t in trades if (t.get("exit_method") or "").lower() != "fallback_entry"]
     pnls = [float(t.get("pnl_usd") or 0) for t in closed]
@@ -1256,12 +1268,16 @@ def _backtest_kpis(trades: list[dict[str, Any]]) -> dict[str, Any]:
             max_streak = max(max_streak, streak)
         else:
             streak = 0
+    total_pnl_pct = total / BACKTEST_STARTING_CAPITAL if BACKTEST_STARTING_CAPITAL else None
+    max_dd_pct = max_dd / BACKTEST_STARTING_CAPITAL if BACKTEST_STARTING_CAPITAL else None
     return {
         "n_trades": n,
         "n_open": len(trades) - n,
         "wins": len(wins),
         "losses": len(losses),
         "total_pnl": round(total, 2),
+        "total_pnl_pct": round(total_pnl_pct, 4) if total_pnl_pct is not None else None,
+        "starting_capital": BACKTEST_STARTING_CAPITAL,
         "best_trade": round(max(pnls), 2) if pnls else None,
         "worst_trade": round(min(pnls), 2) if pnls else None,
         "win_rate": round(win_rate, 4) if win_rate is not None else None,
@@ -1272,6 +1288,7 @@ def _backtest_kpis(trades: list[dict[str, Any]]) -> dict[str, Any]:
         "expectancy": round(expectancy, 2) if expectancy is not None else None,
         "in_range_rate": round(in_range_rate, 4) if in_range_rate is not None else None,
         "max_drawdown": round(max_dd, 2),
+        "max_drawdown_pct": round(max_dd_pct, 4) if max_dd_pct is not None else None,
         "sharpe": sharpe,
         "max_consecutive_losses": max_streak,
         "equity": equity,
@@ -1305,9 +1322,12 @@ def list_backtests() -> JSONResponse:
                 "n_trades": kpis["n_trades"],
                 "n_open": kpis["n_open"],
                 "total_pnl": kpis["total_pnl"],
+                "total_pnl_pct": kpis.get("total_pnl_pct"),
+                "starting_capital": kpis.get("starting_capital"),
                 "win_rate": kpis["win_rate"],
                 "profit_factor": kpis["profit_factor"],
                 "max_drawdown": kpis["max_drawdown"],
+                "max_drawdown_pct": kpis.get("max_drawdown_pct"),
                 "sharpe": kpis["sharpe"],
             },
         })

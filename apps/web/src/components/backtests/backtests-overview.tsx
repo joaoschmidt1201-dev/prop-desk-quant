@@ -66,6 +66,11 @@ function BacktestCard({ bt }: { bt: BacktestSummary }) {
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total P&L</div>
         <div className="mt-1 flex items-baseline gap-2">
           <span className={`text-3xl font-semibold tabular ${pnlClass(bt.kpis.total_pnl)}`}>{fmtMoney(bt.kpis.total_pnl)}</span>
+          {bt.kpis.total_pnl_pct != null && (
+            <span className={`text-base font-medium tabular ${pnlClass(bt.kpis.total_pnl_pct)}`}>
+              {fmtPct(bt.kpis.total_pnl_pct)}
+            </span>
+          )}
           {positive ? (
             <TrendingUp className="h-4 w-4 text-[var(--gain)]" />
           ) : (
@@ -74,6 +79,9 @@ function BacktestCard({ bt }: { bt: BacktestSummary }) {
         </div>
         <div className="mt-1 text-[11px] text-muted-foreground">
           {bt.kpis.n_trades} closed · {bt.kpis.n_open} open · {bt.period ?? "no period"}
+          {bt.kpis.starting_capital != null && (
+            <> · on {fmtMoney(bt.kpis.starting_capital)} base</>
+          )}
         </div>
       </div>
 

@@ -126,9 +126,12 @@ export type BacktestSummary = {
     n_trades: number;
     n_open: number;
     total_pnl: number;
+    total_pnl_pct?: number | null;
+    starting_capital?: number | null;
     win_rate: number | null;
     profit_factor: number | null;
     max_drawdown: number;
+    max_drawdown_pct?: number | null;
     sharpe: number | null;
   };
 };
@@ -147,6 +150,8 @@ export type BacktestKpis = {
   wins: number;
   losses: number;
   total_pnl: number;
+  total_pnl_pct?: number | null;
+  starting_capital?: number | null;
   best_trade: number | null;
   worst_trade: number | null;
   win_rate: number | null;
@@ -157,6 +162,7 @@ export type BacktestKpis = {
   expectancy: number | null;
   in_range_rate: number | null;
   max_drawdown: number;
+  max_drawdown_pct?: number | null;
   sharpe: number | null;
   max_consecutive_losses: number;
   equity: BacktestEquityPoint[];
