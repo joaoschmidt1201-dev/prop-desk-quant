@@ -954,13 +954,14 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
 # (OTM Δ16). PCC variants (PUT-CALL-CALL) live in reports/ as acervo but are
 # intentionally not registered here.
 _TRIPLECAL_CONFIGS = [
-    ("7-10",  "7/10 DTE",  16),
-    ("7-14",  "7/14 DTE",  16),
-    ("14-21", "14/21 DTE", 16),
-    ("21-28", "21/28 DTE", 16),
+    ("7-10",  "7/10 DTE",  16, 1),
+    ("7-14",  "7/14 DTE",  16, 1),
+    ("14-21", "14/21 DTE", 16, 2),
+    ("21-28", "21/28 DTE", 16, 3),
 ]
-for _dte, _horizon, _delta in _TRIPLECAL_CONFIGS:
+for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:
     _legs_desc = "2 Put Calendars (1 ATM Δ50 + 1 OTM Δ16) + 1 Call Calendar (OTM Δ16)"
+    _trades_desc = "1 active trade" if _limit == 1 else f"{_limit} active trades parallel"
     BACKTESTS_REGISTRY.append({
         "id": f"triplecal-spx-{_dte}",
         "name": f"Triple Calendar {_horizon}",
@@ -969,7 +970,7 @@ for _dte, _horizon, _delta in _TRIPLECAL_CONFIGS:
         "horizon": _horizon,
         "description": (
             f"Triple Calendar · SPX · {_horizon} · {_legs_desc} · "
-            "Friday entry, 3 active trades parallel, mid-price fills 15min before close · "
+            f"Friday entry, {_trades_desc}, mid-price fills 15min before close · "
             "$100k starting capital"
         ),
         "trades_csv": f"triplecal_backtest_app/SPX_{_dte}_PPC_d{_delta}/trades.csv",
