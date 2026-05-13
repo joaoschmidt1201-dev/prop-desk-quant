@@ -956,7 +956,9 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
 _TRIPLECAL_CONFIGS = [
     ("7-10",  "7/10 DTE",  16, 1),
     ("7-14",  "7/14 DTE",  16, 1),
+    ("14-17", "14/17 DTE", 16, 2),
     ("14-21", "14/21 DTE", 16, 2),
+    ("21-24", "21/24 DTE", 16, 3),
     ("21-28", "21/28 DTE", 16, 3),
 ]
 for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:

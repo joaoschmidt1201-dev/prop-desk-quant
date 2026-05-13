@@ -39,7 +39,9 @@ OUT_DIR = REPO_ROOT / "reports" / "triplecal_backtest_app"
 CONFIGS = [
     "SPX_7-10_PPC_d16",
     "SPX_7-14_PPC_d16",
+    "SPX_14-17_PPC_d16",
     "SPX_14-21_PPC_d16",
+    "SPX_21-24_PPC_d16",
     "SPX_21-28_PPC_d16",
     "SPX_7-10_PCC_d16",
     "SPX_7-14_PCC_d16",
