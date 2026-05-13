@@ -148,6 +148,7 @@ export function BacktestDetail({ id }: { id: string }) {
         loading={isFetching}
       />
       <KpiBand detail={safeData} />
+      <YearlyBreakdownCard detail={safeData} />
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8 space-y-6">
           <EquityCurveCard detail={safeData} />
@@ -284,8 +285,10 @@ function Header({
 function KpiBand({ detail }: { detail: BacktestDetailType }) {
   const k = detail.kpis;
   const positive = k.total_pnl >= 0;
+  const hasCapital = k.peak_capital_deployed != null && k.peak_capital_deployed > 0;
+  const gridCols = hasCapital ? "xl:grid-cols-9" : "xl:grid-cols-7";
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+    <div className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${gridCols}`}>
       <KpiBlock
         label="Total P&L"
         tone={k.total_pnl}
@@ -311,6 +314,26 @@ function KpiBand({ detail }: { detail: BacktestDetailType }) {
       />
       <KpiBlock label="Best / Worst" value={`${fmtMoney(k.best_trade)} / ${fmtMoney(k.worst_trade)}`} sub="USD per trade" small />
       <KpiBlock label="Sharpe (raw)" value={fmtNum(k.sharpe)} sub={`streak ${k.max_consecutive_losses}L`} />
+      {hasCapital && (
+        <>
+          <KpiBlock
+            label="Capital deployed (peak)"
+            value={fmtMoney(k.peak_capital_deployed)}
+            sub={
+              k.capital_utilization_pct != null
+                ? `${fmtPct(k.capital_utilization_pct)} of ${fmtMoney(k.starting_capital ?? 100000)} base`
+                : undefined
+            }
+          />
+          <KpiBlock
+            label="Return on capital"
+            tone={k.return_on_peak_capital_pct}
+            value={fmtPct(k.return_on_peak_capital_pct)}
+            sub={k.total_pnl_pct != null ? `vs ${fmtPct(k.total_pnl_pct)} on full base` : undefined}
+            highlight
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -348,6 +371,64 @@ export function ChartCard({ title, icon, children, sub }: { title: string; icon:
       </div>
       {children}
     </section>
+  );
+}
+
+export function YearlyBreakdownCard({ detail }: { detail: BacktestDetailType }) {
+  const rows = detail.kpis.yearly_breakdown ?? [];
+  if (rows.length === 0) return null;
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.n_trades += r.n_trades;
+      acc.wins += r.wins;
+      acc.total_pnl += r.total_pnl;
+      acc.total_pnl_pct += r.total_pnl_pct;
+      return acc;
+    },
+    { n_trades: 0, wins: 0, total_pnl: 0, total_pnl_pct: 0 },
+  );
+  const totalWr = totals.n_trades ? totals.wins / totals.n_trades : null;
+  return (
+    <div className="mt-6">
+      <ChartCard title="Yearly breakdown" icon={<BarChart3 className="h-4 w-4" />} sub={`${rows.length} years · entry-year grouping`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm tabular">
+            <thead>
+              <tr className="border-b border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">Year</th>
+                <th className="px-3 py-2 text-right font-medium">Trades</th>
+                <th className="px-3 py-2 text-right font-medium">Wins</th>
+                <th className="px-3 py-2 text-right font-medium">WR</th>
+                <th className="px-3 py-2 text-right font-medium">P&L</th>
+                <th className="px-3 py-2 text-right font-medium">P&L %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.year} className="border-b border-border/30 last:border-0">
+                  <td className="px-3 py-2 text-left font-medium">{r.year}</td>
+                  <td className="px-3 py-2 text-right">{r.n_trades}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{r.wins}</td>
+                  <td className="px-3 py-2 text-right">{fmtPct(r.win_rate)}</td>
+                  <td className={`px-3 py-2 text-right font-medium ${pnlClass(r.total_pnl)}`}>{fmtMoney(r.total_pnl)}</td>
+                  <td className={`px-3 py-2 text-right ${pnlClass(r.total_pnl_pct)}`}>{fmtPct(r.total_pnl_pct)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border/80 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <td className="px-3 py-2 text-left font-semibold">Total</td>
+                <td className="px-3 py-2 text-right font-semibold">{totals.n_trades}</td>
+                <td className="px-3 py-2 text-right font-semibold">{totals.wins}</td>
+                <td className="px-3 py-2 text-right font-semibold">{fmtPct(totalWr)}</td>
+                <td className={`px-3 py-2 text-right font-semibold ${pnlClass(totals.total_pnl)}`}>{fmtMoney(totals.total_pnl)}</td>
+                <td className={`px-3 py-2 text-right font-semibold ${pnlClass(totals.total_pnl_pct)}`}>{fmtPct(totals.total_pnl_pct)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </ChartCard>
+    </div>
   );
 }
 

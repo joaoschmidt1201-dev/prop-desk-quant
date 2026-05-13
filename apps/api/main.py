@@ -1215,7 +1215,11 @@ def _apply_rule(
 BACKTEST_STARTING_CAPITAL = 100_000.0
 
 
-def _backtest_kpis(trades: list[dict[str, Any]]) -> dict[str, Any]:
+def _backtest_kpis(
+    trades: list[dict[str, Any]],
+    kind: str | None = None,
+    multiplier: int = 1,
+) -> dict[str, Any]:
     closed = [t for t in trades if (t.get("exit_method") or "").lower() != "fallback_entry"]
     pnls = [float(t.get("pnl_usd") or 0) for t in closed]
     wins = [p for p in pnls if p > 0]
@@ -1264,6 +1268,84 @@ def _backtest_kpis(trades: list[dict[str, Any]]) -> dict[str, Any]:
             streak = 0
     total_pnl_pct = total / BACKTEST_STARTING_CAPITAL if BACKTEST_STARTING_CAPITAL else None
     max_dd_pct = max_dd / BACKTEST_STARTING_CAPITAL if BACKTEST_STARTING_CAPITAL else None
+
+    # ── Capital efficiency (Triple Calendar only) ─────────────────────────────
+    # Per desk convention, Triple Calendar's `total_credit` field is actually the
+    # debit paid up-front → equal to max capital at risk per trade. We walk the
+    # timeline summing concurrent debit across all open trades to get peak/avg
+    # capital deployed and return-on-capital. For credit strategies (SS42/IC7)
+    # this concept differs (BPR ≠ total_credit) — skip for now.
+    peak_cap: float | None = None
+    avg_cap: float | None = None
+    return_on_peak_cap_pct: float | None = None
+    capital_utilization_pct: float | None = None
+    if kind == "triplecal" and closed:
+        from datetime import date as _date
+
+        def _iso(s: Any) -> _date | None:
+            if not s:
+                return None
+            try:
+                return _date.fromisoformat(str(s)[:10])
+            except (ValueError, TypeError):
+                return None
+
+        intervals: list[tuple[_date, _date, float]] = []
+        for t in closed:
+            start = _iso(t.get("trade_date"))
+            end = _iso(t.get("effective_close_date")) or _iso(t.get("exp_date"))
+            if start is None or end is None or end < start:
+                continue
+            cap = float(t.get("total_credit") or 0) * multiplier
+            if cap <= 0:
+                continue
+            intervals.append((start, end, cap))
+        if intervals:
+            timeline_start = min(iv[0] for iv in intervals)
+            timeline_end = max(iv[1] for iv in intervals)
+            total_days = (timeline_end - timeline_start).days + 1
+            daily_load = [0.0] * total_days
+            for start, end, cap in intervals:
+                i0 = (start - timeline_start).days
+                i1 = (end - timeline_start).days
+                for i in range(i0, i1 + 1):
+                    daily_load[i] += cap
+            peak_cap = max(daily_load)
+            active_days = [d for d in daily_load if d > 0]
+            avg_cap = (sum(active_days) / len(active_days)) if active_days else None
+            if peak_cap and peak_cap > 0:
+                return_on_peak_cap_pct = total / peak_cap
+                capital_utilization_pct = peak_cap / BACKTEST_STARTING_CAPITAL
+
+    # ── Yearly breakdown ──────────────────────────────────────────────────────
+    yearly: dict[int, dict[str, Any]] = {}
+    for t in closed:
+        td = t.get("trade_date")
+        if not td:
+            continue
+        try:
+            year = int(str(td)[:4])
+        except (ValueError, TypeError):
+            continue
+        pnl = float(t.get("pnl_usd") or 0)
+        row = yearly.setdefault(year, {"year": year, "n_trades": 0, "wins": 0, "total_pnl": 0.0})
+        row["n_trades"] += 1
+        if pnl > 0:
+            row["wins"] += 1
+        row["total_pnl"] += pnl
+    yearly_breakdown = []
+    for year in sorted(yearly):
+        row = yearly[year]
+        wr = row["wins"] / row["n_trades"] if row["n_trades"] else None
+        yearly_breakdown.append({
+            "year": year,
+            "n_trades": row["n_trades"],
+            "wins": row["wins"],
+            "win_rate": round(wr, 4) if wr is not None else None,
+            "total_pnl": round(row["total_pnl"], 2),
+            "total_pnl_pct": round(row["total_pnl"] / BACKTEST_STARTING_CAPITAL, 4),
+        })
+
     return {
         "n_trades": n,
         "n_open": len(trades) - n,
@@ -1286,6 +1368,11 @@ def _backtest_kpis(trades: list[dict[str, Any]]) -> dict[str, Any]:
         "sharpe": sharpe,
         "max_consecutive_losses": max_streak,
         "equity": equity,
+        "peak_capital_deployed": round(peak_cap, 2) if peak_cap is not None else None,
+        "avg_capital_deployed": round(avg_cap, 2) if avg_cap is not None else None,
+        "return_on_peak_capital_pct": round(return_on_peak_cap_pct, 4) if return_on_peak_cap_pct is not None else None,
+        "capital_utilization_pct": round(capital_utilization_pct, 4) if capital_utilization_pct is not None else None,
+        "yearly_breakdown": yearly_breakdown,
     }
 
 
@@ -1352,7 +1439,7 @@ def get_backtest(
 
     filtered_trades = _filter_by_vix(raw_trades, vix_filter_to_use)
     trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"])
-    kpis = _backtest_kpis(trades_with_rule)
+    kpis = _backtest_kpis(trades_with_rule, kind=meta["kind"], multiplier=meta["multiplier"])
 
     display_cols_ss42 = [
         "trade_date", "exp_date", "underlying", "dte_entry", "spot_entry", "iv_atm_pct",
