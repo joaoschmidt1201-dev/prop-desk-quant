@@ -148,7 +148,6 @@ export function BacktestDetail({ id }: { id: string }) {
         loading={isFetching}
       />
       <KpiBand detail={safeData} />
-      <YearlyBreakdownCard detail={safeData} />
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-8 space-y-6">
           <EquityCurveCard detail={safeData} />
@@ -160,6 +159,7 @@ export function BacktestDetail({ id }: { id: string }) {
           <RiskCard detail={safeData} />
         </div>
       </div>
+      <YearlyBreakdownCard detail={safeData} />
       <div className="mt-6">
         <TradesTable detail={safeData} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
         <TradeInspector detail={safeData} index={selectedIdx} onChange={setSelectedIdx} />
