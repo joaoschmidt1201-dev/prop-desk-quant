@@ -434,14 +434,18 @@ function HeatCell({
   metric: OccurrenceMetric | null;
   selectedMetric: OccurrenceMetricKey;
 }) {
-  const style = heatStyle(metric, selectedMetric);
   if (!metric || metric.T === 0) {
     return (
-      <td className="h-[88px] min-w-[152px] border-l border-border/25 px-2 py-2 text-center" style={style}>
-        <span className="text-[11px] font-medium opacity-60">—</span>
+      <td
+        className="h-[92px] min-w-[152px] border-l border-border/20 px-2 py-2 text-center"
+        style={{ backgroundColor: "oklch(0.22 0.018 250 / 0.45)" }}
+      >
+        <span className="text-[11px] font-medium text-muted-foreground/55">—</span>
       </td>
     );
   }
+
+  const style = heatStyle(metric, selectedMetric);
 
   const tooltip = [
     `Total events: ${metric.T}`,
@@ -458,14 +462,20 @@ function HeatCell({
 
   return (
     <td
-      className={`group/cell relative h-[88px] min-w-[152px] cursor-help border-l border-border/25 px-2 py-2 text-center transition-all duration-150 hover:z-10 hover:scale-[1.02] hover:shadow-md ${isHighlight ? "ring-1 ring-inset" : ""}`}
-      style={isHighlight ? { ...style, boxShadow: "inset 0 0 0 1px var(--warning)" } : style}
+      className="group/cell relative h-[92px] min-w-[152px] cursor-help border-l border-border/20 px-2 py-2 text-center text-white transition-all duration-150 hover:z-10 hover:scale-[1.03] hover:shadow-xl hover:shadow-black/40"
+      style={
+        isHighlight
+          ? { ...style, boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 12px oklch(0.82 0.16 90 / 0.25)" }
+          : style
+      }
       title={tooltip}
     >
-      <div className="text-[9.5px] font-semibold uppercase tracking-[0.16em] opacity-65">
+      <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/65">
         {metricLabel(selectedMetric)}
       </div>
-      <div className="text-[18px] font-bold leading-tight tabular">{formatMetric(metric, selectedMetric)}</div>
+      <div className="mt-0.5 text-[20px] font-bold leading-tight tabular text-white drop-shadow-sm">
+        {formatMetric(metric, selectedMetric)}
+      </div>
       <SubMetrics metric={metric} selectedMetric={selectedMetric} />
     </td>
   );
@@ -473,7 +483,7 @@ function HeatCell({
 
 function SubMetrics({ metric, selectedMetric }: { metric: OccurrenceMetric; selectedMetric: OccurrenceMetricKey }) {
   return (
-    <div className="mt-1.5 grid grid-cols-4 gap-0.5 text-[9.5px] font-semibold tabular">
+    <div className="mt-2 grid grid-cols-4 gap-[3px] text-[9.5px] font-semibold tabular">
       <SubMetric label="B" value={metric.bounce_pct} suffix="%" active={selectedMetric === "bounce_pct"} tone="gain" />
       <SubMetric label="Bk" value={metric.break_pct} suffix="%" active={selectedMetric === "break_pct"} tone="loss" />
       <SubMetric label="F" value={metric.false_pct} suffix="%" active={selectedMetric === "false_pct"} tone="warning" />
@@ -495,22 +505,22 @@ function SubMetric({
   active: boolean;
   tone: "gain" | "loss" | "warning" | "neutral";
 }) {
-  const color =
+  const dot =
     tone === "gain"
-      ? "var(--gain)"
+      ? "oklch(0.78 0.18 145)"
       : tone === "loss"
-        ? "var(--loss)"
+        ? "oklch(0.72 0.22 25)"
         : tone === "warning"
-          ? "var(--warning)"
-          : "currentColor";
+          ? "oklch(0.85 0.16 90)"
+          : "oklch(0.75 0.02 250)";
 
   return (
     <span
-      className={`rounded-sm px-1 py-0.5 ${active ? "bg-foreground/12" : "bg-foreground/[0.04]"}`}
-      style={{ color: active ? color : undefined }}
+      className={`flex items-center justify-center gap-0.5 rounded-[3px] px-1 py-[3px] backdrop-blur-[1px] ${active ? "bg-white/22 ring-1 ring-white/30" : "bg-black/22"}`}
     >
-      <span className="opacity-65">{label}</span>{" "}
-      <span className="font-bold">
+      <span className="h-1 w-1 rounded-full" style={{ backgroundColor: dot }} />
+      <span className="text-white/75">{label}</span>
+      <span className="font-bold text-white">
         {value == null ? "—" : `${value}${suffix}`}
       </span>
     </span>
@@ -634,42 +644,44 @@ function averagePct(values: number[]): number | null {
 function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMetricKey): CSSProperties {
   const value = metric ? metricValue(metric, selectedMetric) : null;
   if (!metric || metric.T === 0 || value == null) {
-    return { backgroundColor: "oklch(0.24 0.018 250 / 0.4)", color: "oklch(0.6 0.018 250)" };
+    return { backgroundColor: "oklch(0.22 0.018 250 / 0.45)" };
   }
 
-  const bands = heatBands(value, selectedMetric);
+  const bg = heatBands(value, selectedMetric);
 
   return {
-    backgroundColor: bands[0],
-    color: bands[1],
-    opacity: metric.low_sample ? 0.55 : 1,
+    backgroundColor: bg,
+    opacity: metric.low_sample ? 0.6 : 1,
   };
 }
 
-function heatBands(value: number, selectedMetric: OccurrenceMetricKey): [string, string] {
+// Dark, saturated backgrounds engineered for white text on dark theme.
+// Lightness kept in 0.30-0.55 range so text-white remains AAA legible.
+function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
   if (selectedMetric === "T") {
-    if (value < 20) return ["oklch(0.28 0.02 250 / 0.5)", "oklch(0.72 0.018 250)"];
-    if (value < 100) return ["oklch(0.78 0.10 90 / 0.55)", "oklch(0.20 0.06 90)"];
-    if (value < 300) return ["oklch(0.78 0.10 250 / 0.55)", "oklch(0.20 0.06 250)"];
-    if (value < 1000) return ["oklch(0.68 0.16 250 / 0.65)", "oklch(0.15 0.08 250)"];
-    return ["oklch(0.62 0.20 250 / 0.85)", "oklch(0.12 0.10 250)"];
+    if (value < 20) return "oklch(0.28 0.022 250)";
+    if (value < 100) return "oklch(0.38 0.10 250)";
+    if (value < 300) return "oklch(0.44 0.14 250)";
+    if (value < 1000) return "oklch(0.50 0.18 250)";
+    return "oklch(0.56 0.22 250)";
   }
 
   if (selectedMetric === "false_pct") {
-    if (value < 10) return ["oklch(0.72 0.16 145 / 0.55)", "oklch(0.18 0.10 145)"];
-    if (value < 20) return ["oklch(0.78 0.14 145 / 0.40)", "oklch(0.22 0.10 145)"];
-    if (value < 30) return ["oklch(0.78 0.14 90 / 0.45)", "oklch(0.20 0.10 90)"];
-    if (value < 40) return ["oklch(0.72 0.16 50 / 0.55)", "oklch(0.18 0.12 50)"];
-    return ["oklch(0.62 0.20 25 / 0.65)", "oklch(0.14 0.12 25)"];
+    // false% inverted: low is good (green), high is bad (red)
+    if (value < 10) return "oklch(0.46 0.16 145)";
+    if (value < 20) return "oklch(0.50 0.14 110)";
+    if (value < 30) return "oklch(0.50 0.14 80)";
+    if (value < 40) return "oklch(0.48 0.16 45)";
+    return "oklch(0.46 0.18 25)";
   }
 
-  // bounce_pct / break_pct → 6-step gradient
-  if (value < 25) return ["oklch(0.62 0.20 25 / 0.55)", "oklch(0.16 0.12 25)"];
-  if (value < 35) return ["oklch(0.72 0.16 50 / 0.45)", "oklch(0.18 0.12 50)"];
-  if (value < 45) return ["oklch(0.78 0.14 90 / 0.40)", "oklch(0.20 0.10 90)"];
-  if (value < 55) return ["oklch(0.78 0.14 130 / 0.40)", "oklch(0.20 0.10 130)"];
-  if (value < 65) return ["oklch(0.72 0.18 145 / 0.50)", "oklch(0.16 0.12 145)"];
-  return ["oklch(0.65 0.22 145 / 0.70)", "oklch(0.12 0.14 145)"];
+  // bounce_pct / break_pct → red → orange → yellow → lime → green → emerald
+  if (value < 25) return "oklch(0.46 0.18 25)";
+  if (value < 35) return "oklch(0.48 0.16 45)";
+  if (value < 45) return "oklch(0.50 0.14 80)";
+  if (value < 55) return "oklch(0.50 0.14 110)";
+  if (value < 65) return "oklch(0.48 0.16 140)";
+  return "oklch(0.50 0.20 148)";
 }
 
 function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
@@ -698,49 +710,57 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
   const stops =
     selectedMetric === "T"
       ? [
-          { color: "oklch(0.28 0.02 250 / 0.5)", label: "< 20" },
-          { color: "oklch(0.78 0.10 90 / 0.55)", label: "20-99" },
-          { color: "oklch(0.78 0.10 250 / 0.55)", label: "100-299" },
-          { color: "oklch(0.68 0.16 250 / 0.65)", label: "300-999" },
-          { color: "oklch(0.62 0.20 250 / 0.85)", label: "≥ 1000" },
+          { color: "oklch(0.28 0.022 250)", label: "< 20" },
+          { color: "oklch(0.38 0.10 250)", label: "20-99" },
+          { color: "oklch(0.44 0.14 250)", label: "100-299" },
+          { color: "oklch(0.50 0.18 250)", label: "300-999" },
+          { color: "oklch(0.56 0.22 250)", label: "≥ 1000" },
         ]
       : selectedMetric === "false_pct"
         ? [
-            { color: "oklch(0.72 0.16 145 / 0.55)", label: "< 10%" },
-            { color: "oklch(0.78 0.14 145 / 0.40)", label: "10-19%" },
-            { color: "oklch(0.78 0.14 90 / 0.45)", label: "20-29%" },
-            { color: "oklch(0.72 0.16 50 / 0.55)", label: "30-39%" },
-            { color: "oklch(0.62 0.20 25 / 0.65)", label: "≥ 40%" },
+            { color: "oklch(0.46 0.16 145)", label: "< 10%" },
+            { color: "oklch(0.50 0.14 110)", label: "10-19%" },
+            { color: "oklch(0.50 0.14 80)", label: "20-29%" },
+            { color: "oklch(0.48 0.16 45)", label: "30-39%" },
+            { color: "oklch(0.46 0.18 25)", label: "≥ 40%" },
           ]
         : [
-            { color: "oklch(0.62 0.20 25 / 0.55)", label: "< 25%" },
-            { color: "oklch(0.72 0.16 50 / 0.45)", label: "25-34%" },
-            { color: "oklch(0.78 0.14 90 / 0.40)", label: "35-44%" },
-            { color: "oklch(0.78 0.14 130 / 0.40)", label: "45-54%" },
-            { color: "oklch(0.72 0.18 145 / 0.50)", label: "55-64%" },
-            { color: "oklch(0.65 0.22 145 / 0.70)", label: "≥ 65%" },
+            { color: "oklch(0.46 0.18 25)", label: "< 25%" },
+            { color: "oklch(0.48 0.16 45)", label: "25-34%" },
+            { color: "oklch(0.50 0.14 80)", label: "35-44%" },
+            { color: "oklch(0.50 0.14 110)", label: "45-54%" },
+            { color: "oklch(0.48 0.16 140)", label: "55-64%" },
+            { color: "oklch(0.50 0.20 148)", label: "≥ 65%" },
           ];
 
   return (
     <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/30 px-4 py-3 text-xs text-muted-foreground fade-in">
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">Legend · {metricLabel(selectedMetric)}</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/80">
+          Legend · {metricLabel(selectedMetric)}
+        </span>
         <div className="flex items-center gap-1">
           {stops.map((stop) => (
-            <div key={stop.label} className="flex items-center gap-1">
-              <div className="h-3 w-6 rounded" style={{ backgroundColor: stop.color }} />
-              <span className="text-[10px]">{stop.label}</span>
+            <div key={stop.label} className="flex items-center gap-1.5">
+              <div className="h-3.5 w-7 rounded shadow-inner shadow-black/30" style={{ backgroundColor: stop.color }} />
+              <span className="text-[10px] text-foreground/75">{stop.label}</span>
             </div>
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-3 text-[10px]">
+      <div className="flex items-center gap-4 text-[10px]">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded ring-1 ring-inset ring-[var(--warning)]" />
-          High-conviction cell
+          <span
+            className="inline-block h-3.5 w-3.5 rounded"
+            style={{
+              backgroundColor: "oklch(0.50 0.20 148)",
+              boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 6px oklch(0.82 0.16 90 / 0.4)",
+            }}
+          />
+          High-conviction (≥65%)
         </span>
         <span className="flex items-center gap-1.5 opacity-55">
-          <span className="inline-block h-3 w-3 rounded bg-foreground/30" />
+          <span className="inline-block h-3.5 w-3.5 rounded bg-foreground/25" />
           Low sample (n &lt; min)
         </span>
       </div>
