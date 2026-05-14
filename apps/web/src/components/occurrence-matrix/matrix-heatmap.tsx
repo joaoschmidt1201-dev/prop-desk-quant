@@ -4,9 +4,14 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Grid3X3, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
 import type { CSSProperties } from "react";
-import { api, type OccurrenceLeaderboardEntry, type OccurrenceMatrixPayload, type OccurrenceMetric } from "@/lib/api";
-import { fmtRelativeAge } from "@/lib/format";
-import { OccurrenceFilters } from "./filters";
+import {
+  api,
+  type OccurrenceCategory,
+  type OccurrenceLeaderboardEntry,
+  type OccurrenceMatrixPayload,
+  type OccurrenceMetric,
+} from "@/lib/api";
+import { OccurrenceFilters, type OccurrenceMetricKey } from "./filters";
 import { Leaderboards } from "./leaderboards";
 
 type DashboardProps = {
@@ -15,6 +20,8 @@ type DashboardProps = {
 
 type Summary = {
   avgBounce: number | null;
+  avgBreak: number | null;
+  avgFalse: number | null;
   events: number;
   lowSampleCells: number;
   best: OccurrenceLeaderboardEntry | null;
@@ -22,6 +29,7 @@ type Summary = {
 
 export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
   const [selectedTf, setSelectedTf] = useState(initialData?.tfs[0] ?? "D");
+  const [selectedMetric, setSelectedMetric] = useState<OccurrenceMetricKey>("bounce_pct");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedMas, setSelectedMas] = useState<string[]>(initialData?.mas ?? []);
 
@@ -51,6 +59,7 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
 
   const visibleMas = selectedMas.filter((ma) => data.mas.includes(ma));
   const categoryTickers = getCategoryTickers(data, selectedCategory);
+  const visibleCategories = getVisibleCategories(data, selectedCategory);
   const missingTfs = data.expected_tfs.filter((tf) => !data.tfs.includes(tf));
   const meanReversion = collectSetups(data, selectedTf, categoryTickers, visibleMas, "bounce_pct");
   const breakout = collectSetups(data, selectedTf, categoryTickers, visibleMas, "break_pct");
@@ -69,13 +78,15 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
       <Header data={data} isFetching={isFetching} onRefresh={() => refetch()} />
       {missingTfs.length > 0 && <SnapshotNotice loaded={data.tfs} missing={missingTfs} />}
-      <KpiBand summary={summary} selectedTf={selectedTf} oldestSnapshotAge={data.oldest_snapshot_age_seconds} />
+      <KpiBand summary={summary} selectedTf={selectedTf} />
       <div className="mt-5">
         <OccurrenceFilters
           tfs={data.tfs}
           expectedTfs={data.expected_tfs}
           selectedTf={selectedTf}
           onTfChange={setSelectedTf}
+          selectedMetric={selectedMetric}
+          onMetricChange={setSelectedMetric}
           categories={data.categories}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -86,7 +97,13 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
         />
       </div>
       <div className="mt-5">
-        <Heatmap data={data} selectedTf={selectedTf} tickers={categoryTickers} mas={visibleMas} />
+        <Heatmap
+          data={data}
+          selectedTf={selectedTf}
+          categories={visibleCategories}
+          mas={visibleMas}
+          selectedMetric={selectedMetric}
+        />
       </div>
       <div className="mt-5">
         <Leaderboards meanReversion={meanReversion} breakout={breakout} minSample={data.min_sample} />
@@ -149,24 +166,18 @@ function SnapshotNotice({ loaded, missing }: { loaded: string[]; missing: string
 function KpiBand({
   summary,
   selectedTf,
-  oldestSnapshotAge,
 }: {
   summary: Summary;
   selectedTf: string;
-  oldestSnapshotAge: number | null;
 }) {
   return (
     <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <KpiBlock label={`Avg Bounce% ${selectedTf}`} value={formatPct(summary.avgBounce)} sub="Sample-filtered cells" />
-      <KpiBlock label="Events analyzed" value={summary.events.toLocaleString("en-US")} sub="Visible heatmap scope" />
+      <KpiBlock label={`Avg Break% ${selectedTf}`} value={formatPct(summary.avgBreak)} sub="Sample-filtered cells" />
+      <KpiBlock label={`Avg False% ${selectedTf}`} value={formatPct(summary.avgFalse)} sub="Sample-filtered cells" />
       <KpiBlock
-        label="Best setup"
-        value={summary.best ? `${summary.best.ticker} ${summary.best.ma}` : "n/a"}
-        sub={summary.best ? `${summary.best.tf} | ${formatPct(summary.best.bounce_pct)} | n=${summary.best.total}` : "No setup above threshold"}
-      />
-      <KpiBlock
-        label="Oldest snapshot"
-        value={fmtRelativeAge(oldestSnapshotAge)}
+        label="Events analyzed"
+        value={summary.events.toLocaleString("en-US")}
         sub={`${summary.lowSampleCells} low-sample cells`}
       />
     </section>
@@ -186,30 +197,71 @@ function KpiBlock({ label, value, sub }: { label: string; value: string; sub: st
 function Heatmap({
   data,
   selectedTf,
-  tickers,
+  categories,
   mas,
+  selectedMetric,
 }: {
   data: OccurrenceMatrixPayload;
   selectedTf: string;
-  tickers: string[];
+  categories: OccurrenceCategory[];
   mas: string[];
+  selectedMetric: OccurrenceMetricKey;
 }) {
+  const tickerCount = categories.reduce((sum, category) => sum + category.tickers.length, 0);
+
   return (
-    <section className="overflow-hidden rounded-lg border border-border/60 bg-card/35">
+    <section className="rounded-lg border border-border/60 bg-card/35">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-5 py-4">
         <div>
           <h2 className="text-sm font-semibold tracking-tight">Heatmap</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Cell color follows Bounce%; low-confidence cells keep the value at reduced opacity.
+            Every cell shows Bounce%, Break%, False% and total events. Heat color follows the selected metric.
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-[#f3c969]" />
-          {selectedTf} | {mas.length} MAs | {tickers.length} tickers
+          {selectedTf} | {metricLabel(selectedMetric)} | {mas.length} MAs | {tickerCount} tickers
         </div>
       </div>
+      <div className="space-y-5 p-4">
+        {categories.map((category) => (
+          <CategoryHeatmap
+            key={category.name}
+            data={data}
+            selectedTf={selectedTf}
+            category={category}
+            mas={mas}
+            selectedMetric={selectedMetric}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CategoryHeatmap({
+  data,
+  selectedTf,
+  category,
+  mas,
+  selectedMetric,
+}: {
+  data: OccurrenceMatrixPayload;
+  selectedTf: string;
+  category: OccurrenceCategory;
+  mas: string[];
+  selectedMetric: OccurrenceMetricKey;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/45 bg-background/20">
+      <div className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3">
+        <h3 className="text-sm font-semibold">{displayCategoryName(category.name)}</h3>
+        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          {category.tickers.length} tickers
+        </span>
+      </div>
       <div className="overflow-auto">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+        <table className="w-full min-w-[880px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-background/35">
               <th className="sticky left-0 z-10 w-[120px] bg-background/95 px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -218,7 +270,7 @@ function Heatmap({
               {mas.map((ma) => (
                 <th
                   key={ma}
-                  className="min-w-[118px] px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  className="min-w-[150px] px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
                 >
                   {ma}
                 </th>
@@ -226,28 +278,38 @@ function Heatmap({
             </tr>
           </thead>
           <tbody>
-            {tickers.map((ticker) => (
+            {category.tickers.map((ticker) => (
               <tr key={ticker} className="border-b border-border/35 last:border-b-0">
                 <td className="sticky left-0 z-10 bg-background/95 px-3 py-2.5 text-sm font-semibold text-foreground">
                   {ticker}
                 </td>
                 {mas.map((ma) => (
-                  <HeatCell key={`${ticker}-${ma}`} metric={data.data[ticker]?.[selectedTf]?.[ma] ?? null} />
+                  <HeatCell
+                    key={`${ticker}-${ma}`}
+                    metric={data.data[ticker]?.[selectedTf]?.[ma] ?? null}
+                    selectedMetric={selectedMetric}
+                  />
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
   );
 }
 
-function HeatCell({ metric }: { metric: OccurrenceMetric | null }) {
-  const style = heatStyle(metric);
+function HeatCell({
+  metric,
+  selectedMetric,
+}: {
+  metric: OccurrenceMetric | null;
+  selectedMetric: OccurrenceMetricKey;
+}) {
+  const style = heatStyle(metric, selectedMetric);
   if (!metric || metric.T === 0) {
     return (
-      <td className="h-[58px] min-w-[118px] border-l border-border/30 px-2 py-2 text-center" style={style}>
+      <td className="h-[82px] min-w-[150px] border-l border-border/30 px-2 py-2 text-center" style={style}>
         <span className="text-[11px] font-semibold">No data</span>
       </td>
     );
@@ -266,19 +328,67 @@ function HeatCell({ metric }: { metric: OccurrenceMetric | null }) {
 
   return (
     <td
-      className="h-[58px] min-w-[118px] border-l border-border/30 px-2 py-2 text-center transition hover:brightness-105"
+      className="h-[82px] min-w-[150px] border-l border-border/30 px-2 py-2 text-center transition hover:brightness-105"
       style={style}
       title={tooltip}
     >
-      <div className="text-base font-bold tabular">{formatPct(metric.bounce_pct)}</div>
-      <div className="mt-0.5 text-[10px] font-semibold opacity-80">n={metric.T}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">
+        {metricLabel(selectedMetric)}
+      </div>
+      <div className="text-base font-bold tabular">{formatMetric(metric, selectedMetric)}</div>
+      <div className="mt-1 grid grid-cols-4 gap-1 text-[10px] font-semibold tabular">
+        <MiniMetric label="B" value={formatPct(metric.bounce_pct)} tone="gain" />
+        <MiniMetric label="Bk" value={formatPct(metric.break_pct)} tone="break" />
+        <MiniMetric label="F" value={formatPct(metric.false_pct)} tone="false" />
+        <MiniMetric label="n" value={String(metric.T)} tone="neutral" />
+      </div>
     </td>
+  );
+}
+
+function MiniMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "gain" | "break" | "false" | "neutral";
+}) {
+  const toneClass =
+    tone === "gain"
+      ? "bg-emerald-950/10 text-[#143008]"
+      : tone === "break"
+        ? "bg-sky-950/10 text-[#123355]"
+        : tone === "false"
+          ? "bg-rose-950/10 text-[#5f1717]"
+          : "bg-slate-950/10 text-[#2f3a4f]";
+  return (
+    <span className={`rounded px-1 py-0.5 ${toneClass}`}>
+      {label} {value}
+    </span>
   );
 }
 
 function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategory: string): string[] {
   if (selectedCategory === "All") return data.tickers;
   return data.categories.find((category) => category.name === selectedCategory)?.tickers ?? data.tickers;
+}
+
+function getVisibleCategories(data: OccurrenceMatrixPayload, selectedCategory: string): OccurrenceCategory[] {
+  if (selectedCategory === "All") return data.categories;
+  const category = data.categories.find((item) => item.name === selectedCategory);
+  return category ? [category] : data.categories;
+}
+
+function displayCategoryName(name: string): string {
+  const labels: Record<string, string> = {
+    "Indices/Futures": "Major Indices / Futures",
+    FX: "Forex",
+    "QQQ Top 10": "Stocks",
+    "Commodities/ETFs": "Commodities / ETFs",
+  };
+  return labels[name] ?? name;
 }
 
 function collectSetups(
@@ -322,6 +432,8 @@ function summarize(
   meanReversion: OccurrenceLeaderboardEntry[],
 ): Summary {
   const bounceValues: number[] = [];
+  const breakValues: number[] = [];
+  const falseValues: number[] = [];
   let events = 0;
   let lowSampleCells = 0;
 
@@ -334,40 +446,85 @@ function summarize(
       if (metric.T >= data.min_sample && metric.bounce_pct != null) {
         bounceValues.push(metric.bounce_pct);
       }
+      if (metric.T >= data.min_sample && metric.break_pct != null) {
+        breakValues.push(metric.break_pct);
+      }
+      if (metric.T >= data.min_sample && metric.false_pct != null) {
+        falseValues.push(metric.false_pct);
+      }
     }
   }
 
   return {
-    avgBounce: bounceValues.length ? Math.round(bounceValues.reduce((sum, value) => sum + value, 0) / bounceValues.length) : null,
+    avgBounce: averagePct(bounceValues),
+    avgBreak: averagePct(breakValues),
+    avgFalse: averagePct(falseValues),
     events,
     lowSampleCells,
     best: meanReversion[0] ?? null,
   };
 }
 
-function heatStyle(metric: OccurrenceMetric | null): CSSProperties {
-  if (!metric || metric.T === 0 || metric.bounce_pct == null) {
+function averagePct(values: number[]): number | null {
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+}
+
+function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMetricKey): CSSProperties {
+  const value = metric ? metricValue(metric, selectedMetric) : null;
+  if (!metric || metric.T === 0 || value == null) {
     return { backgroundColor: "#f0f0f0", color: "#9aa0a6" };
   }
 
-  const bands =
-    metric.bounce_pct < 25
-      ? ["#fde2e2", "#7a1f1f"]
-      : metric.bounce_pct < 35
-        ? ["#fdedd2", "#6e4d18"]
-        : metric.bounce_pct < 45
-          ? ["#fff8d6", "#5d5418"]
-          : metric.bounce_pct < 55
-            ? ["#e1f1d6", "#345417"]
-            : metric.bounce_pct < 65
-              ? ["#bfe5b0", "#1f4012"]
-              : ["#94d27a", "#143008"];
+  const bands = heatBands(value, selectedMetric);
 
   return {
     backgroundColor: bands[0],
     color: bands[1],
     opacity: metric.low_sample ? 0.55 : 1,
   };
+}
+
+function heatBands(value: number, selectedMetric: OccurrenceMetricKey): [string, string] {
+  if (selectedMetric === "T") {
+    if (value < 20) return ["#f0f0f0", "#9aa0a6"];
+    if (value < 100) return ["#fff8d6", "#5d5418"];
+    if (value < 300) return ["#d8ecff", "#123355"];
+    if (value < 1000) return ["#b7d7ff", "#0f315d"];
+    return ["#88bfff", "#082649"];
+  }
+
+  if (selectedMetric === "false_pct") {
+    if (value < 10) return ["#94d27a", "#143008"];
+    if (value < 20) return ["#bfe5b0", "#1f4012"];
+    if (value < 30) return ["#fff8d6", "#5d5418"];
+    if (value < 40) return ["#fdedd2", "#6e4d18"];
+    return ["#fde2e2", "#7a1f1f"];
+  }
+
+  if (value < 25) return ["#fde2e2", "#7a1f1f"];
+  if (value < 35) return ["#fdedd2", "#6e4d18"];
+  if (value < 45) return ["#fff8d6", "#5d5418"];
+  if (value < 55) return ["#e1f1d6", "#345417"];
+  if (value < 65) return ["#bfe5b0", "#1f4012"];
+  return ["#94d27a", "#143008"];
+}
+
+function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
+  if (selectedMetric === "T") return metric.T;
+  return metric[selectedMetric];
+}
+
+function formatMetric(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): string {
+  const value = metricValue(metric, selectedMetric);
+  if (value == null) return "n/a";
+  return selectedMetric === "T" ? value.toLocaleString("en-US") : `${value}%`;
+}
+
+function metricLabel(selectedMetric: OccurrenceMetricKey): string {
+  if (selectedMetric === "bounce_pct") return "Bounce%";
+  if (selectedMetric === "break_pct") return "Break%";
+  if (selectedMetric === "false_pct") return "False%";
+  return "Events";
 }
 
 function formatPct(value: number | null): string {

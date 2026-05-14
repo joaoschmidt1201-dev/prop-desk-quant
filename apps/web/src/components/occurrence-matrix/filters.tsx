@@ -4,11 +4,22 @@ import { SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import type { OccurrenceCategory } from "@/lib/api";
 
+export type OccurrenceMetricKey = "bounce_pct" | "break_pct" | "false_pct" | "T";
+
+const METRIC_OPTIONS: Array<{ key: OccurrenceMetricKey; label: string }> = [
+  { key: "bounce_pct", label: "Bounce%" },
+  { key: "break_pct", label: "Break%" },
+  { key: "false_pct", label: "False%" },
+  { key: "T", label: "Events" },
+];
+
 type FiltersProps = {
   tfs: string[];
   expectedTfs: string[];
   selectedTf: string;
   onTfChange: (tf: string) => void;
+  selectedMetric: OccurrenceMetricKey;
+  onMetricChange: (metric: OccurrenceMetricKey) => void;
   categories: OccurrenceCategory[];
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
@@ -23,6 +34,8 @@ export function OccurrenceFilters({
   expectedTfs,
   selectedTf,
   onTfChange,
+  selectedMetric,
+  onMetricChange,
   categories,
   selectedCategory,
   onCategoryChange,
@@ -37,7 +50,7 @@ export function OccurrenceFilters({
         <SlidersHorizontal className="h-3.5 w-3.5" />
         Filters
       </div>
-      <div className="grid gap-4 xl:grid-cols-[1.1fr_1.6fr_1.3fr]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1.5fr_1.3fr]">
         <ChipGroup label="Timeframe">
           {expectedTfs.map((tf) => {
             const loaded = tfs.includes(tf);
@@ -55,6 +68,20 @@ export function OccurrenceFilters({
               </button>
             );
           })}
+        </ChipGroup>
+
+        <ChipGroup label="Heat color">
+          {METRIC_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={selectedMetric === option.key}
+              onClick={() => onMetricChange(option.key)}
+              className={chipClass(selectedMetric === option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
         </ChipGroup>
 
         <ChipGroup label="Category">
