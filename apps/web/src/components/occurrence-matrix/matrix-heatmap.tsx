@@ -2,8 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Grid3X3, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
-import type { CSSProperties } from "react";
+import {
+  Activity,
+  AlertCircle,
+  ArrowUpRight,
+  Database,
+  Flame,
+  Grid3X3,
+  Layers,
+  RefreshCw,
+  ShieldAlert,
+  Sparkles,
+  Target,
+  Zap,
+} from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   api,
   type OccurrenceCategory,
@@ -75,11 +88,11 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
+    <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
       <Header data={data} isFetching={isFetching} onRefresh={() => refetch()} />
       {missingTfs.length > 0 && <SnapshotNotice loaded={data.tfs} missing={missingTfs} />}
       <KpiBand summary={summary} selectedTf={selectedTf} />
-      <div className="mt-5">
+      <div className="mt-6 fade-in">
         <OccurrenceFilters
           tfs={data.tfs}
           expectedTfs={data.expected_tfs}
@@ -96,7 +109,7 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           onAllMas={() => setSelectedMas(data.mas)}
         />
       </div>
-      <div className="mt-5">
+      <div className="mt-6 fade-in">
         <Heatmap
           data={data}
           selectedTf={selectedTf}
@@ -105,9 +118,10 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           selectedMetric={selectedMetric}
         />
       </div>
-      <div className="mt-5">
+      <div className="mt-6 fade-in">
         <Leaderboards meanReversion={meanReversion} breakout={breakout} minSample={data.min_sample} />
       </div>
+      <Legend selectedMetric={selectedMetric} />
     </main>
   );
 }
@@ -121,47 +135,83 @@ function Header({
   isFetching: boolean;
   onRefresh: () => void;
 }) {
+  const oldestAge = data.oldest_snapshot_age_seconds ?? 0;
+  const isFresh = oldestAge < 60 * 60 * 24; // < 24h
+  const isStale = oldestAge > 60 * 60 * 24 * 7; // > 7d
+
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <div className="mb-2 inline-flex items-center gap-2 rounded-md border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-primary">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-primary backdrop-blur-sm">
           <Grid3X3 className="h-3.5 w-3.5" />
           Occurrence Matrix
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">MMA Occurrence Matrix</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Bounce, break and false-touch statistics by ticker, timeframe and moving average.
+        <h1 className="text-3xl font-semibold tracking-tight">
+          MMA{" "}
+          <span className="bg-gradient-to-r from-primary via-chart-2 to-accent bg-clip-text text-transparent">
+            Occurrence Matrix
+          </span>
+        </h1>
+        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
+          Bounce, break and false-touch statistics by ticker, timeframe and moving average — calibrated tolerances per (TF, MA).
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <div className="rounded-md border border-border/55 bg-card/35 px-3 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Snapshot</div>
-          <div className="mt-0.5 text-sm font-semibold tabular">{data.latest_snapshot_date ?? "n/a"}</div>
+        <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/45 px-4 py-2.5 shadow-lg shadow-black/5 backdrop-blur-sm">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <Database className="h-4 w-4" />
+          </div>
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Snapshot
+              {isFresh && <StatusDot tone="gain" label="Fresh" />}
+              {isStale && <StatusDot tone="warning" label="Stale" />}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular">{data.latest_snapshot_date ?? "n/a"}</div>
+          </div>
         </div>
         <button
           type="button"
           onClick={onRefresh}
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-border/55 bg-card/45 px-3 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:bg-card/70 hover:text-foreground"
+          disabled={isFetching}
+          className="inline-flex h-11 items-center gap-2 rounded-xl border border-border/55 bg-card/45 px-4 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-foreground active:scale-95 disabled:cursor-wait disabled:opacity-60"
         >
           <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
+          {isFetching ? "Refreshing…" : "Refresh"}
         </button>
       </div>
     </div>
   );
 }
 
+function StatusDot({ tone, label }: { tone: "gain" | "warning"; label: string }) {
+  const color = tone === "gain" ? "var(--gain)" : "var(--warning)";
+  return (
+    <span className="inline-flex items-center gap-1 normal-case tracking-normal">
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: color }} />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+      </span>
+      <span className="text-[9px] font-semibold" style={{ color }}>
+        {label}
+      </span>
+    </span>
+  );
+}
+
 function SnapshotNotice({ loaded, missing }: { loaded: string[]; missing: string[] }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-warning/35 bg-warning/10 px-4 py-3 text-sm">
-      <ShieldAlert className="h-4 w-4 text-[var(--warning)]" />
+    <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/8 px-4 py-3 text-sm">
+      <ShieldAlert className="h-4 w-4 shrink-0 text-[var(--warning)]" />
       <span className="text-foreground/85">
-        Loaded TFs: <strong>{loaded.join(", ") || "none"}</strong>. Missing snapshots:{" "}
-        <strong>{missing.join(", ")}</strong>.
+        Loaded TFs: <strong className="font-semibold">{loaded.join(", ") || "none"}</strong>. Missing snapshots:{" "}
+        <strong className="font-semibold text-[var(--warning)]">{missing.join(", ")}</strong>.
       </span>
     </div>
   );
 }
+
+type KpiTone = "gain" | "loss" | "warning" | "neutral";
 
 function KpiBand({
   summary,
@@ -172,24 +222,78 @@ function KpiBand({
 }) {
   return (
     <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <KpiBlock label={`Avg Bounce% ${selectedTf}`} value={formatPct(summary.avgBounce)} sub="Sample-filtered cells" />
-      <KpiBlock label={`Avg Break% ${selectedTf}`} value={formatPct(summary.avgBreak)} sub="Sample-filtered cells" />
-      <KpiBlock label={`Avg False% ${selectedTf}`} value={formatPct(summary.avgFalse)} sub="Sample-filtered cells" />
       <KpiBlock
-        label="Events analyzed"
+        icon={<Target className="h-4 w-4" />}
+        label={`Avg Bounce% · ${selectedTf}`}
+        value={formatPct(summary.avgBounce)}
+        sub="Mean-reversion strength"
+        tone="gain"
+      />
+      <KpiBlock
+        icon={<Zap className="h-4 w-4" />}
+        label={`Avg Break% · ${selectedTf}`}
+        value={formatPct(summary.avgBreak)}
+        sub="Trend continuation"
+        tone="loss"
+      />
+      <KpiBlock
+        icon={<AlertCircle className="h-4 w-4" />}
+        label={`Avg False% · ${selectedTf}`}
+        value={formatPct(summary.avgFalse)}
+        sub="Whipsaw rate"
+        tone="warning"
+      />
+      <KpiBlock
+        icon={<Activity className="h-4 w-4" />}
+        label="Events Analyzed"
         value={summary.events.toLocaleString("en-US")}
         sub={`${summary.lowSampleCells} low-sample cells`}
+        tone="neutral"
       />
     </section>
   );
 }
 
-function KpiBlock({ label, value, sub }: { label: string; value: string; sub: string }) {
+function KpiBlock({
+  icon,
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  tone: KpiTone;
+}) {
+  const accent =
+    tone === "gain"
+      ? { from: "oklch(0.32 0.12 145 / 0.55)", to: "oklch(0.22 0.04 250 / 0.45)", icon: "var(--gain)", text: "var(--gain)" }
+      : tone === "loss"
+        ? { from: "oklch(0.32 0.14 25 / 0.55)", to: "oklch(0.22 0.04 250 / 0.45)", icon: "var(--loss)", text: "var(--loss)" }
+        : tone === "warning"
+          ? { from: "oklch(0.32 0.12 90 / 0.55)", to: "oklch(0.22 0.04 250 / 0.45)", icon: "var(--warning)", text: "var(--warning)" }
+          : { from: "oklch(0.28 0.06 250 / 0.65)", to: "oklch(0.20 0.02 250 / 0.45)", icon: "var(--primary)", text: "oklch(0.96 0.01 250)" };
+
   return (
-    <div className="rounded-lg border border-border/60 bg-gradient-to-br from-[#0d1f3c] to-[#1c3461] p-4 text-white shadow-xl shadow-black/10">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c9d4ec]">{label}</div>
-      <div className="mt-2 truncate text-2xl font-semibold tabular text-[#f3c969]">{value}</div>
-      <div className="mt-1 truncate text-[11px] text-[#c9d4ec]">{sub}</div>
+    <div
+      className="group relative overflow-hidden rounded-xl border border-border/55 p-4 shadow-lg shadow-black/10 transition hover:border-border/80 hover:shadow-xl hover:shadow-black/20"
+      style={{
+        background: `linear-gradient(135deg, ${accent.from} 0%, ${accent.to} 100%)`,
+      }}
+    >
+      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl transition group-hover:opacity-30" style={{ backgroundColor: accent.icon }} />
+      <div className="relative flex items-start justify-between gap-2">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/70">{label}</div>
+        <div className="rounded-md bg-background/30 p-1.5 backdrop-blur-sm" style={{ color: accent.icon }}>
+          {icon}
+        </div>
+      </div>
+      <div className="relative mt-3 text-3xl font-bold tabular tracking-tight" style={{ color: accent.text }}>
+        {value}
+      </div>
+      <div className="relative mt-1 text-[11px] text-foreground/65">{sub}</div>
     </div>
   );
 }
@@ -210,17 +314,28 @@ function Heatmap({
   const tickerCount = categories.reduce((sum, category) => sum + category.tickers.length, 0);
 
   return (
-    <section className="rounded-lg border border-border/60 bg-card/35">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-5 py-4">
-        <div>
-          <h2 className="text-sm font-semibold tracking-tight">Heatmap</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Every cell shows Bounce%, Break%, False% and total events. Column headers show the tolerance zone used.
-          </p>
+    <section className="overflow-hidden rounded-xl border border-border/60 bg-card/35 shadow-xl shadow-black/10 backdrop-blur-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-gradient-to-r from-card/60 to-card/30 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <Flame className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">Heatmap</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Each cell shows the selected metric, with B/Bk/F sub-bars. Column headers display the (TF, MA) tolerance.
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-[#f3c969]" />
-          {selectedTf} | {metricLabel(selectedMetric)} | {mas.length} MAs | {tickerCount} tickers
+        <div className="flex items-center gap-2 rounded-md border border-border/40 bg-background/30 px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <Sparkles className="h-3.5 w-3.5 text-[var(--warning)]" />
+          <span className="font-semibold text-foreground/85">{selectedTf}</span>
+          <Separator />
+          <span>{metricLabel(selectedMetric)}</span>
+          <Separator />
+          <span>{mas.length} MAs</span>
+          <Separator />
+          <span>{tickerCount} tickers</span>
         </div>
       </div>
       <div className="space-y-5 p-4">
@@ -239,6 +354,10 @@ function Heatmap({
   );
 }
 
+function Separator() {
+  return <span className="text-border/60">·</span>;
+}
+
 function CategoryHeatmap({
   data,
   selectedTf,
@@ -253,29 +372,27 @@ function CategoryHeatmap({
   selectedMetric: OccurrenceMetricKey;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border/45 bg-background/20">
-      <div className="flex items-center justify-between gap-3 border-b border-border/40 px-4 py-3">
-        <h3 className="text-sm font-semibold">{displayCategoryName(category.name)}</h3>
-        <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+    <div className="overflow-hidden rounded-lg border border-border/40 bg-background/15">
+      <div className="flex items-center justify-between gap-3 border-b border-border/35 bg-card/20 px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <Layers className="h-3.5 w-3.5 text-muted-foreground/75" />
+          <h3 className="text-sm font-semibold">{displayCategoryName(category.name)}</h3>
+        </div>
+        <span className="rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
           {category.tickers.length} tickers
         </span>
       </div>
       <div className="overflow-auto">
-        <table className="w-full min-w-[880px] border-collapse text-sm">
+        <table className="w-full min-w-[920px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border/50 bg-background/35">
-              <th className="sticky left-0 z-10 w-[120px] bg-background/95 px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <tr className="border-b border-border/40 bg-background/35">
+              <th className="sticky left-0 z-10 w-[110px] bg-background/95 px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
                 Ticker
               </th>
               {mas.map((ma) => (
-                <th
-                  key={ma}
-                  className="min-w-[150px] px-3 py-3 text-center"
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    {ma}
-                  </div>
-                  <div className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#f3c969]">
+                <th key={ma} className="min-w-[152px] px-2 py-3 text-center">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/85">{ma}</div>
+                  <div className="mt-1 inline-block rounded-full bg-background/35 px-2 py-0.5 text-[9.5px] font-medium normal-case tracking-normal text-[var(--warning)]">
                     {toleranceLabel(data, selectedTf, ma)}
                   </div>
                 </th>
@@ -283,10 +400,16 @@ function CategoryHeatmap({
             </tr>
           </thead>
           <tbody>
-            {category.tickers.map((ticker) => (
-              <tr key={ticker} className="border-b border-border/35 last:border-b-0">
-                <td className="sticky left-0 z-10 bg-background/95 px-3 py-2.5 text-sm font-semibold text-foreground">
-                  {ticker}
+            {category.tickers.map((ticker, rowIdx) => (
+              <tr
+                key={ticker}
+                className="group/row border-b border-border/30 last:border-b-0 transition hover:bg-primary/[0.04]"
+              >
+                <td className="sticky left-0 z-10 bg-background/95 px-3 py-2 text-sm font-semibold text-foreground backdrop-blur-sm transition group-hover/row:text-primary">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-normal text-muted-foreground/60 tabular">{String(rowIdx + 1).padStart(2, "0")}</span>
+                    <span>{ticker}</span>
+                  </div>
                 </td>
                 {mas.map((ma) => (
                   <HeatCell
@@ -314,65 +437,91 @@ function HeatCell({
   const style = heatStyle(metric, selectedMetric);
   if (!metric || metric.T === 0) {
     return (
-      <td className="h-[82px] min-w-[150px] border-l border-border/30 px-2 py-2 text-center" style={style}>
-        <span className="text-[11px] font-semibold">No data</span>
+      <td className="h-[88px] min-w-[152px] border-l border-border/25 px-2 py-2 text-center" style={style}>
+        <span className="text-[11px] font-medium opacity-60">—</span>
       </td>
     );
   }
 
   const tooltip = [
-    `T=${metric.T}`,
-    `B=${metric.B}`,
-    `Bk=${metric.Bk}`,
-    `F=${metric.F}`,
-    `Bounce=${formatPct(metric.bounce_pct)}`,
-    `Break=${formatPct(metric.break_pct)}`,
-    `False=${formatPct(metric.false_pct)}`,
-    `Tolerance=${metric.tolerance_pct == null ? "n/a" : `+/-${metric.tolerance_pct}%`}`,
-  ].join(" | ");
+    `Total events: ${metric.T}`,
+    `Bounce: ${metric.B} (${formatPct(metric.bounce_pct)})`,
+    `Break:  ${metric.Bk} (${formatPct(metric.break_pct)})`,
+    `False:  ${metric.F} (${formatPct(metric.false_pct)})`,
+    `Tolerance: ${metric.tolerance_pct == null ? "n/a" : `±${metric.tolerance_pct}%`}`,
+    metric.low_sample ? "[low sample]" : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const isHighlight = isHighlightValue(metric, selectedMetric);
 
   return (
     <td
-      className="h-[82px] min-w-[150px] border-l border-border/30 px-2 py-2 text-center transition hover:brightness-105"
-      style={style}
+      className={`group/cell relative h-[88px] min-w-[152px] cursor-help border-l border-border/25 px-2 py-2 text-center transition-all duration-150 hover:z-10 hover:scale-[1.02] hover:shadow-md ${isHighlight ? "ring-1 ring-inset" : ""}`}
+      style={isHighlight ? { ...style, boxShadow: "inset 0 0 0 1px var(--warning)" } : style}
       title={tooltip}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-75">
+      <div className="text-[9.5px] font-semibold uppercase tracking-[0.16em] opacity-65">
         {metricLabel(selectedMetric)}
       </div>
-      <div className="text-base font-bold tabular">{formatMetric(metric, selectedMetric)}</div>
-      <div className="mt-1 grid grid-cols-4 gap-1 text-[10px] font-semibold tabular">
-        <MiniMetric label="B" value={formatPct(metric.bounce_pct)} tone="gain" />
-        <MiniMetric label="Bk" value={formatPct(metric.break_pct)} tone="break" />
-        <MiniMetric label="F" value={formatPct(metric.false_pct)} tone="false" />
-        <MiniMetric label="n" value={String(metric.T)} tone="neutral" />
-      </div>
+      <div className="text-[18px] font-bold leading-tight tabular">{formatMetric(metric, selectedMetric)}</div>
+      <SubMetrics metric={metric} selectedMetric={selectedMetric} />
     </td>
   );
 }
 
-function MiniMetric({
+function SubMetrics({ metric, selectedMetric }: { metric: OccurrenceMetric; selectedMetric: OccurrenceMetricKey }) {
+  return (
+    <div className="mt-1.5 grid grid-cols-4 gap-0.5 text-[9.5px] font-semibold tabular">
+      <SubMetric label="B" value={metric.bounce_pct} suffix="%" active={selectedMetric === "bounce_pct"} tone="gain" />
+      <SubMetric label="Bk" value={metric.break_pct} suffix="%" active={selectedMetric === "break_pct"} tone="loss" />
+      <SubMetric label="F" value={metric.false_pct} suffix="%" active={selectedMetric === "false_pct"} tone="warning" />
+      <SubMetric label="n" value={metric.T} suffix="" active={selectedMetric === "T"} tone="neutral" />
+    </div>
+  );
+}
+
+function SubMetric({
   label,
   value,
+  suffix,
+  active,
   tone,
 }: {
   label: string;
-  value: string;
-  tone: "gain" | "break" | "false" | "neutral";
+  value: number | null;
+  suffix: string;
+  active: boolean;
+  tone: "gain" | "loss" | "warning" | "neutral";
 }) {
-  const toneClass =
+  const color =
     tone === "gain"
-      ? "bg-emerald-950/10 text-[#143008]"
-      : tone === "break"
-        ? "bg-sky-950/10 text-[#123355]"
-        : tone === "false"
-          ? "bg-rose-950/10 text-[#5f1717]"
-          : "bg-slate-950/10 text-[#2f3a4f]";
+      ? "var(--gain)"
+      : tone === "loss"
+        ? "var(--loss)"
+        : tone === "warning"
+          ? "var(--warning)"
+          : "currentColor";
+
   return (
-    <span className={`rounded px-1 py-0.5 ${toneClass}`}>
-      {label} {value}
+    <span
+      className={`rounded-sm px-1 py-0.5 ${active ? "bg-foreground/12" : "bg-foreground/[0.04]"}`}
+      style={{ color: active ? color : undefined }}
+    >
+      <span className="opacity-65">{label}</span>{" "}
+      <span className="font-bold">
+        {value == null ? "—" : `${value}${suffix}`}
+      </span>
     </span>
   );
+}
+
+function isHighlightValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): boolean {
+  if (metric.low_sample) return false;
+  if (selectedMetric === "bounce_pct") return (metric.bounce_pct ?? 0) >= 65;
+  if (selectedMetric === "break_pct") return (metric.break_pct ?? 0) >= 55;
+  return false;
 }
 
 function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategory: string): string[] {
@@ -400,8 +549,8 @@ function toleranceLabel(data: OccurrenceMatrixPayload, tf: string, ma: string): 
   const maIndex = data.mas.indexOf(ma);
   const tolerance = maIndex >= 0 ? data.tolerances[tf]?.[maIndex] : null;
   if (tolerance == null) return "tol n/a";
-  if (tolerance === 0) return "tol skip";
-  return `tol +/-${tolerance}%`;
+  if (tolerance === 0) return "skip";
+  return `±${tolerance}%`;
 }
 
 function collectSetups(
@@ -485,7 +634,7 @@ function averagePct(values: number[]): number | null {
 function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMetricKey): CSSProperties {
   const value = metric ? metricValue(metric, selectedMetric) : null;
   if (!metric || metric.T === 0 || value == null) {
-    return { backgroundColor: "#f0f0f0", color: "#9aa0a6" };
+    return { backgroundColor: "oklch(0.24 0.018 250 / 0.4)", color: "oklch(0.6 0.018 250)" };
   }
 
   const bands = heatBands(value, selectedMetric);
@@ -499,27 +648,28 @@ function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMe
 
 function heatBands(value: number, selectedMetric: OccurrenceMetricKey): [string, string] {
   if (selectedMetric === "T") {
-    if (value < 20) return ["#f0f0f0", "#9aa0a6"];
-    if (value < 100) return ["#fff8d6", "#5d5418"];
-    if (value < 300) return ["#d8ecff", "#123355"];
-    if (value < 1000) return ["#b7d7ff", "#0f315d"];
-    return ["#88bfff", "#082649"];
+    if (value < 20) return ["oklch(0.28 0.02 250 / 0.5)", "oklch(0.72 0.018 250)"];
+    if (value < 100) return ["oklch(0.78 0.10 90 / 0.55)", "oklch(0.20 0.06 90)"];
+    if (value < 300) return ["oklch(0.78 0.10 250 / 0.55)", "oklch(0.20 0.06 250)"];
+    if (value < 1000) return ["oklch(0.68 0.16 250 / 0.65)", "oklch(0.15 0.08 250)"];
+    return ["oklch(0.62 0.20 250 / 0.85)", "oklch(0.12 0.10 250)"];
   }
 
   if (selectedMetric === "false_pct") {
-    if (value < 10) return ["#94d27a", "#143008"];
-    if (value < 20) return ["#bfe5b0", "#1f4012"];
-    if (value < 30) return ["#fff8d6", "#5d5418"];
-    if (value < 40) return ["#fdedd2", "#6e4d18"];
-    return ["#fde2e2", "#7a1f1f"];
+    if (value < 10) return ["oklch(0.72 0.16 145 / 0.55)", "oklch(0.18 0.10 145)"];
+    if (value < 20) return ["oklch(0.78 0.14 145 / 0.40)", "oklch(0.22 0.10 145)"];
+    if (value < 30) return ["oklch(0.78 0.14 90 / 0.45)", "oklch(0.20 0.10 90)"];
+    if (value < 40) return ["oklch(0.72 0.16 50 / 0.55)", "oklch(0.18 0.12 50)"];
+    return ["oklch(0.62 0.20 25 / 0.65)", "oklch(0.14 0.12 25)"];
   }
 
-  if (value < 25) return ["#fde2e2", "#7a1f1f"];
-  if (value < 35) return ["#fdedd2", "#6e4d18"];
-  if (value < 45) return ["#fff8d6", "#5d5418"];
-  if (value < 55) return ["#e1f1d6", "#345417"];
-  if (value < 65) return ["#bfe5b0", "#1f4012"];
-  return ["#94d27a", "#143008"];
+  // bounce_pct / break_pct → 6-step gradient
+  if (value < 25) return ["oklch(0.62 0.20 25 / 0.55)", "oklch(0.16 0.12 25)"];
+  if (value < 35) return ["oklch(0.72 0.16 50 / 0.45)", "oklch(0.18 0.12 50)"];
+  if (value < 45) return ["oklch(0.78 0.14 90 / 0.40)", "oklch(0.20 0.10 90)"];
+  if (value < 55) return ["oklch(0.78 0.14 130 / 0.40)", "oklch(0.20 0.10 130)"];
+  if (value < 65) return ["oklch(0.72 0.18 145 / 0.50)", "oklch(0.16 0.12 145)"];
+  return ["oklch(0.65 0.22 145 / 0.70)", "oklch(0.12 0.14 145)"];
 }
 
 function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
@@ -529,7 +679,7 @@ function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricK
 
 function formatMetric(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): string {
   const value = metricValue(metric, selectedMetric);
-  if (value == null) return "n/a";
+  if (value == null) return "—";
   return selectedMetric === "T" ? value.toLocaleString("en-US") : `${value}%`;
 }
 
@@ -541,31 +691,101 @@ function metricLabel(selectedMetric: OccurrenceMetricKey): string {
 }
 
 function formatPct(value: number | null): string {
-  return value == null ? "n/a" : `${value}%`;
+  return value == null ? "—" : `${value}%`;
+}
+
+function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
+  const stops =
+    selectedMetric === "T"
+      ? [
+          { color: "oklch(0.28 0.02 250 / 0.5)", label: "< 20" },
+          { color: "oklch(0.78 0.10 90 / 0.55)", label: "20-99" },
+          { color: "oklch(0.78 0.10 250 / 0.55)", label: "100-299" },
+          { color: "oklch(0.68 0.16 250 / 0.65)", label: "300-999" },
+          { color: "oklch(0.62 0.20 250 / 0.85)", label: "≥ 1000" },
+        ]
+      : selectedMetric === "false_pct"
+        ? [
+            { color: "oklch(0.72 0.16 145 / 0.55)", label: "< 10%" },
+            { color: "oklch(0.78 0.14 145 / 0.40)", label: "10-19%" },
+            { color: "oklch(0.78 0.14 90 / 0.45)", label: "20-29%" },
+            { color: "oklch(0.72 0.16 50 / 0.55)", label: "30-39%" },
+            { color: "oklch(0.62 0.20 25 / 0.65)", label: "≥ 40%" },
+          ]
+        : [
+            { color: "oklch(0.62 0.20 25 / 0.55)", label: "< 25%" },
+            { color: "oklch(0.72 0.16 50 / 0.45)", label: "25-34%" },
+            { color: "oklch(0.78 0.14 90 / 0.40)", label: "35-44%" },
+            { color: "oklch(0.78 0.14 130 / 0.40)", label: "45-54%" },
+            { color: "oklch(0.72 0.18 145 / 0.50)", label: "55-64%" },
+            { color: "oklch(0.65 0.22 145 / 0.70)", label: "≥ 65%" },
+          ];
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/30 px-4 py-3 text-xs text-muted-foreground fade-in">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">Legend · {metricLabel(selectedMetric)}</span>
+        <div className="flex items-center gap-1">
+          {stops.map((stop) => (
+            <div key={stop.label} className="flex items-center gap-1">
+              <div className="h-3 w-6 rounded" style={{ backgroundColor: stop.color }} />
+              <span className="text-[10px]">{stop.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 text-[10px]">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded ring-1 ring-inset ring-[var(--warning)]" />
+          High-conviction cell
+        </span>
+        <span className="flex items-center gap-1.5 opacity-55">
+          <span className="inline-block h-3 w-3 rounded bg-foreground/30" />
+          Low sample (n &lt; min)
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function OccurrenceSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
-      <div className="h-24 animate-pulse rounded-lg bg-card/30" />
-      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
+      <div className="mb-6 h-24 animate-pulse rounded-xl bg-card/30" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="h-24 animate-pulse rounded-lg bg-card/30" />
+          <div key={item} className="h-28 animate-pulse rounded-xl bg-card/30" />
         ))}
       </div>
-      <div className="mt-5 h-[560px] animate-pulse rounded-lg bg-card/25" />
+      <div className="mt-6 h-[640px] animate-pulse rounded-xl bg-card/25" />
     </main>
   );
 }
 
 function OccurrenceError() {
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
-      <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-8">
-        <div className="text-lg font-semibold">Occurrence Matrix unavailable</div>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          The API could not load the TradingView snapshots. Check the snapshot directory and retry the page.
-        </p>
+    <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
+      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-8 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/20 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-lg font-semibold">Occurrence Matrix unavailable</div>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              The API could not load the TradingView snapshots. Verify the snapshot directory and retry the page.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 inline-flex items-center gap-2 rounded-md border border-border/60 bg-card/45 px-3 py-1.5 text-xs font-semibold transition hover:bg-card/65"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Reload page
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
       </div>
     </main>
   );
