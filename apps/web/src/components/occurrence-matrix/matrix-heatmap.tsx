@@ -655,33 +655,40 @@ function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMe
   };
 }
 
-// Dark, saturated backgrounds engineered for white text on dark theme.
-// Lightness kept in 0.30-0.55 range so text-white remains AAA legible.
+// Simple traffic-light palette: red (low) → neutral → green (high).
+// No orange/yellow intermediates — keeps the heatmap calm and scannable.
+// Lightness in 0.32-0.55 range, white text stays AAA-readable.
+const COLOR_RED = "oklch(0.45 0.18 25)";
+const COLOR_RED_SOFT = "oklch(0.40 0.12 25)";
+const COLOR_NEUTRAL = "oklch(0.32 0.03 250)";
+const COLOR_GREEN_SOFT = "oklch(0.44 0.12 148)";
+const COLOR_GREEN = "oklch(0.52 0.20 148)";
+
+const COLOR_BLUE_SOFT = "oklch(0.36 0.10 250)";
+const COLOR_BLUE = "oklch(0.46 0.18 250)";
+const COLOR_BLUE_STRONG = "oklch(0.54 0.22 250)";
+
 function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
   if (selectedMetric === "T") {
-    if (value < 20) return "oklch(0.28 0.022 250)";
-    if (value < 100) return "oklch(0.38 0.10 250)";
-    if (value < 300) return "oklch(0.44 0.14 250)";
-    if (value < 1000) return "oklch(0.50 0.18 250)";
-    return "oklch(0.56 0.22 250)";
+    if (value < 50) return COLOR_NEUTRAL;
+    if (value < 200) return COLOR_BLUE_SOFT;
+    if (value < 1000) return COLOR_BLUE;
+    return COLOR_BLUE_STRONG;
   }
 
   if (selectedMetric === "false_pct") {
     // false% inverted: low is good (green), high is bad (red)
-    if (value < 10) return "oklch(0.46 0.16 145)";
-    if (value < 20) return "oklch(0.50 0.14 110)";
-    if (value < 30) return "oklch(0.50 0.14 80)";
-    if (value < 40) return "oklch(0.48 0.16 45)";
-    return "oklch(0.46 0.18 25)";
+    if (value < 15) return COLOR_GREEN;
+    if (value < 30) return COLOR_NEUTRAL;
+    return COLOR_RED;
   }
 
-  // bounce_pct / break_pct → red → orange → yellow → lime → green → emerald
-  if (value < 25) return "oklch(0.46 0.18 25)";
-  if (value < 35) return "oklch(0.48 0.16 45)";
-  if (value < 45) return "oklch(0.50 0.14 80)";
-  if (value < 55) return "oklch(0.50 0.14 110)";
-  if (value < 65) return "oklch(0.48 0.16 140)";
-  return "oklch(0.50 0.20 148)";
+  // bounce_pct / break_pct
+  if (value < 35) return COLOR_RED;
+  if (value < 45) return COLOR_RED_SOFT;
+  if (value < 55) return COLOR_NEUTRAL;
+  if (value < 65) return COLOR_GREEN_SOFT;
+  return COLOR_GREEN;
 }
 
 function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
@@ -710,27 +717,23 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
   const stops =
     selectedMetric === "T"
       ? [
-          { color: "oklch(0.28 0.022 250)", label: "< 20" },
-          { color: "oklch(0.38 0.10 250)", label: "20-99" },
-          { color: "oklch(0.44 0.14 250)", label: "100-299" },
-          { color: "oklch(0.50 0.18 250)", label: "300-999" },
-          { color: "oklch(0.56 0.22 250)", label: "≥ 1000" },
+          { color: COLOR_NEUTRAL, label: "< 50" },
+          { color: COLOR_BLUE_SOFT, label: "50-199" },
+          { color: COLOR_BLUE, label: "200-999" },
+          { color: COLOR_BLUE_STRONG, label: "≥ 1000" },
         ]
       : selectedMetric === "false_pct"
         ? [
-            { color: "oklch(0.46 0.16 145)", label: "< 10%" },
-            { color: "oklch(0.50 0.14 110)", label: "10-19%" },
-            { color: "oklch(0.50 0.14 80)", label: "20-29%" },
-            { color: "oklch(0.48 0.16 45)", label: "30-39%" },
-            { color: "oklch(0.46 0.18 25)", label: "≥ 40%" },
+            { color: COLOR_GREEN, label: "< 15%" },
+            { color: COLOR_NEUTRAL, label: "15-29%" },
+            { color: COLOR_RED, label: "≥ 30%" },
           ]
         : [
-            { color: "oklch(0.46 0.18 25)", label: "< 25%" },
-            { color: "oklch(0.48 0.16 45)", label: "25-34%" },
-            { color: "oklch(0.50 0.14 80)", label: "35-44%" },
-            { color: "oklch(0.50 0.14 110)", label: "45-54%" },
-            { color: "oklch(0.48 0.16 140)", label: "55-64%" },
-            { color: "oklch(0.50 0.20 148)", label: "≥ 65%" },
+            { color: COLOR_RED, label: "< 35%" },
+            { color: COLOR_RED_SOFT, label: "35-44%" },
+            { color: COLOR_NEUTRAL, label: "45-54%" },
+            { color: COLOR_GREEN_SOFT, label: "55-64%" },
+            { color: COLOR_GREEN, label: "≥ 65%" },
           ];
 
   return (
@@ -753,7 +756,7 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
           <span
             className="inline-block h-3.5 w-3.5 rounded"
             style={{
-              backgroundColor: "oklch(0.50 0.20 148)",
+              backgroundColor: COLOR_GREEN,
               boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 6px oklch(0.82 0.16 90 / 0.4)",
             }}
           />
