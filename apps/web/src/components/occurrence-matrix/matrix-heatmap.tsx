@@ -529,7 +529,7 @@ function SubMetric({
 
 function isHighlightValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): boolean {
   if (metric.low_sample) return false;
-  if (selectedMetric === "bounce_pct") return (metric.bounce_pct ?? 0) >= 65;
+  if (selectedMetric === "bounce_pct") return (metric.bounce_pct ?? 0) >= 55;
   if (selectedMetric === "break_pct") return (metric.break_pct ?? 0) >= 55;
   return false;
 }
@@ -655,13 +655,12 @@ function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMe
   };
 }
 
-// Simple traffic-light palette: red (low) → neutral → green (high).
-// No orange/yellow intermediates — keeps the heatmap calm and scannable.
-// Lightness in 0.32-0.55 range, white text stays AAA-readable.
+// Minimal 3-tone palette: red (< 30%), neutral gray (30-54%), green (>= 55%).
+// Same thresholds applied across bounce/break (high = good) and false%
+// (inverted: high = bad). Events use a separate neutral→blue scale since
+// it's magnitude, not polarity.
 const COLOR_RED = "oklch(0.45 0.18 25)";
-const COLOR_RED_SOFT = "oklch(0.40 0.12 25)";
-const COLOR_NEUTRAL = "oklch(0.32 0.03 250)";
-const COLOR_GREEN_SOFT = "oklch(0.44 0.12 148)";
+const COLOR_NEUTRAL = "oklch(0.32 0.025 250)";
 const COLOR_GREEN = "oklch(0.52 0.20 148)";
 
 const COLOR_BLUE_SOFT = "oklch(0.36 0.10 250)";
@@ -677,17 +676,15 @@ function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
   }
 
   if (selectedMetric === "false_pct") {
-    // false% inverted: low is good (green), high is bad (red)
-    if (value < 15) return COLOR_GREEN;
-    if (value < 30) return COLOR_NEUTRAL;
+    // inverted: low false% = good (green), high = bad (red)
+    if (value < 30) return COLOR_GREEN;
+    if (value < 55) return COLOR_NEUTRAL;
     return COLOR_RED;
   }
 
-  // bounce_pct / break_pct
-  if (value < 35) return COLOR_RED;
-  if (value < 45) return COLOR_RED_SOFT;
+  // bounce_pct / break_pct: high = good
+  if (value < 30) return COLOR_RED;
   if (value < 55) return COLOR_NEUTRAL;
-  if (value < 65) return COLOR_GREEN_SOFT;
   return COLOR_GREEN;
 }
 
@@ -724,16 +721,14 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
         ]
       : selectedMetric === "false_pct"
         ? [
-            { color: COLOR_GREEN, label: "< 15%" },
-            { color: COLOR_NEUTRAL, label: "15-29%" },
-            { color: COLOR_RED, label: "≥ 30%" },
+            { color: COLOR_GREEN, label: "< 30%" },
+            { color: COLOR_NEUTRAL, label: "30-54%" },
+            { color: COLOR_RED, label: "≥ 55%" },
           ]
         : [
-            { color: COLOR_RED, label: "< 35%" },
-            { color: COLOR_RED_SOFT, label: "35-44%" },
-            { color: COLOR_NEUTRAL, label: "45-54%" },
-            { color: COLOR_GREEN_SOFT, label: "55-64%" },
-            { color: COLOR_GREEN, label: "≥ 65%" },
+            { color: COLOR_RED, label: "< 30%" },
+            { color: COLOR_NEUTRAL, label: "30-54%" },
+            { color: COLOR_GREEN, label: "≥ 55%" },
           ];
 
   return (
@@ -760,7 +755,7 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
               boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 6px oklch(0.82 0.16 90 / 0.4)",
             }}
           />
-          High-conviction (≥65%)
+          High-conviction (≥55%)
         </span>
         <span className="flex items-center gap-1.5 opacity-55">
           <span className="inline-block h-3.5 w-3.5 rounded bg-foreground/25" />
