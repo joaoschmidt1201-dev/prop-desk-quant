@@ -1,0 +1,444 @@
+Data: 2026-05-13 (Reunião semanal — formato 30 min, 2x/semana)
+Participantes: João (Speaker 2 / The Architect) e Cristiano/CZ (Speaker 1 / Head Trader)
+Fonte: TurboScribe (pode conter erros de transcrição)
+================================================================================
+
+Speaker 1
+(00) Eu já vou começando para a gente fazer sempre, assim, uma sessão mais automática, tentar fazer 30 minutos, não passar muito disso, né? (0:08) E sempre conversando quando rola tempo, mas sem focar muito na sessão para não ficar maçante, né? (0:17) Duas por semana é muita coisa.
+(0:20) Vou tentar fazer o que a gente se propôs a fazer, né? (0:23) Tentar ver um pouquinho o mercado, dividir opiniões, né? (0:27) Para a gente tentar, sim, ficar com o know-how um pouco um do outro.
+(0:34) Vou projetar aqui um pouco o meu, só para tentar fazer bem rápido, realmente. (0:45) Um gráfico meio carregado, fazendo algumas experiências novas. (0:48) Talvez, assim, essa parte eu vou passar rapidamente também.
+(0:53) Eu treinava muito trocando os layouts, né? (0:56) Estava com três layouts, um main, um scalp, depois tinha feito mais um que era para fazer... (1:02) Ver até as ocorrências, porque ocorrência é quando você rouba um pouco de espaço.
+(1:07) E eu achava que não estava legal, estava perdendo muito tempo, trocando de um lugar para o outro. (1:12) Dá uma complexidade, né? (1:13) Até porque, nesses dias, fiz alguns hedges, né?
+(1:16) Vocês sabem, entrei naqueles open range breakouts, tentando melhorar aqueles resultados e ficou... (1:22) Tardes pesadas. (1:24) E eu acho que a parte mecânica de layout é importante, né?
+(1:29) Senão você fica assim meio doidinho, né? (1:31) E até porque, apesar de a gente ter... (1:35) A gente, quando...
+(1:39) Dentro de um layout, né? (1:40) Quando trabalha com dois tabs aqui, quando faz a análise de um ticker, logicamente isso se reproduz dentro do mesmo layout, mas quando troca de layout já é diferente, né? (1:52) Então, eu estava num outro layout, querendo ver, por exemplo...
+(2:00) Aqui, por exemplo, um tick, ou aquele número de ações acima de um... (2:05) De um view app. (2:06) Aí, já estava carregado, só posso colocar oito indicadores, e aí você fica meio perdido, né?
+(2:13) Você fica trocando de um lugar para o outro sem necessidade. (2:15) Então, eu... (2:16) Resumindo, eu tentei fazer o meu main agora, que é o meu scalp.
+(2:19) Eu tentei unir os dois. (2:22) Então, quando eu sei que eu não vou trocar de ticker, né? (2:25) Eu já tiro aqui a tab do lado.
+(2:27) Às vezes dou uma... (2:28) Amplifico um pouquinho. (2:30) E tentei...
+(2:31) Lembrando que é uma perda, porque... (2:33) Isso eu estou falando agora do scalp, né? (2:35) Estou falando, assim, de uma entrada, open range breakout, porque eu quero fazer um...
+(2:40) Quero tradar Bitcoin, eu quero tradar EWZ. (2:45) Dando aquela estratégia de open range breakout. (2:48) Vai durar, no máximo, uma hora, 40 minutos.
+(2:51) E... (2:52) Então, eu estou usando dois minutos, cinco, 15, uma hora. (2:56) Falta um dia.
+(2:58) Falta um dia, infelizmente. (3:00) Porque um dia também é importante, né? (3:01) Você deixando um pouquinho mais limpo.
+(3:03) Mas não tem jeito. (3:05) Como a gente não quer perder nada, eu tenho vindo aqui e tenho trocado para um dia mesmo. (3:12) Então, eu venho aqui, troco para um dia.
+(3:14) Faço bem rápido, acerto. (3:17) Só tem aqui um demérito, que é... (3:21) Como eu...
+(3:24) Como a gente tem um multi frame, né? (3:26) Quando eu estou no horário, eu digo que... (3:31) O time frame superior do horário é o diário, né?
+(3:35) E aí, eu uso aquilo como... (3:38) Assim, você vai entender bem o que eu vou dizer. (3:40) Não precisa explicar muito.
+(3:41) Aquele que é o diário aqui, já está acertado como o... (3:49) O multiple moving average, o normal. (3:51) Então, fica um em cima do outro, né?
+(3:53) O time frame, descadinha. (3:55) E o normal, que já está aqui no MMA. (3:58) Que é sempre o que nós temos ali para aquele time frame específico.
+(4:02) Só que depois a gente pode até melhorar isso no futuro, para não ficar assim. (4:05) Mas, então, como o foco realmente é o scalp, né? (4:09) Então, eu vou lá, fecho.
+(4:12) Aí, eu volto aqui por uma hora. (4:13) É um experimento ainda. (4:15) Dá um pouco de trabalho.
+(4:19) E, realmente, vem para cá. (4:22) E tem algumas coisas muito curiosas, né? (4:23) A gente tem visto até pelas tuas ocorrências, que quando você treina realmente scalp, tem muita coisa que funciona de moving average.
+(4:33) Principalmente o VWAP, que vai ficar mais importante. (4:36) Dentro até dos cinco minutos, né? (4:39) Para os breakouts.
+(4:40) É muito interessante isso. (4:43) Então, usando a ocorrência aqui, muita coisa aqui faz sentido também, né? (4:47) Quem sabe a gente vai ter que usar depois isso no futuro.
+(4:49) Não por estratégias que a gente está fazendo agora. (4:52) Opções. (4:55) Sete dias.
+(4:57) Mas, realmente, tem uma certa legitimidade. (5:03) E, curiosamente, estou achando que o gráfico mais importante realmente tem sido de 15 minutos. (5:06) Para fazer uma coisa que eu também estou analisando agora com um pouco de calma.
+(5:14) O gráfico de lungs é poderosíssimo. (5:16) Deixando aqui as EMAs horária. (5:20) Nesse caso aqui, a primeira escadinha é horária.
+(5:24) E a escadinha grossa é o diário. (5:32) Eu sempre faço o time frame superior, né? (5:34) Sim.
+(5:34) Tem muita coisa interessante aqui. (5:38) Só para mostrar um pouco a parte de gráfico. (5:41) E, voltando agora, pensando um pouquinho nas análises, né?
+(5:46) Antes de pedir para você falar um pouquinho também. (5:51) Voltei com o Mentor Queue. (5:57) Para você saber uma pena que você não pode usar.
+(6:00) Você pode ativar realmente muito. (6:02) Você pode ativar... (6:05) Quando você entrar lá, você vai ver, né?
+
+Speaker 2
+(6:08) É, eu vi ali que já tem o seu Trading View linkado ali, né? (6:14) Daí não tem como colocar outro.
+
+Speaker 1
+(6:17) É uma pena estar aqui, né? (6:19) Então, só tem realmente uma loading. (6:28) Aqui só cabe um usuário, né?
+(6:32) Uma pena. (6:32) Depois vamos pensar como é que a gente pode usar isso.
+
+Speaker 2
+(6:36) Mas, enfim, voltando agora... (6:38) Uma dúvida, só rapidinho. (6:40) O que você está achando dos levels do Mentor Queue?
+(6:45) Você acha que realmente são levels relevantes? (6:47) Você está utilizando isso para as suas análises? (6:49) Como é que você está tratando esses levels que aparecem no gráfico?
+
+Speaker 1
+(6:54) Cara, eu fiquei realmente essas duas semanas sem levels, né? (6:58) O Trading Elite se cortou. (7:01) Eu não sei se até você atualizou essa semana o Bar Chart.
+
+Speaker 2
+(7:06) Atualizei o Bar Chart, o Trading Elite não, porque ele está há 13 dias sem postar um vídeo. (7:10) Só os do Bar Chart.
+
+Speaker 1
+(7:14) É, eu fiz uma análise do Bar Chart, e aí ele fala realmente que esse end of the day, né? (7:19) Uma atualização diária é muito pouco, né? (7:25) Enfim, por que que voltou a questão do Gamma Level?
+(7:29) Eu estava achando ela bem secundária, não muito importante. (7:33) Sim. (7:34) Porque nós estávamos focando, primeiro estava naquele sufoco, né?
+(7:37) Tentando encontrar uma maneira de tentar colocar 7 DTE. (7:44) E não conseguia porque o mercado estava fazendo só all time highs. (7:49) Muito medo de entrar realmente fazendo um iron condor com a parte superior de call, né?
+(7:55) O que eu acho que foi positivo não ter feito, teria dado muito ainda dor de cabeça. (8:01) E não foi foco no 7 DTE. (8:03) Então, dentro do 7 DTE, eu não sabia ainda o que eu queria dele.
+(8:06) Não tinha ainda uma ideia muito clara. (8:10) Eu conversei com uma pessoa da Alemanha, do que eu tenho falado frequentemente, e encontrei um canal chamado Zero DTE, que eu quero mostrar para você também. (8:20) Sem nenhuma pressa, porque eu também estou estudando.
+(8:25) E a conversa, aliás, não era nem de encontrar um serviço, desculpa aqui, um serviço mais interessante. (8:32) A ideia era estar falando sobre mentores, né? (8:37) Porque apesar de ter muita gente com ideias interessantes, etc., eu acho que os erros que aconteceram em março, abriu, é muito por mentoria, né?
+(8:47) É muita questão do playbook, é muita questão da disciplina, é muita questão de arriscar pouco. (8:53) E aí, conheci uma dica, tive uma dica de uma pessoa que me falou desse Zero DTE, que é um serviço, um canal, de um cara que está há muito tempo na internet, é esse coach. (9:05) E ele tem aprimorado o serviço dele, está fazendo isso há 5, 6 anos.
+(9:10) E ele tem, então, um serviço, eu vou falar bem rapidamente, para não confundir aqui toda a nossa agendinha. (9:18) Mas, basicamente, ele é um coach no sentido clássico, assim. (9:21) E isso é a parte que me deixou muito interessado.
+(9:25) E todo o serviço dele tem feito para desenvolver uma ferramenta, que é mais ou menos assim. (9:37) Depois eu vou te passar o... (9:39) E ele, basicamente, só coloca Iron Condors ou Batmans.
+(9:43) Quer dizer, se ele achar que o mercado vai cair muito, ele vai botar um Putfly, né? (9:49) Lower. (9:49) E se ele achar que o mercado vai subir, vai colocar um Callfly mais acima.
+(9:54) Se ele achar que o mercado está muito volátil, ele não sabe para que lado vai, ele coloca um Batman. (9:59) Dois flies simétricos. (10:02) E a grande, digamos, inovação dele é que ele fala que só pode apostar 10% daquele width.
+(10:13) Ou seja, se o meu width aqui, por exemplo, é 30, eu tenho que buscar um fly, ele já calculou tudo aqui, buscar um fly até 3, 10%. (10:24) 3 dólares para 30, ou 25 dólares para 25. (10:29) Então ele fala que baseado...
+(10:30) Aí vem toda a parte de Money Management, de Risk Management. (10:33) Se você apostar 10%, mesmo com o win rate baixo, quando você tem os seus winners, eles são fantásticos. (10:42) E tudo que ele faz é importante, zero de ti.
+(10:45) É a parte que eu gosto menos. (10:46) Estou fazendo alguns testes com ele, que é isso aqui. (10:55) Esse aqui foi um fly que eu coloquei na segunda-feira.
+(11:00) Esse aqui é o verde, que é um call. (11:04) Esse é um putfly que eu coloquei ontem, que é vermelho. (11:08) E esses azuis são os dele.
+(11:10) O de ontem dele, que em cima tem um. (11:14) O de ontem à noite ele já colocou os dois dele. (11:16) E é realmente fantástico como o fly, muito diferente do condor, como ele...
+(11:23) Para você ter realmente long e short no mesmo short strike. (11:30) Como você começa a ganhar realmente... (11:33) Como você começa a ganhar quando você solta esse cavalinho.
+(11:36) É muito interessante. (11:38) Por exemplo, eu abri essa posição aqui na segunda-feira, e o mercado estava, talvez, inferior aqui. (11:44) Coloquei essa posição e o mercado estava aqui.
+(11:47) Quando ele se aproximou é daqui. (11:49) Ele se aproximou do meu lower call. (11:53) Essa posição aqui era 195 dólares.
+(11:56) 1,95 vezes 100 aqui. (12:01) Ela chegou a dar mais ou menos 100 dólares. (12:06) E nunca tocou o meu long strike.
+(12:10) A questão é que esse aqui é o 430 embaixo e o 490 em cima. (12:19) E o 460 no meio. (12:20) Esse aqui era um de 30.
+(12:23) Mas eu consegui comprar um de 30 por muito menos do que 10%. (12:26) Menos de 3. (12:27) Comprei por 1,95.
+(12:28) Enfim. (12:29) E ontem eu coloquei mais um. (12:32) Eu perdi pouco tempo com isso, porque eu estou ainda monitorando.
+(12:34) Coloquei um aqui que era 7,360 e 7,300 com 7,330 no meio. (12:46) E ontem ele entrou bastante aqui. (12:47) Ele chegou perto do meu short strike.
+(12:50) E vamos ver como foi o resultado aqui. (12:51) Eu estou medindo aqui dentro também. (12:58) Comprei por 2,60 e saí por 9,50.
+(13:02) Falta colocar ali. (13:06) E o anel foi de 690.
+
+Speaker 2
+(13:15) E o Cristiano, esses trades que ele faz que estão em azul, ele posta isso no Discord?
+
+Speaker 1
+(13:21) Posta. (13:22) Aí ele tem aqui uma comunidade muito grande. (13:24) Esse aqui é o trade dele de hoje.
+(13:26) Ah, tá. (13:26) Ele sempre posta. (13:28) Fly on the wall.
+(13:30) Então tem que... (13:30) Assim, eu te convido a ver com toda calma alguns vídeos dele. (13:35) Eu acho uma pena, porque eu não gosto de treinar ele aqui como um foco principal.
+(13:40) Mas ele é um mentor, então tem umas coisas interessantes aqui. (13:43) Por exemplo, a parte da rotina, preparação. (13:48) Ele faz vídeo todo dia.
+(13:51) Outra parte do processo para você fechar aqui. (13:56) Colocar aqui mais informações. (14:00) The report, the journal, the playbook.
+(14:02) É a mesma ferramenta. (14:03) E sabendo que ele já aqui... (14:07) Ele pensou em muitas coisas.
+(14:08) Para você comprar isso aqui, ele fez um gradiente, onde ele fala o seguinte. (14:12) Tudo bem, o teu objetivo é encontrar um width dentro de uma volatilidade. (14:19) Ele tem uma tabela.
+(14:21) Depois você encontra, ele faz um gradiente para você pensar o seguinte. (14:23) Olha, tudo bem, eu tenho aqui um de 2,90. (14:27) Mas se eu baixar dois strikes, eu vou para 1,98.
+(14:31) Esse aqui é 30% menos. (14:33) Então será que não vale a pena economizar? (14:36) Tudo muito baseado no risk management.
+(14:38) Será que não vale a pena ir para esse gradiente aqui? (14:40) 1,98. (14:42) Ganhar 30%.
+(14:44) Só porque eu estou dois strikes abaixo. (14:47) Estou indo no moving average, no expected move, que são essas duas marcações aqui. (14:53) Dentro do add the money.
+(14:54) Enfim, depois vindo para cá, quando você escolhe o teu call desejado, você pode colocar a estratégia aqui. (15:14) Colocar o volume profile, que ele também gosta. (15:17) Ele gosta de usar o volume profile.
+(15:21) Isso aqui ele chama de... (15:23) Ele chama isso aqui de... (15:25) MS, não me lembro.
+(15:26) Ele tem os GAGS levels aqui, mas é no formato bar chart também. (15:30) Uma atualização uma vez por dia. (15:32) Aqui que eu fui me investigar, uma vez por dia é muito pouco.
+(15:35) Até que nem dá importância para isso. (15:39) Enfim, mas são informações interessantes. (15:41) Depois você pode mudar aqui um pouco o que você acha que vai acontecer durante o dia.
+(15:45) Pode puxar um pouco o preço. (15:47) E aqui você vê o que vai acontecer no tempo real. (15:49) Porque é muito importante para você monitorar isso aqui.
+(15:52) É você vendo a curva de P&L, para ganhar experiência, para saber que desde não tocando os teus strikes, você começa com 1,95. (16:04) E normalmente com um pouco de aumento de volatilidade e movimento mais rápido dentro, talvez até meio dia. (16:14) Aí tem a questão do zero de tick, que é uma dinâmica muito própria.
+(16:18) O teta, você começa assim com praticamente, você colocar depois no option strike, você começa com o teta no SPX, que é mais ou menos 800 dólares contra você. (16:32) E aquilo vai caindo assim, cada 15 minutos você vê a diferença. (16:36) Mas depois do almoço, essa dinâmica de ganhar 100 dólares só por uma aproximação pelo strike, já não acontece mais, porque você não tem mais teta, o teta vai comendo toda a tua, é chamada de juice.
+(16:53) E o gama é tão elevado, que qualquer mudança contra você, um tick para baixo, realmente aquilo faz uma diferença muito grande. (17:03) É muito louco você ver esse negócio trabalhar depois do meio dia. (17:06) Então, a análise que eu fiz, é que você começa muito bem, quando o mercado está de lado, e você consegue se posicionar um pouco próximo do at the money, um pouco mais próximo, é muito difícil você ter uma, a não ser que o mercado vá muito na outra direção, você começar negativo.
+(17:22) Eu acho que essa é a grande chance. (17:24) E, logicamente, quando aquilo vai na tua direção e entra dentro do teu, pode ser até do long strike, até meio dia, você tem ali realmente uma chance de ganhar, de retirar mais do que 100% do net credit. (17:38) E é uma estratégia muito específica de butterfly, de realmente, o gama vai subindo, e você tem que fazer realmente essa, aqui você está perdendo com o teta e ganhando com o gama.
+(17:59) Isso quebra um pouco a nossa lógica tradicional. (18:04) Vou monitorar e vou te dar mais feedback futuramente. (18:07) Tá bom.
+(18:08) Perfeito. (18:10) A parte legal é que, por exemplo, (18:11) ele vai fazer um vídeo hoje, meia-dia 15, (18:14) desculpa, (18:16) 9 e 15 dos Estados Unidos, (18:19) e você entra, (18:22) eu consegui já há dois dias (18:24) colocar assuntos que me interessavam, (18:28) ele respondeu para mim, praticamente online, (18:32) e fez uma sessão para mim ontem (18:33) para falar de broken wing butterfly, (18:36) dentro do simétrico, a diferença, (18:40) especificamente fez uma lição só para mim, (18:43) praticamente, para falar daquilo ali. (18:45) Ele é meio lento, está meio velhão, mas o cara tem muita inteligência para buscar essa risk management, isso que ele chama de complexividade, para fazer trades de curto prazo, que podem ter realmente uma relação, um risk reward muito bom em curto tempo, que é o zero de tick, tem que gostar, na verdade.
+
+Speaker 2
+(19:15) Pois é, eu achei bacana ele que eu vi os vídeos, ele posta vídeos todos os dias, então é realmente bem ativo. (19:22) Interessante, depois eu vou dar uma olhada como é que fala.
+
+Speaker 1
+(19:25) Vamos deixar isso para depois, para colocar uma experiência, senão já fica muito doido, porque a gente começou a gostar muito daquele triple calendar, né? (19:34) Sim, sim. (19:37) Eu acho que é muita coisa, a gente tem que cuidar um pouco, né?
+
+Speaker 2
+(19:40) Sim, depois quando você tiver alguma conclusão sobre, você me passa e eu estudo um pouco mais sobre também.
+
+Speaker 1
+(19:50) Estou colocando Orleans de 200 dólares, quando não for o Batman, como ele fez ontem, eu acho que eu vou colocar. (19:57) Detalhe, ele gosta muito de volume profile, ele fala que ele gosta de Gex, mas ele nunca viu ele falar disso, então assim, tem aquele cara que gosta, mas não está usando, né? (20:06) O cara deixa ali e tal, mas você vê o cara entrando, você vê o cara dizendo que vai chegar no short strike dele, tudo isso live, você vê ele saindo, e você vê que ele não falou de Gex, então quer dizer...
+
+Speaker 2
+(20:21) E então não é uma estratégia para deixar até a inspiração, a ideia é que seja retirada antes com um pinel, ou ele deixa até a inspiração.
+
+Speaker 1
+(20:32) Ele não responde de maneira absoluta, (20:34) ele fala que se está apostando 200 dólares, (20:37) com uma chance de ganhar muito mais, (20:40) não pode esquecer que você faz a tenda no SPX, (20:43) está falando de 2 mil dólares, (20:44) 3 mil dólares, (20:45) depende da volatilidade de 0 de TI, (20:51) claro, (20:53) e ele fala que logicamente, (20:54) ele mostra a curva dele de pinel, (20:56) que é muito boa, (20:57) basicamente ele fala o seguinte, (20:58) quando ele perde, ganha, perde, ganha, (21:00) a curva fica sempre de lado, (21:02) ele nunca perde para fazer a curva cair, (21:06) fica de lado, lado, lado, sobe muito, (21:09) fica um pouquinho de lado, sobe muito, (21:11) um pouquinho de lado, sobe muito, (21:13) então essa é a estratégia dele, (21:14) acho que isso é o que estava faltando para mim, (21:16) estou em busca disso, (21:17) não estou buscando mais uma nova estratégia, (21:19) claro que estou aprendendo muito (21:20) sobre o Fly versus Condor, (21:22) é muito interessante, (21:25) a dinâmica do 0 de TI é muito legal, (21:27) mas é própria, (21:29) não dá para copiar muita coisa para um 45 de TI, (21:34) mas acho que a parte que eu mais estou buscando, (21:36) por isso que eu realmente estou ligado no cara (21:38) e quero ficar muito tempo ao lado dele, (21:40) é essa questão de você, (21:42) não importa, (21:43) se você não conseguir 10%, não vai entrar, (21:46) e só vai perder 10%, (21:47) não tem como você perder mais, (21:49) e a questão do exit, (21:51) acho que ainda é um pouco, (21:52) até para ele é um pouco, (21:53) ainda não é muito clara, (21:54) porque quando você está em cima do short strike, (21:56) tem que vender, (21:57) fica tão bom, (21:58) você entrou com 200 e está com 1.500, (22:02) está meio loucura não sair, (22:03) tem que sair, (22:06) não faz sentido você querer contar com a sorte (22:09) para a última uma hora, (22:12) porque aquele gama ali é muito louco, (22:16) então não vale a pena, (22:18) é a minha visão pessoal, (22:19) e ele já falou isso, (22:20) mas ele também não fala se deve deixar até expirar, (22:24) eu acho que deve deixar para expirar, (22:26) às vezes não bate, (22:26) mas você sabe que está no Batman, (22:28) ele está aqui no meio, (22:30) ele está aqui no meio, (22:31) o mercado não tem ainda uma direção própria, (22:34) e você conseguiu entrar aqui com os dois, (22:37) com 10%, (22:38) quer dizer, (22:39) não 30, (22:40) esse custou 150, (22:41) esse custou 150, (22:43) é o mínimo que você precisa para trazer 10px, (22:46) digamos assim, (22:48) se está aqui no meio, (22:49) você acha que é uma perda, (22:51) está dentro do teu daily routine, (22:54) você não pode sair ainda, (22:55) eu acho, (22:56) você pode ter a sorte no final, (22:57) ter um move para cima, (22:59) e um move para baixo, (23:01) e logicamente você pode ter a sorte (23:05) de sair ainda com um pouquinho de profit, (23:09) essa é a parte que vale a pena você deixar, (23:11) se está em cima do teu short strike, (23:13) tem que vender, (23:14) o mercado fica muito bom no 0dg, (23:15) tem que sair fora, (23:18) ele não trabalha com moving average, (23:21) ele faz um suporte de resistência (23:23) totalmente baseado no volume profile, (23:26) então ele pega esses nodes aqui, (23:28) ele dá uma esticada neles, (23:31) justifica que basicamente esse cara aqui (23:35) vai formar um suporte de resistência, (23:37) como está aqui, (23:38) ele vai buscar muito mais (23:40) essa justificativa desse suporte, (23:43) dessa resistência aqui, (23:46) muito mais pelo volume, (23:47) do que pelo GAX, (23:49) que é o que eu estou vendo aqui, (23:50) o vermelho aqui está vindo do GAX, (23:52) coincidiu, (23:54) coincidiu, (23:55) ou de moving average, (23:56) ele vai dizer, (23:57) não, esse aqui é por causa do volume, (23:58) mas eu acho que é um pouco (23:59) meio ao gosto de cada um, (24:01) não sei, (24:03) sim, sim, (24:05) bom, porque eu estou vendo sobre o mercado, (24:07) João, (24:08) é uma coisa que eu unifiquei, (24:10) eu trocava muito de tab, (24:12) aí botei assim tudo na mesma tab, (24:14) tentei manter aqui o risk on, (24:16) risk off, market hedge, (24:20) mas, macro hedge, (24:22) mas tentando deixar, (24:24) quando eu trado, (24:25) eu venho aqui, (24:25) eu coloco um azulzinho na frente, (24:28) quando eu quero tradar, (24:30) quando está interessante, (24:31) quando eu trado eu deixo verde, (24:33) e vou acompanhando pelo mesmo tab, (24:34) para não ter que trocar muito tab também, (24:35) que eu acho um pouco, (24:37) um pouco chato, (24:38) isso é bem particular, (24:40) sim, (24:42) e com relação aos mercados, (24:43) cara, (24:44) a gente está voltando para o all time high, (24:47) uma loucura,
+
+Speaker 2
+(24:49) é, (24:50) ontem, (24:52) ontem o SPX começou com uma queda um pouco mais alta, (24:55) eu até acreditei que poderia vir um pullback um pouco mais forte, (24:58) mas ao longo do dia ele foi se recuperando, (25:00) e hoje, (25:02) todos já estão começando com a alta também, (25:06) então, é realmente loucura.
+
+Speaker 1
+(25:08) Aliás, estou fazendo uma coisa muito errada aqui, (25:09) estou mostrando os três índices, (25:11) que na verdade, (25:13) vamos agora fazer os mercados abertos, (25:18) SPX já está voltando para o all time high, (25:21) o IWM, que eu achei que caiu 2,4% ontem, (25:25) que foi 2,4%, (25:28) mas ele fez toda a gama aqui, (25:30) gama de, (25:31) de, (25:32) de gama levels, (25:34) verdade, (25:37) esse vermelhinho, (25:38) esse vermelhinho estava on já, (25:39) ele fez tudo aqui, (25:41) a parte boa realmente é que parece que ele (25:44) segurou aqui no HVL, que é o gamma flip, (25:46) do outro, outra linguagem, (25:49) é o high volatility level, (25:52) que é o flip, (25:56) mas arrepentou tudo, (25:58) manteve no call resistance, que eu achei legal, (26:03) estava aqui já ontem, esse que era o semanal de segunda-feira, (26:06) praticamente, (26:08) e veio até aqui no HVL, (26:10) que é onde o regime troca, (26:12) eu pensei, puxa, de repente ele vai, (26:14) ele vai trocar e vai cair bastante, (26:16) e o put score está muito longe ainda, (26:18) nem está fazendo cócegas.
+(26:21) Sim, sim. (26:22) Eu também achava, (26:24) eu achava que ele fosse vir para, (26:26) foi um trade bem legal, (26:27) porque fazendo SPX, (26:30) aqui com o meu scalp, (26:32) digamos assim, (26:38) eu estava no mercado então, (26:40) e ele estava aqui no 15 minutos, (26:46) e achei muito legal que, (26:49) quando ele começou a cair ontem, (26:52) eu marquei aqui, (26:55) o que a gente tinha para ver ontem, (26:57) que me chamou muita atenção, (27:00) eu tinha feito esse cara aqui, (27:06) com o possível primeiro suporte, (27:09) e esse que está em cima do meu short strike, (27:11) quando eu vi que ele bateu aqui, (27:12) depois que ele corrigiu, (27:14) vem essa coisa um pouco do scalp, (27:16) que os 5 minutos é muito bom para, (27:18) assim, quando ele começou a voltar, (27:25) ele bateu aqui, (27:26) era mais ou menos o meu, (27:27) isso aqui eram os 5 minutos, (27:29) então isso aqui realmente era um suporte legal, (27:33) e quando eu vi que ele, (27:34) e ele foi mantendo aqui, (27:36) ele não quebrava os 5 minutos, (27:38) quando ele quebrou aqui, (27:40) eu vendi, (27:41) era praticamente o meu short strike ainda, (27:44) e ele foi embora.
+
+Speaker 2
+(27:46) Ele faz com o head and shoulders, invertido, né?
+
+Speaker 1
+(27:51) Foi mais ou menos, (27:53) a verdade é que foi um double top, (27:55) um double top, (27:56) uma marca de suporte, (27:58) quando ele começou a cair, (27:59) não tinha nada embaixo dele, (28:00) só tinha aqui praticamente o, (28:03) vamos voltar aqui para o 15, (28:05) na verdade eu estava querendo buscar (28:11) um justificativo para saber se ele ia cair mais, (28:13) ou se ele ia descer, mas aqui, vendo isso aqui, (28:16) vendo isso aqui live, (28:19) eu só consegui imaginar essa marca aqui, (28:21) e depois essas duas aqui, (28:23) que era também muito interessante.
+(28:26) Estava preparado para isso aqui, quando ele deu nessa daqui, fez um pouco de pull back, e aí o 15 está muito longe, quando você está treinando isso aqui, aí eu fui para o 5, fui para o 5, e começou realmente a, peraí, mais para a direita eu acho, peraí, vou aumentar aqui um pouco, então ele veio, eu acho que está mais para, esse aí está no dia 7, eu acho que é mais para a direita, não?
+
+Speaker 2
+(29:21) Está a queda de hora.
+
+Speaker 1
+(29:23) Claro, claro, claro, hoje estava muito louco, não estava entendendo nada. (29:27) Isso mesmo. (29:27) Bom, e aí nos 5 minutos, eu vi que ele não passava aqui, fez um false, tem que esperar um pouquinho, fazer um candle maior, double top eu não cheguei a ver, eu só cheguei a ver que ele começou a subir, e arrebentou aqui, eu falei, bom, vou vender, acho que ele não chega mais nenhum suporte embaixo, nem suporte fixo, nem dinâmico, e vendi, então foi bem legal.
+(29:51) Então prova que, às vezes, buscar realmente um elemento num time frame menor, realmente ajuda muito a tomar decisão, não é? (29:58) Sim.
+
+================================================================================
+[Parte 2]
+
+Speaker 1
+(0:00) E vale, acho que quem está trazendo até o gráfico horário, quer entrar bem, sair bem, acho que ele pode ir para o horário e até para os 15 minutos. (0:08) Acho que quando vai para os 5 e 12, já fica um pouco específico, né? (0:12) O cara tem que estar gostando e monitorando há muito tempo, senão vai ficar meio perdido.
+(0:16) Mas eu acho que é uma solução gráfica muito legal. (0:21) E até queria falar com você sobre isso, João. (0:25) Bom, vamos só tentar encerrar isso aqui, né?
+(0:28) Estamos voltando para o all time high, e ninguém sabe se ele vai parar por ali, né?
+
+Speaker 2
+(0:36) Pois é, eu estou com uma... (0:37) Abriu aquele aerocondo para o XASP, que é o índice um pouquinho menor do SPX. (0:45) E eu até tinha ficado um pouco feliz ontem com o pullback, que tinha dado uma queda, ele tinha dado uma melhorada.
+(0:53) Mas hoje, voltando para o all time high, realmente não se sabe onde pode chegar. (0:58) Ele disse que é inevitável, talvez vou ter que fechar. (1:01) Tinha definido 50 dólares como stop loss, então vou ter que fechar para depois pensar em uma nova operação.
+(1:07) Realmente esse upper level já ficou muito perigoso. (1:12) Tem 23 dias, já não acho que seja uma muito boa operação.
+
+Speaker 1
+(1:20) Realmente, esse é um momento que eu confesso que até hoje eu não aprendi realmente qual é a melhor prática, né? (1:25) Eu acho que hoje, pelas perdas que eu tive, logicamente não tem a menor dúvida que eu faria o stop mecânico mental, né? (1:34) Porque se você conseguiu levantar net credit, a ideia é muito simples, se você conseguiu levantar 50 com um mercado assim, digamos, um mercado pouco volátil, como ele estava, eu vi que estava 17 na segunda-feira.
+(1:51) Os calls... (1:52) Quer dizer, foi muito difícil levantar esses 50, você teve que deixar muito mais, arriscar muito mais no upside, né? (1:57) Para conseguir fazer essa massa crítica, né?
+(2:00) E juntar 50. (2:02) Então, é muito fácil o mercado subir volatilidade e você, numa condição melhor, conseguir encontrar de novo um trade por 50 dólares de max profit. (2:12) Ou seja, acho que é muito inteligente você, quando vê que está chegando nos 50, dizer esse não deu, vou fazer o próximo.
+(2:19) Essa é a ideia, né? (2:21) Porque o mercado vai ficar muito melhor para você fazer mais do que 50. (2:25) Você pode ter insistido no trade que realmente conduziu ao max loss maior, né?
+(2:32) Três vezes, que ficou muito bom comparado com os meus, que eram até Jade Lizard, né? (2:38) Sem o long call. (2:41) O meu não tinha, né?
+(2:42) Lembra, né? (2:45) O meu sem o long call aqui... (2:47) Isso aqui sem o long call já estaria certamente...
+(2:50) Já estaria negativo, né? (2:52) Bem mais negativo, bem mais negativo.
+
+Speaker 2
+(2:56) É uma decisão difícil, mas eu acho que...
+
+Speaker 1
+(2:59) Olha ali. (3:01) Jade Lizard. (3:02) É o dobro já do net credit.
+(3:06) É o dobro do net credit, mas olha aqui em cima. (3:08) Olha como é que você estaria.
+
+Speaker 2
+(3:10) Sim, eu digo o loss, né? (3:12) O loss já está o dobro do net credit. (3:14) O meu, ele está...
+(3:15) Nem chegou ainda o net credit. (3:17) É 53 e o loss está em 46. (3:19) No Jade Lizard, esse top já fica dobrado, né?
+(3:23) Realmente é muito maior.
+
+Speaker 1
+(3:25) Eu acho que o objetivo de a gente treinar juntos, João, é exatamente esse. (3:30) A gente lembrar um outro do stop mecânico, né?
+
+Speaker 2
+(3:34) Sim.
+
+Speaker 1
+(3:34) E lembrar exatamente isso. (3:36) Cara, segue o mecânico, por quê? (3:38) Porque semana que vem o mercado vai ter caído, talvez, você vai recuperar esses 50 muito mais fácil com o trade, com...
+(3:48) O VIX pode estar superior, só que você vai juntar um trade de 200 dólares muito mais facilmente do que esse de 50 que você teve que fazer, arriscar no upside, né?
+
+Speaker 2
+(3:58) Sim. (3:59) Eu acho que essa comunicação é muito importante, né? (4:01) Porque, por exemplo, quando...
+(4:04) Por mais que a gente diga isso e deixe isso muito claro quando a gente vai abrir o trade, quando chega, de fato, no momento, por exemplo, na segunda-feira, o trade chegou a ficar com 50 dólares negativo. (4:15) Mas aí a nossa cabeça, se a gente não está com o psicológico pronto para isso, a gente tenta arrumar justificativas para tentar manter o trade. (4:21) Então, ah, eu vi o RSI estava em 75, o que caracteriza que possivelmente vai ter um pullback, ele vai voltar.
+(4:28) Eu vou deixar pelo menos mais um dia para ver o que vai acontecer. (4:31) E aí ontem acabou que ele deu uma recuada, já deu ali uma animada, pensar que poderia voltar, mas é por isso que essa comunicação é importante, né? (4:39) É realmente deixar isso claro e não adianta tentar arrumar justificativas.
+(4:44) Vale a pena passar para o próximo trade porque faz parte de uma perda ou outra, né? (4:48) Acho que essa é a ideia. (4:50) Acho que é bem isso.
+
+Speaker 1
+(4:52) A autossabotagem é a maior característica de quem realmente entra em uma posição ou que começa a ganhar muito ou começa a perder rapidamente, né? (5:02) É a autossabotagem. (5:03) E ter um peer na história é muito importante, né?
+(5:06) É muito importante, é fundamental. (5:07) Eu acho que quem trade sozinho realmente vai sempre tradar pior por causa de erros como esse. (5:15) Concordo.
+(5:17) Que bom. (5:18) Mas acho que estão muito legais os teus trades, João. (5:20) Estão muito assim bem fundamentados.
+(5:24) Esse aqui, o XLF, deixa eu ver de novo.
+
+Speaker 2
+(5:28) Está bem no meio, né? (5:29) É, muito encaminhado. (5:31) Eu acho que vou deixar até a inspiração para conseguir o máximo do max profit porque, enfim, eu consigo um range muito bom com esse ticker ele tem, os movimentos são muito lentos e todos os dias ele sobe um pouco, 0,5% e no outro dia ele cai 0,5%.
+(5:48) Está bem no meio do range. (5:49) É um trade muito controlado. (5:52) Ontem chegou a ficar até com 17 dólares de profit, mas acho que vou deixar até a inspiração mesmo.
+
+Speaker 1
+(5:58) É, aí é uma questão de você pensar se você vai colocar mais um trade e vai querer diminuir o risco por causa de muitas posições abertas. (6:07) Enquanto não tiver outra posição aberta, acho que pode deixar. (6:12) E esse aqui realmente é uma coisa que a gente tem que investigar mais.
+(6:17) Eu acho que a gente tem espaço, só para concluir aquilo que eu já falei, tem espaço para colocar um calendar. (6:25) Não sei se double ou diagonal, se fly ou diagonal, se triple ou calendar no mesmo strike. (6:32) Não sei se é 21, 28, o clássico, 14, 21, uma semana de diferença, sempre 7 no meio.
+(6:44) Não sei se é um final de semana. (6:47) Todas elas a gente fez no passado, a gente fez um backtest, deu um pouquinho mais certo, deu um pouquinho menos certo. (6:55) Todas elas, o importante realmente é essa análise aqui, João, você que acha o mais importante.
+
+Speaker 2
+(7:00) Sim.
+
+Speaker 1
+(7:01) As duas coisas são fundamentais. (7:04) Eu acho que ele é um calendário, é um negócio fácil para você ganhar dinheiro. (7:08) Eu acho que tem que fugir um pouco das três semanas, porque isso vai ficar muito exposto, eu acho.
+(7:14) O problema é a exposição, porque a gente está contando aqui com realmente um range, que eu acho com a diminuição de volatilidade. (7:31) E realmente, sei lá, uma super queda, eu acho que a gente vai ficar meio perdido aqui. (7:36) Então, eu acho que quanto mais curto, melhor.
+(7:39) Aqui é um pouco 10 do zero do TI. (7:40) Está tudo em nosso favor. (7:42) As volatilidades são diferentes, não tem nenhum catalisador, não tem um super evento.
+(7:48) Talvez dois, três dias já basta para o cara fechar esse trade. (7:52) Por isso que, dentro dessa perspectiva, talvez um horizonte de três semanas é legal, mas aí tem que ser um pouco de massa crítica. (7:59) Se for realmente só para botar um WM, talvez, era o que a gente teve no passado.
+(8:04) A gente via que dava 20 dólares, 40 dólares, era um tempo maior, e eu achava aquilo um pouco arriscado para pouca massa crítica. (8:12) Mas se isso for bem, eu acho, equalizado, um backtest confirmar, é só a questão de aumentar o volume, não tem nenhum problema. (8:21) Começar a usar talvez o Russell futuramente, ou alguma coisa diferente.
+(8:27) Trocando para outros com SLV, aí realmente eu acho que tem que fazer mais backtest, porque eu não sei como essas coisas se comportam. (8:34) Eles têm esses moves de 7%. (8:37) Eu não tenho a menor ideia, cara, se alguma coisa muda nessas relações.
+
+Speaker 2
+(8:42) Então, Cristiano, até isso era o ponto que eu queria comentar com você sobre o triple calendar. (8:46) Desde que a gente viu o vídeo, eu realmente achei uma estratégia bem interessante. (8:49) Eu comecei a estudar mais, tentar entender mais também esses calendários, que eu acho que a gente tem espaço para colocar isso no nosso dia a dia.
+(8:57) Principalmente eu, que estou tentando desenvolver estratégias de curto prazo, de swing para opções. (9:04) E ontem eu estava pesquisando bastante, testando a ferramenta de backtest do TasteTrade. (9:11) E eu montei backtests para o triple calendar no SPX.
+(9:16) A ferramenta é muito boa para fazer backtests.
+
+Speaker 1
+(9:20) Você gostou? (9:21) Eu achei ela um pouco simples, mas de repente...
+
+Speaker 2
+(9:24) Ela é simples para definição de... (9:28) Se a gente quiser utilizar backtests com análise técnica, realmente não tem como. (9:34) Mas se a gente define também de delta ou de porcentagens do out of the money, ela é possível fazer, e os resultados são rápidos e práticos.
+(9:43) Tem certas limitações, não vai ser algo que você consegue definir cada semana um trade que você vai fazer, mas para ter uma visão geral, um caminho, ela pode ser bem interessante. (9:54) E eu rodei para o SPX, porque justamente eu queria... (9:58) Tinha essas dúvidas que você comentou, então, será que funciona melhor para 7 ou 14 TI, ou 1421, será que essa diferença tem que ser de 7, etc?
+(10:07) Tinha essas dúvidas na minha cabeça. (10:09) Rodei os backtests, os resultados foram muito bacanas, eu rodei para os últimos 5 anos. (10:14) Eu já subi isso no nosso app.
+(10:16) Até aí eu pedi para você dar uma olhada, depois estar na parte de backtests. (10:21) Hoje eu postei no Deez, postei um pouco dos resultados, mas lá no app tem cada um dos trades que eu fiz, eu fiz três tipos de operações ali, essas foram as diferenças de contrato. (10:36) E coloquei alguns filtros, (10:39) porque justamente o que você comentou, (10:40) quando você roda 21 e 28 TI, (10:45) você acaba ficando muito exposto, (10:46) mas o que mostrou é que (10:48) quando você define um target profit (10:50) de, por exemplo, 50%, (10:52) que foi o melhor, (10:53) você acaba deixando com que (10:55) nas primeiras uma ou duas semanas, (10:58) o TED está a nosso favor, (11:00) ele gere um bom P&L (11:02) que chega nesse target profit (11:04) e você faz a execução, (11:07) fecha o trade e abre um novo. (11:09) Isso faz com que se mostre uma estratégia melhor do que deixar até a expiração, montar um trade menor, como 7 a 10 TI, que eu montei para o SELV, que foi a pior performance, quanto maior o período, foi melhor o resultado.
+(11:24) Mas enfim, isso tudo está ali no app, depois quando você tiver um tempinho, dá uma olhada, acho que os resultados foram bem bacanas, acho que tem bastante coisa para explorar também, mas eu coloquei ali mudanças de VIX para você poder filtrar, dependendo do VIX, coloquei target profit diferente, 10%, 20%, 30%, então dá para ter uma visão bem bacana de cada um dos trades.
+
+Speaker 1
+(11:46) Que bacana, e já está dentro do app então?
+
+Speaker 2
+(11:50) Já, já está dentro do app, daí eu coloquei algumas análises, coloquei um breakdown por ano também, então você consegue ver qual foi a performance de cada um dos anos, os 22, 23, 24, então ficou bem bacana a análise.
+
+Speaker 1
+(12:05) Muito bom, João, muito bom, acho que bacana, poxa, que bom. (12:10) Bom, acho bacana, acho que tem espaço, eu vou ler depois com bastante calma para não absorver o assunto todo agora, senão vai demorar uma hora para destrinchá-lo, mas acho muito legal. (12:24) A conclusão então, só para ter já um teaser, que 21, 28 é o melhor, take profit 50.
+(12:33) Ok. (12:35) Bom, take profit 50, acho até um pouco arrojado para esse tipo de estratégia. (12:38) Se você colocasse assim 20, 30, 40, não poderia ser melhor?
+
+Speaker 2
+(12:42) Eu coloquei as opções 10 e depois você consegue ir mudando lá no app, você vai mudando e ele já vai botando os resultados de cada um. (12:51) Coloquei 10, 20, 25 e 50 como opções (12:56) e em algumas delas, (12:58) o 10 ele aumenta o in-rate, (13:00) até acho que eu cheguei a comentar ali, (13:02) o 10 ele aumenta o in-rate, (13:04) mas ele acaba piorando um pouco o P&L total, (13:09) mas você tem também um drawdown menor, (13:11) então é um trade-off, (13:13) mas o resultado final, (13:16) o valor final de P&L, (13:18) porcentagem, etc, (13:19) o que teve o melhor resultado (13:21) foi os 50%, (13:23) mas caso você queira arriscar (13:25) um risco um pouco menor, (13:26) o 10% também, (13:27) 10, 20% se mostrou bem bacana.
+(13:30) Mas por exemplo, se você clicar, clica nessa opção, ali você consegue definir na enclosed rule ali do lado, isso, você pode definir o filtro de VIX, caso você queira mudar, e o target profit, aí eu coloquei ali algumas opções. (13:49) Por exemplo, só de colocar o 10% ele já aumenta muito o P&L e os resultados também já melhoram bastante, o in-rate.
+
+Speaker 1
+(14:01) Pessoal, vamos ver o que é uma perda aqui. (14:05) Eu estou começando a ficar muito atento agora, conversando com esse coach, é Ernie o nome dele, Ernie, que tem, ele tem um in-rate de mais de 90%, que é o que o Flávio Gonal fala, que ninguém fala, e a minha história, a minha história de mês de março e abril, é que o in-rate é bom, você pode ter um loss e pode limpar os ganhos de um mês inteiro. (14:29) Então, realmente, essa convicção de que tem que entrar realmente comprando um super discount para nunca realmente estar preocupado com o que você está arriscando, eu acho que é muito importante, e para mim foi um paradigma novo.
+(14:47) Quanto é que foi o worst aqui? (14:50) 6 mil, não é?
+
+Speaker 2
+(14:52) Esse é o melhor. (14:53) 2 mil, 2 mil. (14:55) Ah, tá.
+(14:56) Isso é interessante do triple calenda, porque como é uma estratégia de débito, então seu max loss é o débito que você paga. (15:03) Então, você consegue também ter esse solo super controlado. (15:07) Até o que eu botei aí de capital efficiency, por mais que você estivere 82%, eu fiz uma simulação com 7 mil dólares, mas o máximo que ficou alocado no período foi 11 mil dólares.
+(15:22) Então, é uma estratégia que tem um capital efficiency muito bom, por causa que o que precisa, de fato, é só a soma dos débitos que estão ali nos trades que você tem aberto. (15:32) Não tem um max loss definido, por exemplo. (15:35) Poxa, muito legal.
+
+Speaker 1
+(15:37) Bom, tem que pensar o que aqui na prática não seria assim, né? (15:39) Vamos começar... (15:40) É aí que entra o forward, né, João?
+(15:41) Já tem a chance de colocar trades e analisar isso, né? (15:45) Muito legal, parece que é perfeito. (15:47) Acho que aqui é um trabalho que a gente tem que pensar quais são os limites disso, né?
+(15:51) Em termos de aproveitar para a gente e pensar no futuro para mais alguma coisa. (15:58) Eu também estou fazendo aqui os meus 0 de TI. (16:04) E sempre o problema é que quando a gente faz os fechamentos, ele sai, né?
+(16:13) Você perde. (16:14) E o mais importante, você perde a história, né?
+
+Speaker 2
+(16:17) Isso é a parte mais chata.
+
+Speaker 1
+(16:18) Isso eu acho muito ruim. (16:20) E é aquilo que o Guedes falou, né? (16:21) Tantas coisas que o option threat podia complementar, né?
+(16:25) Isso eu acho muito ruim.
+
+Speaker 2
+(16:26) A tela fica em branco e você não consegue mais ver.
+
+Speaker 1
+(16:30) Você podia mostrar tanta coisa que podia ser tão simples. (16:33) Seria só indexar, né? (16:34) Mostrar os Greeks, etc.
+(16:35) Com a passagem do tempo, etc. (16:38) Então, o que eu estou fazendo aqui, fiz um 0 de TI para mim para tentar monitorar isso aqui, né? (16:43) Como é que foi o crescimento ontem com o 0 de TI, né?
+(16:47) Mas, assim, o que você está fazendo ali, cara, state of the art. (16:51) Parabéns, muito legal. (16:53) E que bom que você está desminuindo essa estratégia.
+(16:56) Eu acho que a gente tem que pensar um pouco só agora no que seria realmente mudar os underlines, né? (17:00) Assim, de maneira geral, duas coisas, eu acho. (17:02) Eu acho que é o underline e eu acho que é isso aqui, João.
+(17:06) Não pode esquecer. (17:08) O indiano lá teve uma, digamos assim, teve uma live, né? (17:18) Deu uma viajada lá e encontrou um triple calendar, né?
+(17:22) O Steve Gaines, aquele outro australiano lá, tem o fly agonal. (17:27) Não pode esquecer que o fly agonal é basicamente isso aqui, né? (17:33) É basicamente isso aqui e ele deixa na mesma, aqui não muda o calendário, né?
+(17:41) Não muda a inspiração, mas basicamente é isso aqui, né? (17:44) Não pode esquecer que a gente não está falando de coisas tão diferentes, né? (17:49) A gente está com praticamente um iron condor no mesmo strike que tem só a diferença do, opa, tem só a diferença do, quer dizer, a gente está 100% só no delta de praticamente de volatilidade entre as inspirações, né?
+
+Speaker 2
+(18:09) É, e até tem um outro indiano também que foi o Tata Profits que ele fala do próprio double calendar, né? (18:18) Então, também é uma estratégia a ser averiguada, sim. (18:21) E aí eu até vi um vídeo agora, acho que foi do próprio, o que fala sobre o fly agonal é Steve, o nome dele?
+(18:30) Steve Gaines, é. (18:31) E Steve Gaines, é. (18:32) O pai, né?
+(18:34) Ele disse que é o pai, não deve ser, mas ele paga dinheiro por aquilo ali, né? (18:38) Ah, e agora ele veio, ele foi no Tata Profits e falou sobre uma estratégia de oito, que ele chamou de fly diagonal, que é a mesma coisa do fly agonal, só que ele adicionou outro calendar spread na parte do upside. (18:50) Então, você adiciona mais um calendar e você tem um profile um pouco diferente, ele tem oito legs ali em vez de...
+(18:58) Enfim, achei meio...
+
+Speaker 1
+(18:59) Exatamente. (19:01) Ele está especializado nisso ali, né? (19:03) O que ele fala muito é aquilo ali que ultimamente deu uma inversão na minha cabeça, ele fala muito do win rate, né?
+(19:08) Do win rate, porque ele está sendo com 10%, né? (19:14) E... (19:15) E logicamente teve, nesse começo teve em abril, ele deixou claro na entrevista, teve super dessabores como eu tive, né?
+(19:23) Com os super directional moves, né? (19:25) Sim. (19:26) E isso aqui, basicamente...
+(19:30) Basicamente, ele foi pego certamente aqui com a bola caindo e isso aqui disparando, né? (19:36) Mas, enfim, a gente tem que cuidar só um pouco porque a gente pode se apaixonar por esse triple, né? (19:42) E pode esquecer um pouquinho dos outros, né?
+(19:44) Assim, eu não quero ser bem neutro com relação a... (19:47) Com relação a isso aqui, né? (19:49) Eu confesso que, tirando aquele back task que a gente fez no passado, que era EWM, eu achei que estava caro tradar e tinha um resultado um pouco baixo, tinha que esperar.
+(20:00) A gente fazia naquele momento, a gente fazia só para praticamente... (20:04) Nós fazíamos praticamente 7, 7 e 11, né, Jorge? (20:07) Deixava fazer para sexta-feira seguinte e mais a segunda-feira posterior, né?
+(20:13) Aquilo não me convenceu muito, mas fazendo o que você fez agora, back testing, e eventualmente incluindo o flagonal como maneira de comparar, né? (20:22) Para a gente ter certeza, porque a impressão que dá com o flagonal, só para terminar isso aqui da minha parte, é que eu não sei até que ponto faz uma diferença muito grande se ter os três, né? (20:35) E só indexar um deles e apostar mais no fly aqui, porque o fly também tem as suas vantagens, né?
+(20:47) Pode ser que o fly... (20:48) É o que a gente falou agora, o fly, ele... (20:52) Como ele tem short put antagônicos, ele sempre está pagando alguma coisa, diferente do condor.
+(21:01) Se ele começa muito já indo para o lado, aquele sofrimento está passando agora com o teu condor ali, né? (21:07) E se fosse um fly, é sempre mais... (21:10) É sempre mais...
+(21:14) Mais... (21:14) Chamar de... (21:18) Contrabalanceado, né?
+(21:20) Então, esse... (21:21) O painel path, o sofrimento que você passa até ganhar o dinheiro que está previsto, no teu max profit, é a grande diferença. (21:29) Como a gente quer sair antes, tem que investigar se esse fly normal, que não é fly calendário, se ele não é interessante ali naquela...
+(21:39) Nessa situação, né? (21:42) E... (21:42) Se ter os três aqui é tão relevante como ter só um, eu não sei.
+
+Speaker 2
+(21:46) Sim, eu acho que... (21:48) Enfim, eu quero... (21:51) Não quero ter nenhuma preferência em relação a estratégia, eu quero usar para ver qual que funciona melhor.
+(21:56) O que eu sempre tento buscar, principalmente eu acho que o backtest é muito importante nisso, é tentar criar estratégias que sejam com definições mecânicas, para que tirem cada vez mais a parte empírica do trade. (22:07) Então, claro, eu posso utilizar análises técnicas para melhorar um pouco o range, mas, por exemplo, eu montei esse backtest baseado em 16 delta. (22:14) Então, quando eu vou montar um trade no SPX, eu tenho de onde partir, eu não vou inventar algum breakeven, etc.
+(22:22) E aí, claro, a partir daquele trade que eu sei que funciona e tem um bom caminho, eu posso mudar um pouco as minhas lags para ter um resultado melhor baseado na análise técnica. (22:33) Mas eu já tenho uma direção para onde seguir, então vai ser a ideia do backtest. (22:36) Só comentando um pouco, eu fui pesquisar mais sobre o FipucaLenda, realmente, a única pessoa que eu ouvi falar sobre isso é esse indiano, eu vi que ele tem um canal no YouTube, comprei alguns vídeos e vi que ele tinha o canal do Discord.
+(22:48) Entrei no canal do Discord, vi algumas pessoas comentando sobre, que estão testando, vi alguns backtests, pessoas fazendo backtests sobre a estratégia e foi aí que eu pensei em fazer também e montar aqueles backtests que eu postei já.
+
+Speaker 1
+(23:02) Que bom, que bom, cara. (23:03) Famoso na primeira vista, né? (23:05) Você gostou quando viu a...
+(23:07) Eu também gostei quando eu vi, a gente viu... (23:09) Eu vi... (23:09) Antes de você, eu não falei nada, gostei e aí vi que você viu também, porque a cataproc deve estar aí no teu algoritmo, né?
+(23:17) Sim. (23:18) E... (23:19) Engraçado, aquele cara lá tem um serviço muito simples, né?
+(23:22) Ele está apresentando um serviço incrível, né? (23:23) Assim, de inovação, né? (23:26) O John.
+(23:27) Sim. (23:27) O John, você quando vem aqui, quando você faz a escolha do strike, do primeiro calendar aqui, do mais, do lower, você faz a... (23:37) Você vai no 16 direto ou você faz aquela...
+(23:40) A gente vai parar no 16... (23:41) A estratégia dele era colocar um... (23:44) É fazer um straddle um longo straddle ele falava, né?
+(23:48) Colocar a short aqui para medir até qual é o expected move, né? (23:53) Isso. (23:54) Que é aqui, na verdade, né?
+
+Speaker 2
+(23:57) Isso, exato. (23:58) Essa estratégia que ele passou no...
+
+Speaker 1
+(23:59) Seria aqui, né?
+
+Speaker 2
+(23:59) 7 e 2. (24:01) Isso. (24:02) Essa estratégia que ele passou no vídeo, né?
+(24:04) E o que eu fiz para montar o backtest? (24:08) Eu coloquei um calendar primeiro. (24:10) O principal, ele é the money, né?
+(24:12) Então, em cima do the money. (24:15) Aí eu coloquei tanto o lower, o put calendar que fica no lower, tanto o call calendar eu coloquei no delta 16. (24:26) Porque aí eu consigo definir...
+(24:27) Eu consegui... (24:28) Eu consigo definir isso e eu, claro, primeiro testei antes montando no próprio Aspects. (24:32) Eu vi que ele monta um range bom.
+(24:34) Um range que fica além do standard deviation com um bom P&L e relação com max loss. (24:42) E aí isso é uma definição muito mecânica.
+
+Speaker 1
+(24:45) Fica no 16, praticamente, aqui. (24:47) Então, eu estou vendo o 17, então é o 16 e eu coloquei É a regra do Taste, basicamente, né? (24:52) O Taste, exato.
+(24:57) Engraçado, engraçado. (24:58) É bom, legal. (25:01) Está ótimo.
+(25:03) O Taste, ele monta o expected move baseado, realmente, ele tem uma fórmula. (25:07) Ele usa um straddle, tem uma formulazinha, que eu acho que é basicamente essa aí que ele está usando. (25:16) Que não é exatamente o que dá um standard deviation.
+(25:20) O expected move do Trade, do Taste, é baseado exatamente, acho, no long straddle. (25:27) Que é a mesma que o Indiano sugeriu, né? (25:31) Um comentário sobre o Taste, cara, é que o Taste, realmente, eu estou lendo um livro agora, já quero abandonar esse livro e voltar e ler de novo o livro do Taste, porque realmente é uma escola muito legal.
+(25:43) E eu acabei vendo aqui, em muitos vídeos, por acaso, hoje eu vi um, por exemplo. (25:49) Pena que eu não gosto de estudar. (25:52) Cara, eles fazem, eu acho que aquilo que você gosta, eles fazem backtest direto, né?
+(25:57) E é muito legal ficar assistindo. (25:59) Eu achei o canal muito interessante, cara. (26:01) Não vale a pena trocar facilmente por outro.
+(26:04) Acho que a gente tem que ver outros, mas sempre tem que ter o Taste, assim, na manga. (26:10) Eu vi também aquelas meninas que fazem o... (26:14) Elas fizeram uma fantástica de Zero de Ti.
+(26:17) Deixa ver se eu consigo pegar na minha história aqui. (26:18) Vai estar muito para baixo. (26:26) Mas...
+(26:26) Bom, vou encontrar aqui no canal do Taste mesmo. (26:38) Aqui, ó. (26:41) Elas têm...
+(26:41) Vou tentar pegar no canal. (26:45) Tem muita coisa legal, cara. (26:47) Eu encontrei aqui...
+(26:49) Eu gosto muito quando elas... (26:53) Essas aqui, ó. (26:54) Elas estão ali.
+(26:59) É... (27:00) E mostram sempre esses vídeos de sete minutos que são realmente algum produto do backtest, né? (27:06) Elas vêm exibir.
+(27:11) E... (27:12) Cara, tem estudos muito legais aqui. (27:15) Tem estudos muito legais aqui.
+(27:17) E acho que vale a pena ter isso. (27:19) A gente que gosta da... (27:20) A gente que busca inovação, mas quer manter a escola deles por detrás, né?
+(27:25) Short selling, standard deviation, probabilidade. (27:29) É... (27:30) O...
+(27:30) E... (27:31) Não sei por que, mas assim, a gente está com muita coisa no radar. (27:35) Mas tem que ter um ou dois spies no formato strangle, sempre correndo por detrás do nosso trades, né?
+(27:42) Sim. (27:44) Porque... (27:44) Ou você confia, ou você não confia na probabilidade do que você está fazendo, do mundo de opções, né?
+(27:50) E... (27:51) Tudo deixa claro que você vai perder. (27:52) Talvez você vai começar com aquele...
+(27:54) Com o azar de jogar o dado e ter cinco perdas seguidas, mas... (28:00) Ou você confia ou você não confia, né? (28:02) E...
+(28:03) Eu acho que short strangle com SPY, que é menor do que o SPX, o SPX que é muito pesado, tem que estar sempre rodando em paralelo.
+
+Speaker 2
+(28:12) Sim. (28:13) E... (28:13) Também é aquilo, né?
+(28:15) Para... (28:15) Para que seja lucrativo, tem que ter um número de coerências grade. (28:18) Então, não ajuda você a perder uma ou duas vezes e parar de fazer, porque é realmente igual ir no cassino, jogar duas vezes na roleta, você tem a chance de ganhar ou perder, e se você sair...
+(28:29) Então, para que realmente você ganhe, o cassino precisa que você pode ir lá e você ganhar muito na roleta. (28:34) Para o cassino ser lucrativo, você tem que... (28:36) Quanto mais ocorrências tiver, você vai conseguir ali esse lucro.
+(28:39) Então, essa é a ideia. (28:40) Igual, por exemplo, eu montei esse Aero Condor no XSP, baseado... (28:44) Mesma coisa, né?
+(28:44) Que tem espaço, com delta 16, só... (28:47) A única diferença que vem de usar o strangle quando a minha conta é pequena é usar o Aero Condor. (28:51) O resultado acabou sendo negativo, mas é um momento muito específico do mercado, não é algo normal.
+(28:56) E não necessariamente eu perdi a crença. (28:57) Eu acho que eu quero sempre manter um trade desse modelo na minha cadeia de opções.
+
+Speaker 1
+(29:03) Muito legal, João. (29:05) Muito legal. (29:05) É, o que eles falam no livro é que a versão mais covardada é o 16 e usa swings com 10, né?
+(29:13) De delta, né? (29:14) Isso, né? (29:15) Isso.
+(29:17) Eu acho assim, tira um pouco o glamour, né? (29:20) Até porque, por exemplo, nós vimos agora o Aero Condor é diferente do fly, né? (29:25) E o fly você não teria essa situação agora de estar...
+(29:30) O fly pode ser batman também, né? (29:32) Tem que pensar um pouco nisso. (29:34) E eu estou aprendendo um pouco nessa coisa que a gente viu, que é...
+(29:40) Fazer muito broken wing, você quebra toda essa ideia desse balanço, né? (29:47) Nunca ter um P&L durante um caminho tão desagradável como está passando agora. (29:54) Mas, logicamente, eu acho que o 10 trava muito.
+(29:57) O wing 10 trava muito, né?
+
+================================================================================
+[Parte 3]
+
+Speaker 1
+(0:00) para deixar lá o XSP, o SPI, ou até realmente um pouco mais volátil, até o Triple Queue ou EWM, e deixar realmente no formato String. (0:11) O String tem que ser, temos que colocar ali de maneira perene. (0:16) João, alguma coisa aqui para a gente ver, se não sobrou nada aqui da listinha.
+(0:24) Triple Calendar Strategy, eu vi que você já evoluiu muito mais do que eu imaginava. (0:28) Vamos colocar mais Forward Trades, eu acho que é maneira da gente analisar isso, depois em paralelo com o P&L Curve. (0:41) E como eu estou fazendo 0 de TI, o que eu quero fazer agora é aumentar o 0 de TI para eventualmente até 5 de TI, para tentar usar um pouco a dinâmica da semana, de segunda a sexta, eu acho que fazer 7 fica um pouco exagerado.
+(0:56) Mas eu quero colocar Forwards, então, da ideia do 0 de TI, usando mais agora Fly, ao invés de usar Iron Condor, por exemplo. (1:06) Por isso que eu demorei um pouco para fazer, eu estou tentando estudar um pouco mais esse 0 de TI, e também para saber até que ponto eu quero usar Gamma Level ainda, para fazer o 0 de TI transformá-lo até 5 de TI. (1:17) Certo.
+(1:19) Da minha parte aqui, a passagem nova, a gente vai comprar a passagem, a gente encontrou uma passagem para final de novembro, final de outubro, desculpa. (1:33) E a gente demorou um pouquinho para responder, veio um link no domingo à noite, eu fui ver isso ontem de manhã, quando acordei, e a passagem tinha subido de novo, deu um pulo, enfim, não sei se o preço original era real, mas nós vamos precisar da companhia comprar, precisar da TAP, já estava 400 dólares mais caro, mas vou comprar em breve. (1:54) E o que eu coloquei aqui, vamos dizer, o que está aqui no work plan, vou tirar aqui.
+(2:10) Estou usando perplexity, mas não está me ajudando muito. (2:14) É aqui o ponto, ocorrência, João, isso eu queria falar, estava esquecendo. (2:25) Eu acho ocorrência está muito legal, João.
+(2:30) Vou abrir aqui, dentro do... (2:33) Aqui, para eu ver aqui bem. (2:36) Tchau, detalhe que pode compartilhar comigo.
+(2:39) Aparece, sim, já vou abrir. (2:49) Ocorrência, eu sempre me confundo, tem ocorrência, ocorrência é MTF. (2:52) Ah, tem que tirar aqui o indicador.
+
+Speaker 2
+(2:55) Vou pegar esse aqui. (3:06) Está aqui, não é?
+
+Speaker 1
+(3:09) Está, acho que está fantástico, João. (3:12) Acho que vai nos ajudar muito. (3:17) Isso aqui, logicamente, está um pouco no olhômetro, não é?
+(3:23) Não sei se é o mais indicado, estou tentando testar um pouco. (3:30) Você acha que tem condição, João, de a gente fazer uma tabela agora externa com relação a isso? (3:37) Você diz...
+(3:40) Como você começou a fazer, né? (3:42) E eu falei, João, vamos parar só porque a gente tem que definir a questão da tolerância, né? (3:50) Isso.
+(3:53) Acho que tem, sim, é tranquilo de fazer. (3:55) O único detalhe é realmente definir as tolerâncias ali para cada um dos... (3:58) É isso que eu tenho um pouco de dificuldade, assim.
+(4:00) Qual que é a melhor tolerância para cada um dos timeframes, né? (4:03) Porque a dinâmica do 15 minutos é muito diferente da dinâmica do diário, por exemplo. (4:07) Então, as EMAs se comportam diferente, o preço fica mais perto.
+(4:12) Depende do ticker também. (4:13) Tem tickers com preço mais elevado e você vai trabalhar, por exemplo, com tickers com preço menor. (4:21) A dinâmica também muda.
+(4:22) Então, tudo isso difere um pouco, mas definindo bem ali as tolerâncias que a gente quer para cada um dos timeframes eu consigo fazer tranquilamente essa tabela. (4:34) É, porque eu acho interessante você buscar realmente na fonte do que está gerando... (4:40) Enfim, está gerando um indicador dentro do painel, mas colocar esse lado a lado, né?
+(4:46) A tolerância não tem segredo, João. (4:48) A tolerância você tem que bater o olho, né? (4:54) Uma coisa que você podia pensar futuramente é para não ficar muitos indicadores, né?
+(4:58) A gente tentar juntar os dois, né? (5:02) E aí você só ativa... (5:06) A única diferença é que a gente vê a marquinha, a marca, né?
+(5:11) As setas no gráfico, né? (5:17) É, ele... (5:18) Como aqui é a tabela, você tem ali todos os lags, se eu colocasse as setas ia ficar uma confusão, né?
+(5:23) Não teria como você analisar o que é cada coisa, né? (5:28) O outro indicador ele está tendo somente o MMA, por exemplo, aí você consegue ver... (5:33) Ele destaca o MMA só e você consegue ver exatamente.
+(5:37) Daquele timeframe, né? (5:39) Isso, daquele timeframe. (5:41) É, eu acho que, assim, ele está muito legal.
+(5:46) Só que eu estou achando que a gente tem que melhorar o seguinte... (5:51) Porque apesar dele ter ficado muito bacana e você fez muito rápido... (5:57) Eu acho que ele...
+(5:59) Quando a gente abre ele aqui, dá a impressão que ele é muito cambiante, né? (6:02) Que ele é muito assim... (6:02) Ah, eu vou treinar agora o IWM e vou olhar para o IWM para saber...
+(6:07) Ah, ok. (6:09) Eu estou no gráfico de 15, ele tem uma boa justificativa. (6:13) Ótimo.
+(6:13) Só que acontece o contrário. (6:15) Eu vou treinar o IWM e vou sabendo... (6:20) Frente a uma tabela...
+(6:21) Eu vou usar o gráfico de 15 minutos para buscar uma justificativa... (6:25) Porque eu já sabia disso a priori, entende? (6:27) Baseado em uma tabela.
+(6:30) E também não vai mudar muito, né? (6:32) Depois que a gente usar realmente... (6:33) Depois que a gente definir o que a gente quer de tolerância...
+(6:36) E essa tabela for gerada... (6:37) Vai demorar meses até você ter um ranking diferente, né? (6:41) São muitas ocorrências para você começar a ter esse ranking modificado.
+(6:45) Ou seja, o mecanismo é um pouco diferente. (6:48) Eu tenho a tabela... (6:50) Eu treino o SPX todos os dias.
+(6:53) Eu sigo o SPX 15 minutos... (6:56) E o M20 é muito bom. (6:59) E eu já estou preparado para isso.
+(7:01) Não quero que... (7:02) Não preciso da informação de um indicador, né? (7:05) Até como a palavra sugere, o indicador...
+(7:08) Está mudando constantemente... (7:10) Para usar essa informação. (7:12) Eu já sabia, porque eu vi isso previamente, antes do trade.
+(7:16) Baseado na tabela e baseado na comparativa, né? (7:19) Sim, sim. (7:20) Entendi.
+(7:20) Entendi a dinâmica que você está buscando. (7:23) Eu acho que não tem nada de alta aqui, entende? (7:25) É legal.
+(7:26) Mas não é o processo de decisão que vai acontecer, né? (7:29) Vai acontecer antes, né? (7:31) Quer dizer, eu quero olhar para a tabela e dizer...
+(7:32) Caramba, eu usava o gráfico de uma hora a mais de 15 minutos. (7:35) É melhor ainda?
+
+Speaker 2
+(7:37) Sim.
+
+Speaker 1
+(7:38) Então, basicamente, a ideia é essa. (7:43) Vou pensar em como que eu posso... (7:46) Fazer isso de uma forma que fique claro ali...
+(7:49) E facilite esse processo de decisão... (7:51) Antes, de fato, de você começar a abrir o gráfico ali para analisar. (7:55) Isso.
+(7:56) Então, já que é um algoritmo, né? (7:59) Algoritmo é só incluir... (8:00) Mais algumas linhas...
+(8:03) Pode colocar os 5 e 2 minutos também. (8:07) Tá. (8:08) Pode deixar.
+(8:11) Legal. (8:12) E é muito interessante, cara. (8:13) Isso aqui é muito legal, porque...
+(8:16) Essa... (8:17) Vou chamar de matriz, né? (8:19) Porque tem ticker, tem...
+(8:23) EWMs e tem... (8:25) Os minutos, né? (8:26) O time frame.
+(8:27) Isso aqui, cara, bem explorado... (8:30) Depois tem que ter esse check real, né? (8:32) Para você ver exatamente onde é que as setas são geradas.
+(8:34) Se a seta estava ali próximo... (8:36) Da linha do EMA... (8:38) De uma maneira plausível, né?
+(8:39) Se ela já não fez o bounce muito antes... (8:41) Porque a tolerância está sendo... (8:43) Exagerada, né?
+(8:45) Ou não... (8:47) Depois que faz esse pequeno acerto... (8:49) De tolerância...
+(8:51) E seja mais confiável... (8:53) É muito poderoso isso aí, cara. (8:54) É muito poderoso.
+(8:56) Se você começar a ter realmente... (8:59) EMAs de mais de 60% de confirmação... (9:02) Isso ajuda muito, muito, muito, né?
+(9:05) É.
+
+Speaker 2
+(9:06) Por exemplo, nos últimos feitos que eu estou tentando montar...
+
+[trecho final da gravação cortado/inaudível]

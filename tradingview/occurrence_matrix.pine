@@ -5,8 +5,8 @@
 
 indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true)
 
-string ver_num  = "v11.0"
-string ver_date = "2026-04-29"
+string ver_num  = "v12.8"
+string ver_date = "2026-05-14"
 
 // ==========================================
 // 1. INPUTS
@@ -20,8 +20,10 @@ g_fx     = "Tickers — FX"
 g_comm   = "Tickers — Commodities/ETFs"
 g_qqq    = "Tickers — QQQ Top 10"
 
-approx   = input.float(0.1, "Zone Tolerance (+/- %)", step=0.1, group=g_main, tooltip="Close MUST break this buffer to count as a violation. Match the value used in your stand-alone Occurrence Scanner.")
-winSize  = input.int(2, "Lookahead Candles", minval=2, group=g_main)
+// Tolerances are auto-resolved from a SPY-calibrated table per (TF, MA).
+// See get_tol() below. The override input is for ad-hoc debugging only.
+approxOverride = input.float(0.0, "Override tolerance (0 = use table)", step=0.01, group=g_main, tooltip="Leave at 0 to apply the SPY-calibrated table (TF × MA). Set > 0 to force a single value across all MAs (debugging / parity tests).")
+winSize        = input.int(2, "Lookahead Candles", minval=2, group=g_main)
 
 useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=g_filter)
 useDateFilter    = input.bool(true,  "Filter Start Date?", group=g_filter)
@@ -47,6 +49,14 @@ showQQQ     = input.bool(false, "Show QQQ Top 10",        group=g_table, tooltip
 g_alert       = "Snapshot Export"
 printSnapshot = input.bool(true,  "Print snapshot to Pine Logs (manual mode)", group=g_alert, tooltip="Quando ligado: imprime o payload JSON no painel Pine Logs assim que o chart termina de carregar. Use pra copiar manualmente sem precisar configurar webhook. Abra View → Pine Logs no Pine Editor.")
 enableAlert   = input.bool(false, "Enable Friday Close Snapshot Alert (auto mode)", group=g_alert, tooltip="Quando ligado: dispara alert() com payload JSON no fechamento de Sexta D1. Configure 1 alert no TV (Add alert → condition 'Any alert() function call') apontando pro webhook. Use em chart D1 de SPY ou outro asset com sessão US.")
+
+// ==========================================
+// 1b. DEBUG / PARITY (compare against Occurrence Scanner [ST])
+// ==========================================
+g_debug    = "Debug — Event Log"
+dbgEnable  = input.bool(false, "Enable event log for one ticker + MA", group=g_debug, tooltip="Logs every Bounce/Break/False event with trigger date and end bar. Open View → Pine Logs to read. Use to compare against OS [ST] triangles on chart.")
+dbgTicker  = input.string("SPY", "Ticker to log", options=["ES","SPX","SPY","XSP","NQ","NDX","QQQ","RTY","RUT","IWM","BTC","ETH","EURUSD","EURCHF","GBPUSD","GLD","SLV","USO","EWZ","NVDA","AAPL","MSFT","AMZN","GOOGL","AVGO","GOOG","META","TSLA","BRK.B"], group=g_debug)
+dbgMA      = input.string("SMA200", "MA to log", options=["EMA9","EMA20","SMA50","SMA200","VWAP"], group=g_debug)
 
 // 29 tickers (universo definido com CZ)
 t01 = input.symbol("CME_MINI:ES1!",   "ES",   group=g_idx)
@@ -115,12 +125,39 @@ n28 = "TSLA"
 n29 = "BRK.B"
 
 // ==========================================
-// 2. STATE MACHINE — paridade exata com Occurrence Scanner v10.3
+// 2. TOLERANCE TABLE — SPY-calibrated (% of MA value)
 // ==========================================
-// Recebe a MA já calculada e o estado do squeeze do contexto atual,
+// Resolves the touch buffer per (chart_TF, MA_index). MA index: 0=EMA9, 1=EMA20, 2=SMA50, 3=SMA200, 4=VWAP.
+// VWAP is session-anchored, so D/W are intentionally skipped (returns 0 → ticker_csv writes [0,0,0,0]).
+// Override input wins when > 0 (debug / cross-version parity).
+get_tol(int ma_idx) =>
+    string p = timeframe.period
+    float t = 0.0
+    if approxOverride > 0.0
+        t := approxOverride
+    else if p == "2"
+        t := 0.02
+    else if p == "5"
+        t := 0.02
+    else if p == "15"
+        t := 0.05
+    else if p == "60"
+        t := 0.1
+    else if p == "D"
+        t := ma_idx == 0 ? 0.2 : ma_idx == 1 ? 0.2 : ma_idx == 2 ? 0.3 : ma_idx == 3 ? 0.3 : 0.0
+    else if p == "W"
+        t := ma_idx == 0 ? 0.2 : ma_idx == 1 ? 0.3 : ma_idx == 2 ? 0.4 : ma_idx == 3 ? 0.4 : 0.0
+    else
+        t := 0.1
+    t
+
+// ==========================================
+// 3. STATE MACHINE — paridade exata com Occurrence Scanner v10.3
+// ==========================================
+// Recebe a MA já calculada, o estado do squeeze e a tolerância (%),
 // roda a state machine bar-a-bar e retorna [Total, Bounce, Break, False].
 
-run_sm(float ma_val, bool sqz_on) =>
+run_sm(float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
     var int  cT       = 0
     var int  cB       = 0
     var int  cBk      = 0
@@ -129,12 +166,13 @@ run_sm(float ma_val, bool sqz_on) =>
     var int  timer    = 0
     var bool ts       = false
     var int  tr_idx   = 0
+    var int  tr_time  = 0
     var int  cv       = 0
     var bool vio      = false
     var bool ew       = false
 
-    upper_buf = ma_val * (1 + approx / 100)
-    lower_buf = ma_val * (1 - approx / 100)
+    upper_buf = ma_val * (1 + approx_pct / 100)
+    lower_buf = ma_val * (1 - approx_pct / 100)
 
     bool touched = (low <= upper_buf and high >= lower_buf)
     bool crossed = ta.crossover(close, ma_val) or ta.crossunder(close, ma_val)
@@ -146,6 +184,7 @@ run_sm(float ma_val, bool sqz_on) =>
         timer    := 0
         ts       := close[1] > ma_val[1]
         tr_idx   := bar_index
+        tr_time  := time
         vio      := false
         ew       := false
         bool out_strict = ts ? close < lower_buf : close > upper_buf
@@ -179,6 +218,8 @@ run_sm(float ma_val, bool sqz_on) =>
             if cv >= 2
                 cBk := cBk + 1
                 cT  := cT  + 1
+                if dbg
+                    log.info(lbl + " | BREAK  | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
                 in_event := false
                 cv := 0
                 ew := false
@@ -189,9 +230,13 @@ run_sm(float ma_val, bool sqz_on) =>
                     if not vio
                         cB := cB + 1
                         cT := cT + 1
+                        if dbg
+                            log.info(lbl + " | BOUNCE | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
                     else
                         cF := cF + 1
                         cT := cT + 1
+                        if dbg
+                            log.info(lbl + " | FALSE  | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
                     in_event := false
                     cv := 0
                     ew := false
@@ -199,7 +244,7 @@ run_sm(float ma_val, bool sqz_on) =>
     [cT, cB, cBk, cF]
 
 // ==========================================
-// 3. WRAPPER — calcula squeeze + 5 MAs no contexto do símbolo solicitado
+// 4. WRAPPER — calcula squeeze + 5 MAs no contexto do símbolo solicitado
 // ==========================================
 run_full() =>
     // Squeeze (mesmos params do v10.3: BB 20/2.0, KC 20/1.5)
@@ -217,53 +262,751 @@ run_full() =>
     ma4 = ta.sma(close, sma_long_p)
     ma5 = ta.vwap
 
-    [t1, b1, k1, f1] = run_sm(ma1, sqz)
-    [t2, b2, k2, f2] = run_sm(ma2, sqz)
-    [t3, b3, k3, f3] = run_sm(ma3, sqz)
-    [t4, b4, k4, f4] = run_sm(ma4, sqz)
-    [t5, b5, k5, f5] = run_sm(ma5, sqz)
+    // Per-MA tolerance from SPY-calibrated table (TF auto-resolved)
+    float tol1 = get_tol(0)
+    float tol2 = get_tol(1)
+    float tol3 = get_tol(2)
+    float tol4 = get_tol(3)
+    float tol5 = get_tol(4)
+
+    // Debug flags — only the (ticker, MA) pair selected in inputs logs events.
+    // syminfo.ticker inside a request.security() context returns the requested ticker.
+    bool is_dbg_t   = dbgEnable and syminfo.ticker == dbgTicker
+    bool dbg_ema9   = is_dbg_t and dbgMA == "EMA9"
+    bool dbg_ema20  = is_dbg_t and dbgMA == "EMA20"
+    bool dbg_sma50  = is_dbg_t and dbgMA == "SMA50"
+    bool dbg_sma200 = is_dbg_t and dbgMA == "SMA200"
+    bool dbg_vwap   = is_dbg_t and dbgMA == "VWAP"
+
+    // Run state machine for all 5 MAs. A tolerance of 0 means "skip this MA on this TF"
+    // (e.g., VWAP on D/W) — we still execute run_sm (Pine v5 can't conditionally call var-bearing
+    // functions) but coerce outputs to 0 so the snapshot stays comparable across TFs.
+    [_t1, _b1, _k1, _f1] = run_sm(ma1, sqz, tol1 > 0 ? tol1 : 0.0001, dbg_ema9,   "EMA9")
+    [_t2, _b2, _k2, _f2] = run_sm(ma2, sqz, tol2 > 0 ? tol2 : 0.0001, dbg_ema20,  "EMA20")
+    [_t3, _b3, _k3, _f3] = run_sm(ma3, sqz, tol3 > 0 ? tol3 : 0.0001, dbg_sma50,  "SMA50")
+    [_t4, _b4, _k4, _f4] = run_sm(ma4, sqz, tol4 > 0 ? tol4 : 0.0001, dbg_sma200, "SMA200")
+    [_t5, _b5, _k5, _f5] = run_sm(ma5, sqz, tol5 > 0 ? tol5 : 0.0001, dbg_vwap,   "VWAP")
+
+    int t1 = tol1 > 0 ? _t1 : 0
+    int b1 = tol1 > 0 ? _b1 : 0
+    int k1 = tol1 > 0 ? _k1 : 0
+    int f1 = tol1 > 0 ? _f1 : 0
+    int t2 = tol2 > 0 ? _t2 : 0
+    int b2 = tol2 > 0 ? _b2 : 0
+    int k2 = tol2 > 0 ? _k2 : 0
+    int f2 = tol2 > 0 ? _f2 : 0
+    int t3 = tol3 > 0 ? _t3 : 0
+    int b3 = tol3 > 0 ? _b3 : 0
+    int k3 = tol3 > 0 ? _k3 : 0
+    int f3 = tol3 > 0 ? _f3 : 0
+    int t4 = tol4 > 0 ? _t4 : 0
+    int b4 = tol4 > 0 ? _b4 : 0
+    int k4 = tol4 > 0 ? _k4 : 0
+    int f4 = tol4 > 0 ? _f4 : 0
+    int t5 = tol5 > 0 ? _t5 : 0
+    int b5 = tol5 > 0 ? _b5 : 0
+    int k5 = tol5 > 0 ? _k5 : 0
+    int f5 = tol5 > 0 ? _f5 : 0
 
     [t1,b1,k1,f1, t2,b2,k2,f2, t3,b3,k3,f3, t4,b4,k4,f4, t5,b5,k5,f5]
 
 // ==========================================
-// 4. RUN PER TICKER (29 calls — within Pine's 40-security limit)
+// 5. RUN PER TICKER (29 calls — within Pine's 40-security limit)
 // ==========================================
-[a01_t1,a01_b1,a01_k1,a01_f1, a01_t2,a01_b2,a01_k2,a01_f2, a01_t3,a01_b3,a01_k3,a01_f3, a01_t4,a01_b4,a01_k4,a01_f4, a01_t5,a01_b5,a01_k5,a01_f5] = request.security(t01, timeframe.period, run_full())
-[a02_t1,a02_b1,a02_k1,a02_f1, a02_t2,a02_b2,a02_k2,a02_f2, a02_t3,a02_b3,a02_k3,a02_f3, a02_t4,a02_b4,a02_k4,a02_f4, a02_t5,a02_b5,a02_k5,a02_f5] = request.security(t02, timeframe.period, run_full())
-[a03_t1,a03_b1,a03_k1,a03_f1, a03_t2,a03_b2,a03_k2,a03_f2, a03_t3,a03_b3,a03_k3,a03_f3, a03_t4,a03_b4,a03_k4,a03_f4, a03_t5,a03_b5,a03_k5,a03_f5] = request.security(t03, timeframe.period, run_full())
-[a04_t1,a04_b1,a04_k1,a04_f1, a04_t2,a04_b2,a04_k2,a04_f2, a04_t3,a04_b3,a04_k3,a04_f3, a04_t4,a04_b4,a04_k4,a04_f4, a04_t5,a04_b5,a04_k5,a04_f5] = request.security(t04, timeframe.period, run_full())
-[a05_t1,a05_b1,a05_k1,a05_f1, a05_t2,a05_b2,a05_k2,a05_f2, a05_t3,a05_b3,a05_k3,a05_f3, a05_t4,a05_b4,a05_k4,a05_f4, a05_t5,a05_b5,a05_k5,a05_f5] = request.security(t05, timeframe.period, run_full())
-[a06_t1,a06_b1,a06_k1,a06_f1, a06_t2,a06_b2,a06_k2,a06_f2, a06_t3,a06_b3,a06_k3,a06_f3, a06_t4,a06_b4,a06_k4,a06_f4, a06_t5,a06_b5,a06_k5,a06_f5] = request.security(t06, timeframe.period, run_full())
-[a07_t1,a07_b1,a07_k1,a07_f1, a07_t2,a07_b2,a07_k2,a07_f2, a07_t3,a07_b3,a07_k3,a07_f3, a07_t4,a07_b4,a07_k4,a07_f4, a07_t5,a07_b5,a07_k5,a07_f5] = request.security(t07, timeframe.period, run_full())
-[a08_t1,a08_b1,a08_k1,a08_f1, a08_t2,a08_b2,a08_k2,a08_f2, a08_t3,a08_b3,a08_k3,a08_f3, a08_t4,a08_b4,a08_k4,a08_f4, a08_t5,a08_b5,a08_k5,a08_f5] = request.security(t08, timeframe.period, run_full())
-[a09_t1,a09_b1,a09_k1,a09_f1, a09_t2,a09_b2,a09_k2,a09_f2, a09_t3,a09_b3,a09_k3,a09_f3, a09_t4,a09_b4,a09_k4,a09_f4, a09_t5,a09_b5,a09_k5,a09_f5] = request.security(t09, timeframe.period, run_full())
-[a10_t1,a10_b1,a10_k1,a10_f1, a10_t2,a10_b2,a10_k2,a10_f2, a10_t3,a10_b3,a10_k3,a10_f3, a10_t4,a10_b4,a10_k4,a10_f4, a10_t5,a10_b5,a10_k5,a10_f5] = request.security(t10, timeframe.period, run_full())
+[a01_t1,a01_b1,a01_k1,a01_f1, a01_t2,a01_b2,a01_k2,a01_f2, a01_t3,a01_b3,a01_k3,a01_f3, a01_t4,a01_b4,a01_k4,a01_f4, a01_t5,a01_b5,a01_k5,a01_f5] = request.security(t01, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a02_t1,a02_b1,a02_k1,a02_f1, a02_t2,a02_b2,a02_k2,a02_f2, a02_t3,a02_b3,a02_k3,a02_f3, a02_t4,a02_b4,a02_k4,a02_f4, a02_t5,a02_b5,a02_k5,a02_f5] = request.security(t02, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a03_t1,a03_b1,a03_k1,a03_f1, a03_t2,a03_b2,a03_k2,a03_f2, a03_t3,a03_b3,a03_k3,a03_f3, a03_t4,a03_b4,a03_k4,a03_f4, a03_t5,a03_b5,a03_k5,a03_f5] = request.security(t03, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a04_t1,a04_b1,a04_k1,a04_f1, a04_t2,a04_b2,a04_k2,a04_f2, a04_t3,a04_b3,a04_k3,a04_f3, a04_t4,a04_b4,a04_k4,a04_f4, a04_t5,a04_b5,a04_k5,a04_f5] = request.security(t04, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a05_t1,a05_b1,a05_k1,a05_f1, a05_t2,a05_b2,a05_k2,a05_f2, a05_t3,a05_b3,a05_k3,a05_f3, a05_t4,a05_b4,a05_k4,a05_f4, a05_t5,a05_b5,a05_k5,a05_f5] = request.security(t05, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a06_t1,a06_b1,a06_k1,a06_f1, a06_t2,a06_b2,a06_k2,a06_f2, a06_t3,a06_b3,a06_k3,a06_f3, a06_t4,a06_b4,a06_k4,a06_f4, a06_t5,a06_b5,a06_k5,a06_f5] = request.security(t06, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a07_t1,a07_b1,a07_k1,a07_f1, a07_t2,a07_b2,a07_k2,a07_f2, a07_t3,a07_b3,a07_k3,a07_f3, a07_t4,a07_b4,a07_k4,a07_f4, a07_t5,a07_b5,a07_k5,a07_f5] = request.security(t07, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a08_t1,a08_b1,a08_k1,a08_f1, a08_t2,a08_b2,a08_k2,a08_f2, a08_t3,a08_b3,a08_k3,a08_f3, a08_t4,a08_b4,a08_k4,a08_f4, a08_t5,a08_b5,a08_k5,a08_f5] = request.security(t08, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a09_t1,a09_b1,a09_k1,a09_f1, a09_t2,a09_b2,a09_k2,a09_f2, a09_t3,a09_b3,a09_k3,a09_f3, a09_t4,a09_b4,a09_k4,a09_f4, a09_t5,a09_b5,a09_k5,a09_f5] = request.security(t09, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a10_t1,a10_b1,a10_k1,a10_f1, a10_t2,a10_b2,a10_k2,a10_f2, a10_t3,a10_b3,a10_k3,a10_f3, a10_t4,a10_b4,a10_k4,a10_f4, a10_t5,a10_b5,a10_k5,a10_f5] = request.security(t10, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
-[a11_t1,a11_b1,a11_k1,a11_f1, a11_t2,a11_b2,a11_k2,a11_f2, a11_t3,a11_b3,a11_k3,a11_f3, a11_t4,a11_b4,a11_k4,a11_f4, a11_t5,a11_b5,a11_k5,a11_f5] = request.security(t11, timeframe.period, run_full())
-[a12_t1,a12_b1,a12_k1,a12_f1, a12_t2,a12_b2,a12_k2,a12_f2, a12_t3,a12_b3,a12_k3,a12_f3, a12_t4,a12_b4,a12_k4,a12_f4, a12_t5,a12_b5,a12_k5,a12_f5] = request.security(t12, timeframe.period, run_full())
+[a11_t1,a11_b1,a11_k1,a11_f1, a11_t2,a11_b2,a11_k2,a11_f2, a11_t3,a11_b3,a11_k3,a11_f3, a11_t4,a11_b4,a11_k4,a11_f4, a11_t5,a11_b5,a11_k5,a11_f5] = request.security(t11, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a12_t1,a12_b1,a12_k1,a12_f1, a12_t2,a12_b2,a12_k2,a12_f2, a12_t3,a12_b3,a12_k3,a12_f3, a12_t4,a12_b4,a12_k4,a12_f4, a12_t5,a12_b5,a12_k5,a12_f5] = request.security(t12, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
-[a13_t1,a13_b1,a13_k1,a13_f1, a13_t2,a13_b2,a13_k2,a13_f2, a13_t3,a13_b3,a13_k3,a13_f3, a13_t4,a13_b4,a13_k4,a13_f4, a13_t5,a13_b5,a13_k5,a13_f5] = request.security(t13, timeframe.period, run_full())
-[a14_t1,a14_b1,a14_k1,a14_f1, a14_t2,a14_b2,a14_k2,a14_f2, a14_t3,a14_b3,a14_k3,a14_f3, a14_t4,a14_b4,a14_k4,a14_f4, a14_t5,a14_b5,a14_k5,a14_f5] = request.security(t14, timeframe.period, run_full())
-[a15_t1,a15_b1,a15_k1,a15_f1, a15_t2,a15_b2,a15_k2,a15_f2, a15_t3,a15_b3,a15_k3,a15_f3, a15_t4,a15_b4,a15_k4,a15_f4, a15_t5,a15_b5,a15_k5,a15_f5] = request.security(t15, timeframe.period, run_full())
+[a13_t1,a13_b1,a13_k1,a13_f1, a13_t2,a13_b2,a13_k2,a13_f2, a13_t3,a13_b3,a13_k3,a13_f3, a13_t4,a13_b4,a13_k4,a13_f4, a13_t5,a13_b5,a13_k5,a13_f5] = request.security(t13, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a14_t1,a14_b1,a14_k1,a14_f1, a14_t2,a14_b2,a14_k2,a14_f2, a14_t3,a14_b3,a14_k3,a14_f3, a14_t4,a14_b4,a14_k4,a14_f4, a14_t5,a14_b5,a14_k5,a14_f5] = request.security(t14, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a15_t1,a15_b1,a15_k1,a15_f1, a15_t2,a15_b2,a15_k2,a15_f2, a15_t3,a15_b3,a15_k3,a15_f3, a15_t4,a15_b4,a15_k4,a15_f4, a15_t5,a15_b5,a15_k5,a15_f5] = request.security(t15, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
-[a16_t1,a16_b1,a16_k1,a16_f1, a16_t2,a16_b2,a16_k2,a16_f2, a16_t3,a16_b3,a16_k3,a16_f3, a16_t4,a16_b4,a16_k4,a16_f4, a16_t5,a16_b5,a16_k5,a16_f5] = request.security(t16, timeframe.period, run_full())
-[a17_t1,a17_b1,a17_k1,a17_f1, a17_t2,a17_b2,a17_k2,a17_f2, a17_t3,a17_b3,a17_k3,a17_f3, a17_t4,a17_b4,a17_k4,a17_f4, a17_t5,a17_b5,a17_k5,a17_f5] = request.security(t17, timeframe.period, run_full())
-[a18_t1,a18_b1,a18_k1,a18_f1, a18_t2,a18_b2,a18_k2,a18_f2, a18_t3,a18_b3,a18_k3,a18_f3, a18_t4,a18_b4,a18_k4,a18_f4, a18_t5,a18_b5,a18_k5,a18_f5] = request.security(t18, timeframe.period, run_full())
-[a19_t1,a19_b1,a19_k1,a19_f1, a19_t2,a19_b2,a19_k2,a19_f2, a19_t3,a19_b3,a19_k3,a19_f3, a19_t4,a19_b4,a19_k4,a19_f4, a19_t5,a19_b5,a19_k5,a19_f5] = request.security(t19, timeframe.period, run_full())
+[a16_t1,a16_b1,a16_k1,a16_f1, a16_t2,a16_b2,a16_k2,a16_f2, a16_t3,a16_b3,a16_k3,a16_f3, a16_t4,a16_b4,a16_k4,a16_f4, a16_t5,a16_b5,a16_k5,a16_f5] = request.security(t16, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a17_t1,a17_b1,a17_k1,a17_f1, a17_t2,a17_b2,a17_k2,a17_f2, a17_t3,a17_b3,a17_k3,a17_f3, a17_t4,a17_b4,a17_k4,a17_f4, a17_t5,a17_b5,a17_k5,a17_f5] = request.security(t17, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a18_t1,a18_b1,a18_k1,a18_f1, a18_t2,a18_b2,a18_k2,a18_f2, a18_t3,a18_b3,a18_k3,a18_f3, a18_t4,a18_b4,a18_k4,a18_f4, a18_t5,a18_b5,a18_k5,a18_f5] = request.security(t18, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a19_t1,a19_b1,a19_k1,a19_f1, a19_t2,a19_b2,a19_k2,a19_f2, a19_t3,a19_b3,a19_k3,a19_f3, a19_t4,a19_b4,a19_k4,a19_f4, a19_t5,a19_b5,a19_k5,a19_f5] = request.security(t19, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
-[a20_t1,a20_b1,a20_k1,a20_f1, a20_t2,a20_b2,a20_k2,a20_f2, a20_t3,a20_b3,a20_k3,a20_f3, a20_t4,a20_b4,a20_k4,a20_f4, a20_t5,a20_b5,a20_k5,a20_f5] = request.security(t20, timeframe.period, run_full())
-[a21_t1,a21_b1,a21_k1,a21_f1, a21_t2,a21_b2,a21_k2,a21_f2, a21_t3,a21_b3,a21_k3,a21_f3, a21_t4,a21_b4,a21_k4,a21_f4, a21_t5,a21_b5,a21_k5,a21_f5] = request.security(t21, timeframe.period, run_full())
-[a22_t1,a22_b1,a22_k1,a22_f1, a22_t2,a22_b2,a22_k2,a22_f2, a22_t3,a22_b3,a22_k3,a22_f3, a22_t4,a22_b4,a22_k4,a22_f4, a22_t5,a22_b5,a22_k5,a22_f5] = request.security(t22, timeframe.period, run_full())
-[a23_t1,a23_b1,a23_k1,a23_f1, a23_t2,a23_b2,a23_k2,a23_f2, a23_t3,a23_b3,a23_k3,a23_f3, a23_t4,a23_b4,a23_k4,a23_f4, a23_t5,a23_b5,a23_k5,a23_f5] = request.security(t23, timeframe.period, run_full())
-[a24_t1,a24_b1,a24_k1,a24_f1, a24_t2,a24_b2,a24_k2,a24_f2, a24_t3,a24_b3,a24_k3,a24_f3, a24_t4,a24_b4,a24_k4,a24_f4, a24_t5,a24_b5,a24_k5,a24_f5] = request.security(t24, timeframe.period, run_full())
-[a25_t1,a25_b1,a25_k1,a25_f1, a25_t2,a25_b2,a25_k2,a25_f2, a25_t3,a25_b3,a25_k3,a25_f3, a25_t4,a25_b4,a25_k4,a25_f4, a25_t5,a25_b5,a25_k5,a25_f5] = request.security(t25, timeframe.period, run_full())
-[a26_t1,a26_b1,a26_k1,a26_f1, a26_t2,a26_b2,a26_k2,a26_f2, a26_t3,a26_b3,a26_k3,a26_f3, a26_t4,a26_b4,a26_k4,a26_f4, a26_t5,a26_b5,a26_k5,a26_f5] = request.security(t26, timeframe.period, run_full())
-[a27_t1,a27_b1,a27_k1,a27_f1, a27_t2,a27_b2,a27_k2,a27_f2, a27_t3,a27_b3,a27_k3,a27_f3, a27_t4,a27_b4,a27_k4,a27_f4, a27_t5,a27_b5,a27_k5,a27_f5] = request.security(t27, timeframe.period, run_full())
-[a28_t1,a28_b1,a28_k1,a28_f1, a28_t2,a28_b2,a28_k2,a28_f2, a28_t3,a28_b3,a28_k3,a28_f3, a28_t4,a28_b4,a28_k4,a28_f4, a28_t5,a28_b5,a28_k5,a28_f5] = request.security(t28, timeframe.period, run_full())
-[a29_t1,a29_b1,a29_k1,a29_f1, a29_t2,a29_b2,a29_k2,a29_f2, a29_t3,a29_b3,a29_k3,a29_f3, a29_t4,a29_b4,a29_k4,a29_f4, a29_t5,a29_b5,a29_k5,a29_f5] = request.security(t29, timeframe.period, run_full())
+[a20_t1,a20_b1,a20_k1,a20_f1, a20_t2,a20_b2,a20_k2,a20_f2, a20_t3,a20_b3,a20_k3,a20_f3, a20_t4,a20_b4,a20_k4,a20_f4, a20_t5,a20_b5,a20_k5,a20_f5] = request.security(t20, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a21_t1,a21_b1,a21_k1,a21_f1, a21_t2,a21_b2,a21_k2,a21_f2, a21_t3,a21_b3,a21_k3,a21_f3, a21_t4,a21_b4,a21_k4,a21_f4, a21_t5,a21_b5,a21_k5,a21_f5] = request.security(t21, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a22_t1,a22_b1,a22_k1,a22_f1, a22_t2,a22_b2,a22_k2,a22_f2, a22_t3,a22_b3,a22_k3,a22_f3, a22_t4,a22_b4,a22_k4,a22_f4, a22_t5,a22_b5,a22_k5,a22_f5] = request.security(t22, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a23_t1,a23_b1,a23_k1,a23_f1, a23_t2,a23_b2,a23_k2,a23_f2, a23_t3,a23_b3,a23_k3,a23_f3, a23_t4,a23_b4,a23_k4,a23_f4, a23_t5,a23_b5,a23_k5,a23_f5] = request.security(t23, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a24_t1,a24_b1,a24_k1,a24_f1, a24_t2,a24_b2,a24_k2,a24_f2, a24_t3,a24_b3,a24_k3,a24_f3, a24_t4,a24_b4,a24_k4,a24_f4, a24_t5,a24_b5,a24_k5,a24_f5] = request.security(t24, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a25_t1,a25_b1,a25_k1,a25_f1, a25_t2,a25_b2,a25_k2,a25_f2, a25_t3,a25_b3,a25_k3,a25_f3, a25_t4,a25_b4,a25_k4,a25_f4, a25_t5,a25_b5,a25_k5,a25_f5] = request.security(t25, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a26_t1,a26_b1,a26_k1,a26_f1, a26_t2,a26_b2,a26_k2,a26_f2, a26_t3,a26_b3,a26_k3,a26_f3, a26_t4,a26_b4,a26_k4,a26_f4, a26_t5,a26_b5,a26_k5,a26_f5] = request.security(t26, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a27_t1,a27_b1,a27_k1,a27_f1, a27_t2,a27_b2,a27_k2,a27_f2, a27_t3,a27_b3,a27_k3,a27_f3, a27_t4,a27_b4,a27_k4,a27_f4, a27_t5,a27_b5,a27_k5,a27_f5] = request.security(t27, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a28_t1,a28_b1,a28_k1,a28_f1, a28_t2,a28_b2,a28_k2,a28_f2, a28_t3,a28_b3,a28_k3,a28_f3, a28_t4,a28_b4,a28_k4,a28_f4, a28_t5,a28_b5,a28_k5,a28_f5] = request.security(t28, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+[a29_t1,a29_b1,a29_k1,a29_f1, a29_t2,a29_b2,a29_k2,a29_f2, a29_t3,a29_b3,a29_k3,a29_f3, a29_t4,a29_b4,a29_k4,a29_f4, a29_t5,a29_b5,a29_k5,a29_f5] = request.security(t29, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
 // ==========================================
-// 5. TABLE RENDERING
+// 5b. DIRECT FALLBACK FOR CHART TICKER
+// ==========================================
+// request.security has documented quirks (bar history init, timezone/session
+// edges, var state propagation) that cause it to detect events the chart base
+// wouldn't see. To guarantee bit-identical parity with OS [ST] for the ticker
+// you are currently auditing on the chart, recompute that ticker directly
+// (no request.security) and override its row's values in the table.
+[d_t1,d_b1,d_k1,d_f1, d_t2,d_b2,d_k2,d_f2, d_t3,d_b3,d_k3,d_f3, d_t4,d_b4,d_k4,d_f4, d_t5,d_b5,d_k5,d_f5] = run_full()
+string chartId = syminfo.tickerid
+
+// === DIAGNOSTIC LOG (one-shot on last bar) ===
+// Helps catch ticker-id mismatches between chart and inputs (e.g., "AMEX:SPY" vs "BATS:SPY").
+// If chart's symbol doesn't match any tNN, the DIRECT fallback won't trigger and the table
+// row will show request.security values (potentially divergent vs OS [ST]).
+if barstate.islast and dbgEnable
+    log.info("CHART-ID = '" + chartId + "' | syminfo.ticker = '" + syminfo.ticker + "'")
+    log.info("Inputs: t01='" + t01 + "' t02='" + t02 + "' t03='" + t03 + "' t04='" + t04 + "' t05='" + t05 + "' t06='" + t06 + "' t07='" + t07 + "' t08='" + t08 + "' t09='" + t09 + "' t10='" + t10 + "'")
+    log.info("Match check: str.contains(chartId, t03) is " + str.tostring(str.contains(chartId, t03)) + " | direct SMA200: T=" + str.tostring(d_t4) + " B=" + str.tostring(d_b4) + " Bk=" + str.tostring(d_k4) + " F=" + str.tostring(d_f4))
+
+if str.contains(chartId, t01)
+    a01_t1 := d_t1
+    a01_b1 := d_b1
+    a01_k1 := d_k1
+    a01_f1 := d_f1
+    a01_t2 := d_t2
+    a01_b2 := d_b2
+    a01_k2 := d_k2
+    a01_f2 := d_f2
+    a01_t3 := d_t3
+    a01_b3 := d_b3
+    a01_k3 := d_k3
+    a01_f3 := d_f3
+    a01_t4 := d_t4
+    a01_b4 := d_b4
+    a01_k4 := d_k4
+    a01_f4 := d_f4
+    a01_t5 := d_t5
+    a01_b5 := d_b5
+    a01_k5 := d_k5
+    a01_f5 := d_f5
+
+if str.contains(chartId, t02)
+    a02_t1 := d_t1
+    a02_b1 := d_b1
+    a02_k1 := d_k1
+    a02_f1 := d_f1
+    a02_t2 := d_t2
+    a02_b2 := d_b2
+    a02_k2 := d_k2
+    a02_f2 := d_f2
+    a02_t3 := d_t3
+    a02_b3 := d_b3
+    a02_k3 := d_k3
+    a02_f3 := d_f3
+    a02_t4 := d_t4
+    a02_b4 := d_b4
+    a02_k4 := d_k4
+    a02_f4 := d_f4
+    a02_t5 := d_t5
+    a02_b5 := d_b5
+    a02_k5 := d_k5
+    a02_f5 := d_f5
+
+if str.contains(chartId, t03)
+    a03_t1 := d_t1
+    a03_b1 := d_b1
+    a03_k1 := d_k1
+    a03_f1 := d_f1
+    a03_t2 := d_t2
+    a03_b2 := d_b2
+    a03_k2 := d_k2
+    a03_f2 := d_f2
+    a03_t3 := d_t3
+    a03_b3 := d_b3
+    a03_k3 := d_k3
+    a03_f3 := d_f3
+    a03_t4 := d_t4
+    a03_b4 := d_b4
+    a03_k4 := d_k4
+    a03_f4 := d_f4
+    a03_t5 := d_t5
+    a03_b5 := d_b5
+    a03_k5 := d_k5
+    a03_f5 := d_f5
+
+if str.contains(chartId, t04)
+    a04_t1 := d_t1
+    a04_b1 := d_b1
+    a04_k1 := d_k1
+    a04_f1 := d_f1
+    a04_t2 := d_t2
+    a04_b2 := d_b2
+    a04_k2 := d_k2
+    a04_f2 := d_f2
+    a04_t3 := d_t3
+    a04_b3 := d_b3
+    a04_k3 := d_k3
+    a04_f3 := d_f3
+    a04_t4 := d_t4
+    a04_b4 := d_b4
+    a04_k4 := d_k4
+    a04_f4 := d_f4
+    a04_t5 := d_t5
+    a04_b5 := d_b5
+    a04_k5 := d_k5
+    a04_f5 := d_f5
+
+if str.contains(chartId, t05)
+    a05_t1 := d_t1
+    a05_b1 := d_b1
+    a05_k1 := d_k1
+    a05_f1 := d_f1
+    a05_t2 := d_t2
+    a05_b2 := d_b2
+    a05_k2 := d_k2
+    a05_f2 := d_f2
+    a05_t3 := d_t3
+    a05_b3 := d_b3
+    a05_k3 := d_k3
+    a05_f3 := d_f3
+    a05_t4 := d_t4
+    a05_b4 := d_b4
+    a05_k4 := d_k4
+    a05_f4 := d_f4
+    a05_t5 := d_t5
+    a05_b5 := d_b5
+    a05_k5 := d_k5
+    a05_f5 := d_f5
+
+if str.contains(chartId, t06)
+    a06_t1 := d_t1
+    a06_b1 := d_b1
+    a06_k1 := d_k1
+    a06_f1 := d_f1
+    a06_t2 := d_t2
+    a06_b2 := d_b2
+    a06_k2 := d_k2
+    a06_f2 := d_f2
+    a06_t3 := d_t3
+    a06_b3 := d_b3
+    a06_k3 := d_k3
+    a06_f3 := d_f3
+    a06_t4 := d_t4
+    a06_b4 := d_b4
+    a06_k4 := d_k4
+    a06_f4 := d_f4
+    a06_t5 := d_t5
+    a06_b5 := d_b5
+    a06_k5 := d_k5
+    a06_f5 := d_f5
+
+if str.contains(chartId, t07)
+    a07_t1 := d_t1
+    a07_b1 := d_b1
+    a07_k1 := d_k1
+    a07_f1 := d_f1
+    a07_t2 := d_t2
+    a07_b2 := d_b2
+    a07_k2 := d_k2
+    a07_f2 := d_f2
+    a07_t3 := d_t3
+    a07_b3 := d_b3
+    a07_k3 := d_k3
+    a07_f3 := d_f3
+    a07_t4 := d_t4
+    a07_b4 := d_b4
+    a07_k4 := d_k4
+    a07_f4 := d_f4
+    a07_t5 := d_t5
+    a07_b5 := d_b5
+    a07_k5 := d_k5
+    a07_f5 := d_f5
+
+if str.contains(chartId, t08)
+    a08_t1 := d_t1
+    a08_b1 := d_b1
+    a08_k1 := d_k1
+    a08_f1 := d_f1
+    a08_t2 := d_t2
+    a08_b2 := d_b2
+    a08_k2 := d_k2
+    a08_f2 := d_f2
+    a08_t3 := d_t3
+    a08_b3 := d_b3
+    a08_k3 := d_k3
+    a08_f3 := d_f3
+    a08_t4 := d_t4
+    a08_b4 := d_b4
+    a08_k4 := d_k4
+    a08_f4 := d_f4
+    a08_t5 := d_t5
+    a08_b5 := d_b5
+    a08_k5 := d_k5
+    a08_f5 := d_f5
+
+if str.contains(chartId, t09)
+    a09_t1 := d_t1
+    a09_b1 := d_b1
+    a09_k1 := d_k1
+    a09_f1 := d_f1
+    a09_t2 := d_t2
+    a09_b2 := d_b2
+    a09_k2 := d_k2
+    a09_f2 := d_f2
+    a09_t3 := d_t3
+    a09_b3 := d_b3
+    a09_k3 := d_k3
+    a09_f3 := d_f3
+    a09_t4 := d_t4
+    a09_b4 := d_b4
+    a09_k4 := d_k4
+    a09_f4 := d_f4
+    a09_t5 := d_t5
+    a09_b5 := d_b5
+    a09_k5 := d_k5
+    a09_f5 := d_f5
+
+if str.contains(chartId, t10)
+    a10_t1 := d_t1
+    a10_b1 := d_b1
+    a10_k1 := d_k1
+    a10_f1 := d_f1
+    a10_t2 := d_t2
+    a10_b2 := d_b2
+    a10_k2 := d_k2
+    a10_f2 := d_f2
+    a10_t3 := d_t3
+    a10_b3 := d_b3
+    a10_k3 := d_k3
+    a10_f3 := d_f3
+    a10_t4 := d_t4
+    a10_b4 := d_b4
+    a10_k4 := d_k4
+    a10_f4 := d_f4
+    a10_t5 := d_t5
+    a10_b5 := d_b5
+    a10_k5 := d_k5
+    a10_f5 := d_f5
+
+if str.contains(chartId, t11)
+    a11_t1 := d_t1
+    a11_b1 := d_b1
+    a11_k1 := d_k1
+    a11_f1 := d_f1
+    a11_t2 := d_t2
+    a11_b2 := d_b2
+    a11_k2 := d_k2
+    a11_f2 := d_f2
+    a11_t3 := d_t3
+    a11_b3 := d_b3
+    a11_k3 := d_k3
+    a11_f3 := d_f3
+    a11_t4 := d_t4
+    a11_b4 := d_b4
+    a11_k4 := d_k4
+    a11_f4 := d_f4
+    a11_t5 := d_t5
+    a11_b5 := d_b5
+    a11_k5 := d_k5
+    a11_f5 := d_f5
+
+if str.contains(chartId, t12)
+    a12_t1 := d_t1
+    a12_b1 := d_b1
+    a12_k1 := d_k1
+    a12_f1 := d_f1
+    a12_t2 := d_t2
+    a12_b2 := d_b2
+    a12_k2 := d_k2
+    a12_f2 := d_f2
+    a12_t3 := d_t3
+    a12_b3 := d_b3
+    a12_k3 := d_k3
+    a12_f3 := d_f3
+    a12_t4 := d_t4
+    a12_b4 := d_b4
+    a12_k4 := d_k4
+    a12_f4 := d_f4
+    a12_t5 := d_t5
+    a12_b5 := d_b5
+    a12_k5 := d_k5
+    a12_f5 := d_f5
+
+if str.contains(chartId, t13)
+    a13_t1 := d_t1
+    a13_b1 := d_b1
+    a13_k1 := d_k1
+    a13_f1 := d_f1
+    a13_t2 := d_t2
+    a13_b2 := d_b2
+    a13_k2 := d_k2
+    a13_f2 := d_f2
+    a13_t3 := d_t3
+    a13_b3 := d_b3
+    a13_k3 := d_k3
+    a13_f3 := d_f3
+    a13_t4 := d_t4
+    a13_b4 := d_b4
+    a13_k4 := d_k4
+    a13_f4 := d_f4
+    a13_t5 := d_t5
+    a13_b5 := d_b5
+    a13_k5 := d_k5
+    a13_f5 := d_f5
+
+if str.contains(chartId, t14)
+    a14_t1 := d_t1
+    a14_b1 := d_b1
+    a14_k1 := d_k1
+    a14_f1 := d_f1
+    a14_t2 := d_t2
+    a14_b2 := d_b2
+    a14_k2 := d_k2
+    a14_f2 := d_f2
+    a14_t3 := d_t3
+    a14_b3 := d_b3
+    a14_k3 := d_k3
+    a14_f3 := d_f3
+    a14_t4 := d_t4
+    a14_b4 := d_b4
+    a14_k4 := d_k4
+    a14_f4 := d_f4
+    a14_t5 := d_t5
+    a14_b5 := d_b5
+    a14_k5 := d_k5
+    a14_f5 := d_f5
+
+if str.contains(chartId, t15)
+    a15_t1 := d_t1
+    a15_b1 := d_b1
+    a15_k1 := d_k1
+    a15_f1 := d_f1
+    a15_t2 := d_t2
+    a15_b2 := d_b2
+    a15_k2 := d_k2
+    a15_f2 := d_f2
+    a15_t3 := d_t3
+    a15_b3 := d_b3
+    a15_k3 := d_k3
+    a15_f3 := d_f3
+    a15_t4 := d_t4
+    a15_b4 := d_b4
+    a15_k4 := d_k4
+    a15_f4 := d_f4
+    a15_t5 := d_t5
+    a15_b5 := d_b5
+    a15_k5 := d_k5
+    a15_f5 := d_f5
+
+if str.contains(chartId, t16)
+    a16_t1 := d_t1
+    a16_b1 := d_b1
+    a16_k1 := d_k1
+    a16_f1 := d_f1
+    a16_t2 := d_t2
+    a16_b2 := d_b2
+    a16_k2 := d_k2
+    a16_f2 := d_f2
+    a16_t3 := d_t3
+    a16_b3 := d_b3
+    a16_k3 := d_k3
+    a16_f3 := d_f3
+    a16_t4 := d_t4
+    a16_b4 := d_b4
+    a16_k4 := d_k4
+    a16_f4 := d_f4
+    a16_t5 := d_t5
+    a16_b5 := d_b5
+    a16_k5 := d_k5
+    a16_f5 := d_f5
+
+if str.contains(chartId, t17)
+    a17_t1 := d_t1
+    a17_b1 := d_b1
+    a17_k1 := d_k1
+    a17_f1 := d_f1
+    a17_t2 := d_t2
+    a17_b2 := d_b2
+    a17_k2 := d_k2
+    a17_f2 := d_f2
+    a17_t3 := d_t3
+    a17_b3 := d_b3
+    a17_k3 := d_k3
+    a17_f3 := d_f3
+    a17_t4 := d_t4
+    a17_b4 := d_b4
+    a17_k4 := d_k4
+    a17_f4 := d_f4
+    a17_t5 := d_t5
+    a17_b5 := d_b5
+    a17_k5 := d_k5
+    a17_f5 := d_f5
+
+if str.contains(chartId, t18)
+    a18_t1 := d_t1
+    a18_b1 := d_b1
+    a18_k1 := d_k1
+    a18_f1 := d_f1
+    a18_t2 := d_t2
+    a18_b2 := d_b2
+    a18_k2 := d_k2
+    a18_f2 := d_f2
+    a18_t3 := d_t3
+    a18_b3 := d_b3
+    a18_k3 := d_k3
+    a18_f3 := d_f3
+    a18_t4 := d_t4
+    a18_b4 := d_b4
+    a18_k4 := d_k4
+    a18_f4 := d_f4
+    a18_t5 := d_t5
+    a18_b5 := d_b5
+    a18_k5 := d_k5
+    a18_f5 := d_f5
+
+if str.contains(chartId, t19)
+    a19_t1 := d_t1
+    a19_b1 := d_b1
+    a19_k1 := d_k1
+    a19_f1 := d_f1
+    a19_t2 := d_t2
+    a19_b2 := d_b2
+    a19_k2 := d_k2
+    a19_f2 := d_f2
+    a19_t3 := d_t3
+    a19_b3 := d_b3
+    a19_k3 := d_k3
+    a19_f3 := d_f3
+    a19_t4 := d_t4
+    a19_b4 := d_b4
+    a19_k4 := d_k4
+    a19_f4 := d_f4
+    a19_t5 := d_t5
+    a19_b5 := d_b5
+    a19_k5 := d_k5
+    a19_f5 := d_f5
+
+if str.contains(chartId, t20)
+    a20_t1 := d_t1
+    a20_b1 := d_b1
+    a20_k1 := d_k1
+    a20_f1 := d_f1
+    a20_t2 := d_t2
+    a20_b2 := d_b2
+    a20_k2 := d_k2
+    a20_f2 := d_f2
+    a20_t3 := d_t3
+    a20_b3 := d_b3
+    a20_k3 := d_k3
+    a20_f3 := d_f3
+    a20_t4 := d_t4
+    a20_b4 := d_b4
+    a20_k4 := d_k4
+    a20_f4 := d_f4
+    a20_t5 := d_t5
+    a20_b5 := d_b5
+    a20_k5 := d_k5
+    a20_f5 := d_f5
+
+if str.contains(chartId, t21)
+    a21_t1 := d_t1
+    a21_b1 := d_b1
+    a21_k1 := d_k1
+    a21_f1 := d_f1
+    a21_t2 := d_t2
+    a21_b2 := d_b2
+    a21_k2 := d_k2
+    a21_f2 := d_f2
+    a21_t3 := d_t3
+    a21_b3 := d_b3
+    a21_k3 := d_k3
+    a21_f3 := d_f3
+    a21_t4 := d_t4
+    a21_b4 := d_b4
+    a21_k4 := d_k4
+    a21_f4 := d_f4
+    a21_t5 := d_t5
+    a21_b5 := d_b5
+    a21_k5 := d_k5
+    a21_f5 := d_f5
+
+if str.contains(chartId, t22)
+    a22_t1 := d_t1
+    a22_b1 := d_b1
+    a22_k1 := d_k1
+    a22_f1 := d_f1
+    a22_t2 := d_t2
+    a22_b2 := d_b2
+    a22_k2 := d_k2
+    a22_f2 := d_f2
+    a22_t3 := d_t3
+    a22_b3 := d_b3
+    a22_k3 := d_k3
+    a22_f3 := d_f3
+    a22_t4 := d_t4
+    a22_b4 := d_b4
+    a22_k4 := d_k4
+    a22_f4 := d_f4
+    a22_t5 := d_t5
+    a22_b5 := d_b5
+    a22_k5 := d_k5
+    a22_f5 := d_f5
+
+if str.contains(chartId, t23)
+    a23_t1 := d_t1
+    a23_b1 := d_b1
+    a23_k1 := d_k1
+    a23_f1 := d_f1
+    a23_t2 := d_t2
+    a23_b2 := d_b2
+    a23_k2 := d_k2
+    a23_f2 := d_f2
+    a23_t3 := d_t3
+    a23_b3 := d_b3
+    a23_k3 := d_k3
+    a23_f3 := d_f3
+    a23_t4 := d_t4
+    a23_b4 := d_b4
+    a23_k4 := d_k4
+    a23_f4 := d_f4
+    a23_t5 := d_t5
+    a23_b5 := d_b5
+    a23_k5 := d_k5
+    a23_f5 := d_f5
+
+if str.contains(chartId, t24)
+    a24_t1 := d_t1
+    a24_b1 := d_b1
+    a24_k1 := d_k1
+    a24_f1 := d_f1
+    a24_t2 := d_t2
+    a24_b2 := d_b2
+    a24_k2 := d_k2
+    a24_f2 := d_f2
+    a24_t3 := d_t3
+    a24_b3 := d_b3
+    a24_k3 := d_k3
+    a24_f3 := d_f3
+    a24_t4 := d_t4
+    a24_b4 := d_b4
+    a24_k4 := d_k4
+    a24_f4 := d_f4
+    a24_t5 := d_t5
+    a24_b5 := d_b5
+    a24_k5 := d_k5
+    a24_f5 := d_f5
+
+if str.contains(chartId, t25)
+    a25_t1 := d_t1
+    a25_b1 := d_b1
+    a25_k1 := d_k1
+    a25_f1 := d_f1
+    a25_t2 := d_t2
+    a25_b2 := d_b2
+    a25_k2 := d_k2
+    a25_f2 := d_f2
+    a25_t3 := d_t3
+    a25_b3 := d_b3
+    a25_k3 := d_k3
+    a25_f3 := d_f3
+    a25_t4 := d_t4
+    a25_b4 := d_b4
+    a25_k4 := d_k4
+    a25_f4 := d_f4
+    a25_t5 := d_t5
+    a25_b5 := d_b5
+    a25_k5 := d_k5
+    a25_f5 := d_f5
+
+if str.contains(chartId, t26)
+    a26_t1 := d_t1
+    a26_b1 := d_b1
+    a26_k1 := d_k1
+    a26_f1 := d_f1
+    a26_t2 := d_t2
+    a26_b2 := d_b2
+    a26_k2 := d_k2
+    a26_f2 := d_f2
+    a26_t3 := d_t3
+    a26_b3 := d_b3
+    a26_k3 := d_k3
+    a26_f3 := d_f3
+    a26_t4 := d_t4
+    a26_b4 := d_b4
+    a26_k4 := d_k4
+    a26_f4 := d_f4
+    a26_t5 := d_t5
+    a26_b5 := d_b5
+    a26_k5 := d_k5
+    a26_f5 := d_f5
+
+if str.contains(chartId, t27)
+    a27_t1 := d_t1
+    a27_b1 := d_b1
+    a27_k1 := d_k1
+    a27_f1 := d_f1
+    a27_t2 := d_t2
+    a27_b2 := d_b2
+    a27_k2 := d_k2
+    a27_f2 := d_f2
+    a27_t3 := d_t3
+    a27_b3 := d_b3
+    a27_k3 := d_k3
+    a27_f3 := d_f3
+    a27_t4 := d_t4
+    a27_b4 := d_b4
+    a27_k4 := d_k4
+    a27_f4 := d_f4
+    a27_t5 := d_t5
+    a27_b5 := d_b5
+    a27_k5 := d_k5
+    a27_f5 := d_f5
+
+if str.contains(chartId, t28)
+    a28_t1 := d_t1
+    a28_b1 := d_b1
+    a28_k1 := d_k1
+    a28_f1 := d_f1
+    a28_t2 := d_t2
+    a28_b2 := d_b2
+    a28_k2 := d_k2
+    a28_f2 := d_f2
+    a28_t3 := d_t3
+    a28_b3 := d_b3
+    a28_k3 := d_k3
+    a28_f3 := d_f3
+    a28_t4 := d_t4
+    a28_b4 := d_b4
+    a28_k4 := d_k4
+    a28_f4 := d_f4
+    a28_t5 := d_t5
+    a28_b5 := d_b5
+    a28_k5 := d_k5
+    a28_f5 := d_f5
+
+if str.contains(chartId, t29)
+    a29_t1 := d_t1
+    a29_b1 := d_b1
+    a29_k1 := d_k1
+    a29_f1 := d_f1
+    a29_t2 := d_t2
+    a29_b2 := d_b2
+    a29_k2 := d_k2
+    a29_f2 := d_f2
+    a29_t3 := d_t3
+    a29_b3 := d_b3
+    a29_k3 := d_k3
+    a29_f3 := d_f3
+    a29_t4 := d_t4
+    a29_b4 := d_b4
+    a29_k4 := d_k4
+    a29_f4 := d_f4
+    a29_t5 := d_t5
+    a29_b5 := d_b5
+    a29_k5 := d_k5
+    a29_f5 := d_f5
+
+// ==========================================
+// 6. TABLE RENDERING
 // ==========================================
 position_of(string s) =>
     s == "top_right"     ? position.top_right     :
@@ -328,14 +1071,19 @@ render_row(int row, string name, int t1, int b1, int t2, int b2, int t3, int b3,
 if barstate.islast
     string sz = tableTextSize
 
-    // Header
+    // Header — MA name + tolerance applied on this TF (auto-resolved)
     string tf_label = "[" + timeframe.period + "]"
+    string tol_label_1 = "\n±" + str.tostring(get_tol(0)) + "%"
+    string tol_label_2 = "\n±" + str.tostring(get_tol(1)) + "%"
+    string tol_label_3 = "\n±" + str.tostring(get_tol(2)) + "%"
+    string tol_label_4 = "\n±" + str.tostring(get_tol(3)) + "%"
+    string tol_label_5 = get_tol(4) > 0 ? ("\n±" + str.tostring(get_tol(4)) + "%") : "\n(skip)"
     table.cell(tbl, 0, 0, "Ticker " + tf_label, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
-    table.cell(tbl, 1, 0, "EMA " + str.tostring(ema_fast_p), text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
-    table.cell(tbl, 2, 0, "EMA " + str.tostring(ema_slow_p), text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
-    table.cell(tbl, 3, 0, "SMA " + str.tostring(sma_mid_p),  text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
-    table.cell(tbl, 4, 0, "SMA " + str.tostring(sma_long_p), text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
-    table.cell(tbl, 5, 0, "VWAP",                            text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 1, 0, "EMA " + str.tostring(ema_fast_p) + tol_label_1, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 2, 0, "EMA " + str.tostring(ema_slow_p) + tol_label_2, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 3, 0, "SMA " + str.tostring(sma_mid_p)  + tol_label_3, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 4, 0, "SMA " + str.tostring(sma_long_p) + tol_label_4, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 5, 0, "VWAP"                            + tol_label_5, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
 
     // 29 ticker rows
     render_row( 1, n01, a01_t1,a01_b1, a01_t2,a01_b2, a01_t3,a01_b3, a01_t4,a01_b4, a01_t5,a01_b5, sz)
@@ -369,7 +1117,7 @@ if barstate.islast
     render_row(29, n29, a29_t1,a29_b1, a29_t2,a29_b2, a29_t3,a29_b3, a29_t4,a29_b4, a29_t5,a29_b5, sz)
 
 // ==========================================
-// 6. FRIDAY CLOSE SNAPSHOT ALERT
+// 7. FRIDAY CLOSE SNAPSHOT ALERT
 // ==========================================
 // Empacota Total/Bounce/Break/False de 1 ticker (5 MAs = 20 ints) em CSV
 ticker_csv(int t1, int b1, int k1, int f1, int t2, int b2, int k2, int f2, int t3, int b3, int k3, int f3, int t4, int b4, int k4, int f4, int t5, int b5, int k5, int f5) =>
@@ -383,7 +1131,8 @@ must_log        = printSnapshot and barstate.islast
 must_alert      = enableAlert  and is_friday_close
 
 if must_log or must_alert
-    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"data\":{"
+    string tol_csv = str.tostring(get_tol(0)) + "," + str.tostring(get_tol(1)) + "," + str.tostring(get_tol(2)) + "," + str.tostring(get_tol(3)) + "," + str.tostring(get_tol(4))
+    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tolerances\":[" + tol_csv + "],\"data\":{"
     string body = ""
     body := body + "\""+n01+"\":["+ticker_csv(a01_t1,a01_b1,a01_k1,a01_f1,a01_t2,a01_b2,a01_k2,a01_f2,a01_t3,a01_b3,a01_k3,a01_f3,a01_t4,a01_b4,a01_k4,a01_f4,a01_t5,a01_b5,a01_k5,a01_f5)+"]"
     body := body + ",\""+n02+"\":["+ticker_csv(a02_t1,a02_b1,a02_k1,a02_f1,a02_t2,a02_b2,a02_k2,a02_f2,a02_t3,a02_b3,a02_k3,a02_f3,a02_t4,a02_b4,a02_k4,a02_f4,a02_t5,a02_b5,a02_k5,a02_f5)+"]"
@@ -420,3 +1169,43 @@ if must_log or must_alert
         log.info(payload)
     if must_alert
         alert(payload, alert.freq_once_per_bar_close)
+
+// ==========================================
+// 8. DIRECT-CHART PARITY TEST (bypasses request.security)
+// ==========================================
+// Runs the SAME state machine directly on the chart's symbol (no request.security
+// wrapper). Use this to isolate whether the discrepancy vs OS [ST] comes from
+// request.security history-leak / initialization quirks.
+//
+// HOW TO USE:
+//   1. Enable "Enable event log" in the Debug group.
+//   2. Set "MA to log" to the MA you want to validate (e.g., SMA200).
+//   3. Set "Override tolerance" to the same value used in OS [ST] (e.g., 0.4).
+//   4. Open Pine Logs. Compare:
+//      - "DIRECT-<MA>" lines  → no request.security path
+//      - "<MA>" lines          → via request.security (for the same ticker, if it matches dbgTicker)
+//   5. If DIRECT matches OS [ST] but the request.security path doesn't, the bug is in the wrapper.
+
+if dbgEnable
+    int dbg_idx = dbgMA == "EMA9" ? 0 : dbgMA == "EMA20" ? 1 : dbgMA == "SMA50" ? 2 : dbgMA == "SMA200" ? 3 : 4
+    float dbg_tol = approxOverride > 0.0 ? approxOverride : get_tol(dbg_idx)
+
+    float dbg_ma = dbgMA == "EMA9"   ? ta.ema(close, ema_fast_p) :
+                   dbgMA == "EMA20"  ? ta.ema(close, ema_slow_p) :
+                   dbgMA == "SMA50"  ? ta.sma(close, sma_mid_p)  :
+                   dbgMA == "SMA200" ? ta.sma(close, sma_long_p) :
+                                       ta.vwap
+
+    // Squeeze (identical params to run_full)
+    [_dm, _dub, _dlb] = ta.bb(close, 20, 2.0)
+    _dbk  = ta.sma(close, 20)
+    _drk  = ta.tr(true)
+    _dark = ta.sma(_drk, 20)
+    _dukc = _dbk + _dark * 1.5
+    _dlkc = _dbk - _dark * 1.5
+    bool dbg_sqz = (_dub < _dukc) and (_dlb > _dlkc)
+
+    [d_t, d_b, d_k, d_f] = run_sm(dbg_ma, dbg_sqz, dbg_tol > 0 ? dbg_tol : 0.0001, true, "DIRECT-" + dbgMA)
+
+    if barstate.islast
+        log.info("=== DIRECT-CHART | " + syminfo.ticker + " " + timeframe.period + " " + dbgMA + " tol=" + str.tostring(dbg_tol) + "% | Total=" + str.tostring(d_t) + " Bounce=" + str.tostring(d_b) + " Break=" + str.tostring(d_k) + " False=" + str.tostring(d_f) + " ===")
