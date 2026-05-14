@@ -3,20 +3,12 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Activity,
   AlertCircle,
   ArrowUpRight,
-  Database,
-  Flame,
-  Grid3X3,
-  Layers,
   RefreshCw,
   ShieldAlert,
-  Sparkles,
-  Target,
-  Zap,
 } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import {
   api,
   type OccurrenceCategory,
@@ -26,6 +18,17 @@ import {
 } from "@/lib/api";
 import { OccurrenceFilters, type OccurrenceMetricKey } from "./filters";
 import { Leaderboards } from "./leaderboards";
+
+// ============================================================
+// Color palette — calm, modern, dark-theme native
+// ============================================================
+const COLOR_RED = "oklch(0.46 0.16 25)";
+const COLOR_NEUTRAL = "oklch(0.30 0.025 250)";
+const COLOR_GREEN = "oklch(0.55 0.20 148)";
+
+const COLOR_BLUE_SOFT = "oklch(0.36 0.10 250)";
+const COLOR_BLUE = "oklch(0.46 0.18 250)";
+const COLOR_BLUE_STRONG = "oklch(0.54 0.22 250)";
 
 type DashboardProps = {
   initialData?: OccurrenceMatrixPayload | null;
@@ -88,11 +91,15 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
+    <main className="mx-auto w-full max-w-[1500px] flex-1 px-6 py-10 lg:px-10">
       <Header data={data} isFetching={isFetching} onRefresh={() => refetch()} />
       {missingTfs.length > 0 && <SnapshotNotice loaded={data.tfs} missing={missingTfs} />}
-      <KpiBand summary={summary} selectedTf={selectedTf} />
-      <div className="mt-6 fade-in">
+
+      <div className="mt-10 fade-in">
+        <KpiBand summary={summary} selectedTf={selectedTf} />
+      </div>
+
+      <div className="mt-8 fade-in">
         <OccurrenceFilters
           tfs={data.tfs}
           expectedTfs={data.expected_tfs}
@@ -109,7 +116,8 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           onAllMas={() => setSelectedMas(data.mas)}
         />
       </div>
-      <div className="mt-6 fade-in">
+
+      <div className="mt-8 fade-in">
         <Heatmap
           data={data}
           selectedTf={selectedTf}
@@ -118,14 +126,19 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           selectedMetric={selectedMetric}
         />
       </div>
-      <div className="mt-6 fade-in">
+
+      <div className="mt-8 fade-in">
         <Leaderboards meanReversion={meanReversion} breakout={breakout} minSample={data.min_sample} />
       </div>
+
       <Legend selectedMetric={selectedMetric} />
     </main>
   );
 }
 
+// ============================================================
+// Header
+// ============================================================
 function Header({
   data,
   isFetching,
@@ -136,83 +149,65 @@ function Header({
   onRefresh: () => void;
 }) {
   const oldestAge = data.oldest_snapshot_age_seconds ?? 0;
-  const isFresh = oldestAge < 60 * 60 * 24; // < 24h
-  const isStale = oldestAge > 60 * 60 * 24 * 7; // > 7d
+  const freshLabel = formatAge(oldestAge);
 
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
       <div>
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-primary backdrop-blur-sm">
-          <Grid3X3 className="h-3.5 w-3.5" />
+        <div className="mb-3 inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">
+          <span className="inline-block h-1 w-6 rounded-full bg-primary/70" />
           Occurrence Matrix
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight">
-          MMA{" "}
-          <span className="bg-gradient-to-r from-primary via-chart-2 to-accent bg-clip-text text-transparent">
-            Occurrence Matrix
-          </span>
-        </h1>
-        <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
-          Bounce, break and false-touch statistics by ticker, timeframe and moving average — calibrated tolerances per (TF, MA).
+        <h1 className="text-4xl font-semibold tracking-tight">MMA Occurrence Matrix</h1>
+        <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
+          Bounce, break and false-touch statistics across {data.tickers.length} tickers, {data.tfs.length} timeframes and {data.mas.length} moving averages.
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/45 px-4 py-2.5 shadow-lg shadow-black/5 backdrop-blur-sm">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <Database className="h-4 w-4" />
+      <div className="flex items-center gap-4">
+        <div className="text-right">
+          <div className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            Snapshot
           </div>
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Snapshot
-              {isFresh && <StatusDot tone="gain" label="Fresh" />}
-              {isStale && <StatusDot tone="warning" label="Stale" />}
-            </div>
-            <div className="mt-0.5 text-sm font-semibold tabular">{data.latest_snapshot_date ?? "n/a"}</div>
+          <div className="mt-1 text-sm font-semibold tabular">
+            {data.latest_snapshot_date ?? "n/a"}
           </div>
+          <div className="text-[10px] text-muted-foreground">{freshLabel}</div>
         </div>
         <button
           type="button"
           onClick={onRefresh}
           disabled={isFetching}
-          className="inline-flex h-11 items-center gap-2 rounded-xl border border-border/55 bg-card/45 px-4 text-xs font-semibold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/10 hover:text-foreground active:scale-95 disabled:cursor-wait disabled:opacity-60"
+          className="group inline-flex h-10 items-center gap-2 rounded-lg border border-border/40 bg-card/30 px-3.5 text-[12px] font-medium text-muted-foreground transition hover:border-border/80 hover:bg-card/60 hover:text-foreground disabled:cursor-wait disabled:opacity-60"
         >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          {isFetching ? "Refreshing…" : "Refresh"}
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : "group-hover:rotate-90 transition-transform"}`} />
+          {isFetching ? "Refreshing" : "Refresh"}
         </button>
       </div>
     </div>
   );
 }
 
-function StatusDot({ tone, label }: { tone: "gain" | "warning"; label: string }) {
-  const color = tone === "gain" ? "var(--gain)" : "var(--warning)";
-  return (
-    <span className="inline-flex items-center gap-1 normal-case tracking-normal">
-      <span className="relative flex h-1.5 w-1.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: color }} />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-      </span>
-      <span className="text-[9px] font-semibold" style={{ color }}>
-        {label}
-      </span>
-    </span>
-  );
+function formatAge(seconds: number): string {
+  if (seconds < 60) return "moments ago";
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
+  const days = Math.round(seconds / 86400);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 function SnapshotNotice({ loaded, missing }: { loaded: string[]; missing: string[] }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-warning/30 bg-warning/8 px-4 py-3 text-sm">
-      <ShieldAlert className="h-4 w-4 shrink-0 text-[var(--warning)]" />
-      <span className="text-foreground/85">
-        Loaded TFs: <strong className="font-semibold">{loaded.join(", ") || "none"}</strong>. Missing snapshots:{" "}
-        <strong className="font-semibold text-[var(--warning)]">{missing.join(", ")}</strong>.
-      </span>
+    <div className="mt-6 flex flex-wrap items-center gap-2 rounded-lg border border-warning/25 bg-warning/[0.06] px-4 py-2.5 text-[13px] text-foreground/80">
+      <ShieldAlert className="h-3.5 w-3.5 text-[var(--warning)]" />
+      Loaded: <span className="font-medium">{loaded.join(", ") || "none"}</span> · Missing:{" "}
+      <span className="font-medium text-[var(--warning)]">{missing.join(", ")}</span>
     </div>
   );
 }
 
-type KpiTone = "gain" | "loss" | "warning" | "neutral";
-
+// ============================================================
+// KPI Band — minimal, big numbers
+// ============================================================
 function KpiBand({
   summary,
   selectedTf,
@@ -221,83 +216,52 @@ function KpiBand({
   selectedTf: string;
 }) {
   return (
-    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border/40 bg-border/40 xl:grid-cols-4">
+      <KpiBlock label="Bounce" value={formatPct(summary.avgBounce)} sub={`avg · ${selectedTf}`} accent={COLOR_GREEN} />
+      <KpiBlock label="Break" value={formatPct(summary.avgBreak)} sub={`avg · ${selectedTf}`} accent={COLOR_BLUE} />
+      <KpiBlock label="False" value={formatPct(summary.avgFalse)} sub={`avg · ${selectedTf}`} accent={COLOR_RED} />
       <KpiBlock
-        icon={<Target className="h-4 w-4" />}
-        label={`Avg Bounce% · ${selectedTf}`}
-        value={formatPct(summary.avgBounce)}
-        sub="Mean-reversion strength"
-        tone="gain"
-      />
-      <KpiBlock
-        icon={<Zap className="h-4 w-4" />}
-        label={`Avg Break% · ${selectedTf}`}
-        value={formatPct(summary.avgBreak)}
-        sub="Trend continuation"
-        tone="loss"
-      />
-      <KpiBlock
-        icon={<AlertCircle className="h-4 w-4" />}
-        label={`Avg False% · ${selectedTf}`}
-        value={formatPct(summary.avgFalse)}
-        sub="Whipsaw rate"
-        tone="warning"
-      />
-      <KpiBlock
-        icon={<Activity className="h-4 w-4" />}
-        label="Events Analyzed"
+        label="Events"
         value={summary.events.toLocaleString("en-US")}
-        sub={`${summary.lowSampleCells} low-sample cells`}
-        tone="neutral"
+        sub={`${summary.lowSampleCells} low-sample`}
       />
     </section>
   );
 }
 
 function KpiBlock({
-  icon,
   label,
   value,
   sub,
-  tone,
+  accent,
 }: {
-  icon: ReactNode;
   label: string;
   value: string;
   sub: string;
-  tone: KpiTone;
+  accent?: string;
 }) {
-  const accent =
-    tone === "gain"
-      ? { from: "oklch(0.32 0.12 145 / 0.55)", to: "oklch(0.22 0.04 250 / 0.45)", icon: "var(--gain)", text: "var(--gain)" }
-      : tone === "loss"
-        ? { from: "oklch(0.32 0.14 25 / 0.55)", to: "oklch(0.22 0.04 250 / 0.45)", icon: "var(--loss)", text: "var(--loss)" }
-        : tone === "warning"
-          ? { from: "oklch(0.32 0.12 90 / 0.55)", to: "oklch(0.22 0.04 250 / 0.45)", icon: "var(--warning)", text: "var(--warning)" }
-          : { from: "oklch(0.28 0.06 250 / 0.65)", to: "oklch(0.20 0.02 250 / 0.45)", icon: "var(--primary)", text: "oklch(0.96 0.01 250)" };
-
   return (
-    <div
-      className="group relative overflow-hidden rounded-xl border border-border/55 p-4 shadow-lg shadow-black/10 transition hover:border-border/80 hover:shadow-xl hover:shadow-black/20"
-      style={{
-        background: `linear-gradient(135deg, ${accent.from} 0%, ${accent.to} 100%)`,
-      }}
-    >
-      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl transition group-hover:opacity-30" style={{ backgroundColor: accent.icon }} />
-      <div className="relative flex items-start justify-between gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/70">{label}</div>
-        <div className="rounded-md bg-background/30 p-1.5 backdrop-blur-sm" style={{ color: accent.icon }}>
-          {icon}
-        </div>
+    <div className="group relative bg-card/60 px-6 py-5 transition hover:bg-card/80">
+      {accent && (
+        <span
+          className="absolute inset-x-6 top-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
+        />
+      )}
+      <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+        {label}
       </div>
-      <div className="relative mt-3 text-3xl font-bold tabular tracking-tight" style={{ color: accent.text }}>
+      <div className="mt-3 text-4xl font-semibold tabular leading-none tracking-tight text-foreground">
         {value}
       </div>
-      <div className="relative mt-1 text-[11px] text-foreground/65">{sub}</div>
+      <div className="mt-2 text-[11px] text-muted-foreground/85">{sub}</div>
     </div>
   );
 }
 
+// ============================================================
+// Heatmap — clean cells, big numbers, hover reveals detail
+// ============================================================
 function Heatmap({
   data,
   selectedTf,
@@ -311,34 +275,21 @@ function Heatmap({
   mas: string[];
   selectedMetric: OccurrenceMetricKey;
 }) {
-  const tickerCount = categories.reduce((sum, category) => sum + category.tickers.length, 0);
-
   return (
-    <section className="overflow-hidden rounded-xl border border-border/60 bg-card/35 shadow-xl shadow-black/10 backdrop-blur-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-gradient-to-r from-card/60 to-card/30 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <Flame className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold tracking-tight">Heatmap</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Each cell shows the selected metric, with B/Bk/F sub-bars. Column headers display the (TF, MA) tolerance.
-            </p>
-          </div>
+    <section>
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Matrix</h2>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Each cell shows{" "}
+            <span className="font-medium text-foreground/85">{metricLabel(selectedMetric)}</span> · hover for details.
+          </p>
         </div>
-        <div className="flex items-center gap-2 rounded-md border border-border/40 bg-background/30 px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5 text-[var(--warning)]" />
-          <span className="font-semibold text-foreground/85">{selectedTf}</span>
-          <Separator />
-          <span>{metricLabel(selectedMetric)}</span>
-          <Separator />
-          <span>{mas.length} MAs</span>
-          <Separator />
-          <span>{tickerCount} tickers</span>
+        <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          {selectedTf} · {mas.length} MAs · {categories.reduce((sum, c) => sum + c.tickers.length, 0)} tickers
         </div>
       </div>
-      <div className="space-y-5 p-4">
+      <div className="space-y-8">
         {categories.map((category) => (
           <CategoryHeatmap
             key={category.name}
@@ -352,10 +303,6 @@ function Heatmap({
       </div>
     </section>
   );
-}
-
-function Separator() {
-  return <span className="text-border/60">·</span>;
 }
 
 function CategoryHeatmap({
@@ -372,56 +319,51 @@ function CategoryHeatmap({
   selectedMetric: OccurrenceMetricKey;
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border/40 bg-background/15">
-      <div className="flex items-center justify-between gap-3 border-b border-border/35 bg-card/20 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-muted-foreground/75" />
-          <h3 className="text-sm font-semibold">{displayCategoryName(category.name)}</h3>
-        </div>
-        <span className="rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+    <div>
+      <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
+        <h3 className="text-[13px] font-semibold tracking-tight text-foreground/85">
+          {displayCategoryName(category.name)}
+        </h3>
+        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
           {category.tickers.length} tickers
         </span>
       </div>
-      <div className="overflow-auto">
-        <table className="w-full min-w-[920px] border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-border/40 bg-background/35">
-              <th className="sticky left-0 z-10 w-[110px] bg-background/95 px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
-                Ticker
-              </th>
-              {mas.map((ma) => (
-                <th key={ma} className="min-w-[152px] px-2 py-3 text-center">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/85">{ma}</div>
-                  <div className="mt-1 inline-block rounded-full bg-background/35 px-2 py-0.5 text-[9.5px] font-medium normal-case tracking-normal text-[var(--warning)]">
-                    {toleranceLabel(data, selectedTf, ma)}
-                  </div>
+      <div className="overflow-hidden rounded-xl border border-border/35 bg-card/20">
+        <div className="overflow-auto">
+          <table className="w-full min-w-[840px] border-collapse">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 w-[100px] bg-card/85 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground backdrop-blur-sm">
+                  Ticker
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {category.tickers.map((ticker, rowIdx) => (
-              <tr
-                key={ticker}
-                className="group/row border-b border-border/30 last:border-b-0 transition hover:bg-primary/[0.04]"
-              >
-                <td className="sticky left-0 z-10 bg-background/95 px-3 py-2 text-sm font-semibold text-foreground backdrop-blur-sm transition group-hover/row:text-primary">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-normal text-muted-foreground/60 tabular">{String(rowIdx + 1).padStart(2, "0")}</span>
-                    <span>{ticker}</span>
-                  </div>
-                </td>
                 {mas.map((ma) => (
-                  <HeatCell
-                    key={`${ticker}-${ma}`}
-                    metric={data.data[ticker]?.[selectedTf]?.[ma] ?? null}
-                    selectedMetric={selectedMetric}
-                  />
+                  <th key={ma} className="min-w-[140px] px-2 py-3 text-center">
+                    <div className="text-[11px] font-semibold tracking-tight text-foreground/90">{ma}</div>
+                    <div className="mt-0.5 text-[10px] font-normal text-muted-foreground/75">
+                      {toleranceLabel(data, selectedTf, ma)}
+                    </div>
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {category.tickers.map((ticker) => (
+                <tr key={ticker} className="group/row border-t border-border/25 transition hover:bg-primary/[0.025]">
+                  <td className="sticky left-0 z-10 bg-card/85 px-4 py-2 text-[13px] font-semibold text-foreground backdrop-blur-sm transition group-hover/row:text-primary">
+                    {ticker}
+                  </td>
+                  {mas.map((ma) => (
+                    <HeatCell
+                      key={`${ticker}-${ma}`}
+                      metric={data.data[ticker]?.[selectedTf]?.[ma] ?? null}
+                      selectedMetric={selectedMetric}
+                    />
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -437,97 +379,77 @@ function HeatCell({
   if (!metric || metric.T === 0) {
     return (
       <td
-        className="h-[92px] min-w-[152px] border-l border-border/20 px-2 py-2 text-center"
-        style={{ backgroundColor: "oklch(0.22 0.018 250 / 0.45)" }}
+        className="h-[68px] min-w-[140px] border-l border-border/15 px-2 py-2 text-center"
+        style={{ backgroundColor: "oklch(0.18 0.012 250)" }}
       >
-        <span className="text-[11px] font-medium text-muted-foreground/55">—</span>
+        <span className="text-[12px] text-muted-foreground/40">—</span>
       </td>
     );
   }
 
   const style = heatStyle(metric, selectedMetric);
-
   const tooltip = [
-    `Total events: ${metric.T}`,
-    `Bounce: ${metric.B} (${formatPct(metric.bounce_pct)})`,
-    `Break:  ${metric.Bk} (${formatPct(metric.break_pct)})`,
-    `False:  ${metric.F} (${formatPct(metric.false_pct)})`,
-    `Tolerance: ${metric.tolerance_pct == null ? "n/a" : `±${metric.tolerance_pct}%`}`,
-    metric.low_sample ? "[low sample]" : "",
+    `T=${metric.T}`,
+    `Bounce ${metric.B} · ${formatPct(metric.bounce_pct)}`,
+    `Break  ${metric.Bk} · ${formatPct(metric.break_pct)}`,
+    `False  ${metric.F} · ${formatPct(metric.false_pct)}`,
+    `Tol ±${metric.tolerance_pct ?? "n/a"}%`,
+    metric.low_sample ? "low sample" : "",
   ]
     .filter(Boolean)
     .join("\n");
 
   const isHighlight = isHighlightValue(metric, selectedMetric);
-
-  let cellStyle: CSSProperties = style;
-  if (isHighlight) {
-    cellStyle = { ...style, boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 12px oklch(0.82 0.16 90 / 0.25)" };
-  } else if (metric.low_sample) {
-    cellStyle = { ...style, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.25)" };
-  }
+  const cellStyle: CSSProperties = isHighlight
+    ? { ...style, boxShadow: "inset 0 0 0 1.5px var(--warning)" }
+    : metric.low_sample
+      ? { ...style, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.18)" }
+      : style;
 
   return (
     <td
-      className="group/cell relative h-[92px] min-w-[152px] cursor-help border-l border-border/20 px-2 py-2 text-center text-white transition-all duration-150 hover:z-10 hover:scale-[1.03] hover:shadow-xl hover:shadow-black/40"
+      className="group/cell relative h-[68px] min-w-[140px] cursor-help border-l border-border/15 px-2 py-2 text-center text-white transition-all duration-150 hover:z-10 hover:scale-[1.04]"
       style={cellStyle}
       title={tooltip}
     >
-      <div className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white/80">
-        {metricLabel(selectedMetric)}
-      </div>
-      <div className="mt-0.5 text-[20px] font-bold leading-tight tabular text-white">
+      <div className="text-[22px] font-semibold leading-none tabular tracking-tight">
         {formatMetric(metric, selectedMetric)}
       </div>
-      <SubMetrics metric={metric} selectedMetric={selectedMetric} />
+      <div className="mt-1.5 text-[10px] font-medium tabular text-white/65">
+        n = {metric.T.toLocaleString("en-US")}
+      </div>
     </td>
   );
 }
 
-function SubMetrics({ metric, selectedMetric }: { metric: OccurrenceMetric; selectedMetric: OccurrenceMetricKey }) {
-  return (
-    <div className="mt-2 grid grid-cols-4 gap-[3px] text-[9.5px] font-semibold tabular">
-      <SubMetric label="B" value={metric.bounce_pct} suffix="%" active={selectedMetric === "bounce_pct"} tone="gain" />
-      <SubMetric label="Bk" value={metric.break_pct} suffix="%" active={selectedMetric === "break_pct"} tone="loss" />
-      <SubMetric label="F" value={metric.false_pct} suffix="%" active={selectedMetric === "false_pct"} tone="warning" />
-      <SubMetric label="n" value={metric.T} suffix="" active={selectedMetric === "T"} tone="neutral" />
-    </div>
-  );
+// ============================================================
+// Color logic — 3-tone palette (red / neutral / green)
+// ============================================================
+function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMetricKey): CSSProperties {
+  const value = metric ? metricValue(metric, selectedMetric) : null;
+  if (!metric || metric.T === 0 || value == null) {
+    return { backgroundColor: "oklch(0.20 0.015 250)" };
+  }
+  return { backgroundColor: heatBands(value, selectedMetric) };
 }
 
-function SubMetric({
-  label,
-  value,
-  suffix,
-  active,
-  tone,
-}: {
-  label: string;
-  value: number | null;
-  suffix: string;
-  active: boolean;
-  tone: "gain" | "loss" | "warning" | "neutral";
-}) {
-  const dot =
-    tone === "gain"
-      ? "oklch(0.78 0.18 145)"
-      : tone === "loss"
-        ? "oklch(0.72 0.22 25)"
-        : tone === "warning"
-          ? "oklch(0.85 0.16 90)"
-          : "oklch(0.75 0.02 250)";
+function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
+  if (selectedMetric === "T") {
+    if (value < 50) return COLOR_NEUTRAL;
+    if (value < 200) return COLOR_BLUE_SOFT;
+    if (value < 1000) return COLOR_BLUE;
+    return COLOR_BLUE_STRONG;
+  }
 
-  return (
-    <span
-      className={`flex items-center justify-center gap-0.5 rounded-[3px] px-1 py-[3px] ${active ? "bg-white/25 ring-1 ring-white/40" : "bg-black/35"}`}
-    >
-      <span className="h-1 w-1 rounded-full" style={{ backgroundColor: dot }} />
-      <span className="text-white/90">{label}</span>
-      <span className="font-bold text-white">
-        {value == null ? "—" : `${value}${suffix}`}
-      </span>
-    </span>
-  );
+  if (selectedMetric === "false_pct") {
+    if (value < 30) return COLOR_GREEN;
+    if (value < 50) return COLOR_NEUTRAL;
+    return COLOR_RED;
+  }
+
+  if (value < 30) return COLOR_RED;
+  if (value < 50) return COLOR_NEUTRAL;
+  return COLOR_GREEN;
 }
 
 function isHighlightValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): boolean {
@@ -537,6 +459,9 @@ function isHighlightValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMe
   return false;
 }
 
+// ============================================================
+// Helpers
+// ============================================================
 function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategory: string): string[] {
   if (selectedCategory === "All") return data.tickers;
   return data.categories.find((category) => category.name === selectedCategory)?.tickers ?? data.tickers;
@@ -618,15 +543,9 @@ function summarize(
       if (!metric) continue;
       events += metric.T;
       if (metric.T > 0 && metric.T < data.min_sample) lowSampleCells += 1;
-      if (metric.T >= data.min_sample && metric.bounce_pct != null) {
-        bounceValues.push(metric.bounce_pct);
-      }
-      if (metric.T >= data.min_sample && metric.break_pct != null) {
-        breakValues.push(metric.break_pct);
-      }
-      if (metric.T >= data.min_sample && metric.false_pct != null) {
-        falseValues.push(metric.false_pct);
-      }
+      if (metric.T >= data.min_sample && metric.bounce_pct != null) bounceValues.push(metric.bounce_pct);
+      if (metric.T >= data.min_sample && metric.break_pct != null) breakValues.push(metric.break_pct);
+      if (metric.T >= data.min_sample && metric.false_pct != null) falseValues.push(metric.false_pct);
     }
   }
 
@@ -644,52 +563,6 @@ function averagePct(values: number[]): number | null {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
-function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMetricKey): CSSProperties {
-  const value = metric ? metricValue(metric, selectedMetric) : null;
-  if (!metric || metric.T === 0 || value == null) {
-    return { backgroundColor: "oklch(0.22 0.018 250 / 0.45)" };
-  }
-
-  const bg = heatBands(value, selectedMetric);
-
-  // Keep cells fully opaque so the text stays sharp. Low-sample cells are
-  // flagged via a dashed ring in HeatCell instead of reducing opacity.
-  return { backgroundColor: bg };
-}
-
-// Minimal 3-tone palette: red (< 30%), neutral gray (30-54%), green (>= 55%).
-// Same thresholds applied across bounce/break (high = good) and false%
-// (inverted: high = bad). Events use a separate neutral→blue scale since
-// it's magnitude, not polarity.
-const COLOR_RED = "oklch(0.45 0.18 25)";
-const COLOR_NEUTRAL = "oklch(0.32 0.025 250)";
-const COLOR_GREEN = "oklch(0.52 0.20 148)";
-
-const COLOR_BLUE_SOFT = "oklch(0.36 0.10 250)";
-const COLOR_BLUE = "oklch(0.46 0.18 250)";
-const COLOR_BLUE_STRONG = "oklch(0.54 0.22 250)";
-
-function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
-  if (selectedMetric === "T") {
-    if (value < 50) return COLOR_NEUTRAL;
-    if (value < 200) return COLOR_BLUE_SOFT;
-    if (value < 1000) return COLOR_BLUE;
-    return COLOR_BLUE_STRONG;
-  }
-
-  if (selectedMetric === "false_pct") {
-    // inverted: low false% = good (green), high = bad (red)
-    if (value < 30) return COLOR_GREEN;
-    if (value < 50) return COLOR_NEUTRAL;
-    return COLOR_RED;
-  }
-
-  // bounce_pct / break_pct: high = good
-  if (value < 30) return COLOR_RED;
-  if (value < 50) return COLOR_NEUTRAL;
-  return COLOR_GREEN;
-}
-
 function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
   if (selectedMetric === "T") return metric.T;
   return metric[selectedMetric];
@@ -702,9 +575,9 @@ function formatMetric(metric: OccurrenceMetric, selectedMetric: OccurrenceMetric
 }
 
 function metricLabel(selectedMetric: OccurrenceMetricKey): string {
-  if (selectedMetric === "bounce_pct") return "Bounce%";
-  if (selectedMetric === "break_pct") return "Break%";
-  if (selectedMetric === "false_pct") return "False%";
+  if (selectedMetric === "bounce_pct") return "Bounce %";
+  if (selectedMetric === "break_pct") return "Break %";
+  if (selectedMetric === "false_pct") return "False %";
   return "Events";
 }
 
@@ -712,6 +585,9 @@ function formatPct(value: number | null): string {
   return value == null ? "—" : `${value}%`;
 }
 
+// ============================================================
+// Legend
+// ============================================================
 function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
   const stops =
     selectedMetric === "T"
@@ -734,76 +610,70 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
           ];
 
   return (
-    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/30 px-4 py-3 text-xs text-muted-foreground fade-in">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/80">
-          Legend · {metricLabel(selectedMetric)}
+    <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border/35 px-1 pt-5 text-[11px] text-muted-foreground fade-in">
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="font-medium uppercase tracking-[0.2em] text-foreground/70">
+          {metricLabel(selectedMetric)}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3">
           {stops.map((stop) => (
             <div key={stop.label} className="flex items-center gap-1.5">
-              <div className="h-3.5 w-7 rounded shadow-inner shadow-black/30" style={{ backgroundColor: stop.color }} />
-              <span className="text-[10px] text-foreground/75">{stop.label}</span>
+              <span className="block h-3 w-6 rounded" style={{ backgroundColor: stop.color }} />
+              <span className="tabular">{stop.label}</span>
             </div>
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-4 text-[10px]">
+      <div className="flex items-center gap-4">
         <span className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3.5 w-3.5 rounded"
-            style={{
-              backgroundColor: COLOR_GREEN,
-              boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 6px oklch(0.82 0.16 90 / 0.4)",
-            }}
-          />
-          High-conviction (≥50%)
+          <span className="block h-3 w-3 rounded" style={{ backgroundColor: COLOR_GREEN, boxShadow: "inset 0 0 0 1.5px var(--warning)" }} />
+          high-conviction (≥50%)
         </span>
         <span className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3.5 w-3.5 rounded"
-            style={{ backgroundColor: COLOR_NEUTRAL, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.25)" }}
-          />
-          Low sample (n &lt; min)
+          <span className="block h-3 w-3 rounded" style={{ backgroundColor: COLOR_NEUTRAL, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.2)" }} />
+          low sample
         </span>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// Skeleton + Error
+// ============================================================
 function OccurrenceSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
-      <div className="mb-6 h-24 animate-pulse rounded-xl bg-card/30" />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <main className="mx-auto w-full max-w-[1500px] flex-1 px-6 py-10 lg:px-10">
+      <div className="h-16 max-w-xl animate-pulse rounded-lg bg-card/30" />
+      <div className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-2xl xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="h-28 animate-pulse rounded-xl bg-card/30" />
+          <div key={item} className="h-28 animate-pulse bg-card/30" />
         ))}
       </div>
-      <div className="mt-6 h-[640px] animate-pulse rounded-xl bg-card/25" />
+      <div className="mt-8 h-[520px] animate-pulse rounded-2xl bg-card/25" />
     </main>
   );
 }
 
 function OccurrenceError() {
   return (
-    <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
-      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-8 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/20 text-destructive">
+    <main className="mx-auto w-full max-w-[1500px] flex-1 px-6 py-10 lg:px-10">
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/[0.06] p-10">
+        <div className="flex items-center gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-destructive/15 text-destructive">
             <AlertCircle className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-lg font-semibold">Occurrence Matrix unavailable</div>
+            <div className="text-lg font-semibold tracking-tight">Occurrence Matrix unavailable</div>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              The API could not load the TradingView snapshots. Verify the snapshot directory and retry the page.
+              The API could not load the TradingView snapshots. Verify the snapshot directory and retry.
             </p>
           </div>
         </div>
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-4 inline-flex items-center gap-2 rounded-md border border-border/60 bg-card/45 px-3 py-1.5 text-xs font-semibold transition hover:bg-card/65"
+          className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border/50 bg-card/45 px-4 py-2 text-[12px] font-medium transition hover:bg-card/70"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Reload page
