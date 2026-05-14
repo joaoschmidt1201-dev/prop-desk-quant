@@ -460,20 +460,23 @@ function HeatCell({
 
   const isHighlight = isHighlightValue(metric, selectedMetric);
 
+  let cellStyle: CSSProperties = style;
+  if (isHighlight) {
+    cellStyle = { ...style, boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 12px oklch(0.82 0.16 90 / 0.25)" };
+  } else if (metric.low_sample) {
+    cellStyle = { ...style, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.25)" };
+  }
+
   return (
     <td
       className="group/cell relative h-[92px] min-w-[152px] cursor-help border-l border-border/20 px-2 py-2 text-center text-white transition-all duration-150 hover:z-10 hover:scale-[1.03] hover:shadow-xl hover:shadow-black/40"
-      style={
-        isHighlight
-          ? { ...style, boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 12px oklch(0.82 0.16 90 / 0.25)" }
-          : style
-      }
+      style={cellStyle}
       title={tooltip}
     >
-      <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/65">
+      <div className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white/80">
         {metricLabel(selectedMetric)}
       </div>
-      <div className="mt-0.5 text-[20px] font-bold leading-tight tabular text-white drop-shadow-sm">
+      <div className="mt-0.5 text-[20px] font-bold leading-tight tabular text-white">
         {formatMetric(metric, selectedMetric)}
       </div>
       <SubMetrics metric={metric} selectedMetric={selectedMetric} />
@@ -516,10 +519,10 @@ function SubMetric({
 
   return (
     <span
-      className={`flex items-center justify-center gap-0.5 rounded-[3px] px-1 py-[3px] backdrop-blur-[1px] ${active ? "bg-white/22 ring-1 ring-white/30" : "bg-black/22"}`}
+      className={`flex items-center justify-center gap-0.5 rounded-[3px] px-1 py-[3px] ${active ? "bg-white/25 ring-1 ring-white/40" : "bg-black/35"}`}
     >
       <span className="h-1 w-1 rounded-full" style={{ backgroundColor: dot }} />
-      <span className="text-white/75">{label}</span>
+      <span className="text-white/90">{label}</span>
       <span className="font-bold text-white">
         {value == null ? "—" : `${value}${suffix}`}
       </span>
@@ -529,8 +532,8 @@ function SubMetric({
 
 function isHighlightValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): boolean {
   if (metric.low_sample) return false;
-  if (selectedMetric === "bounce_pct") return (metric.bounce_pct ?? 0) >= 55;
-  if (selectedMetric === "break_pct") return (metric.break_pct ?? 0) >= 55;
+  if (selectedMetric === "bounce_pct") return (metric.bounce_pct ?? 0) >= 50;
+  if (selectedMetric === "break_pct") return (metric.break_pct ?? 0) >= 50;
   return false;
 }
 
@@ -649,10 +652,9 @@ function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMe
 
   const bg = heatBands(value, selectedMetric);
 
-  return {
-    backgroundColor: bg,
-    opacity: metric.low_sample ? 0.6 : 1,
-  };
+  // Keep cells fully opaque so the text stays sharp. Low-sample cells are
+  // flagged via a dashed ring in HeatCell instead of reducing opacity.
+  return { backgroundColor: bg };
 }
 
 // Minimal 3-tone palette: red (< 30%), neutral gray (30-54%), green (>= 55%).
@@ -678,13 +680,13 @@ function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
   if (selectedMetric === "false_pct") {
     // inverted: low false% = good (green), high = bad (red)
     if (value < 30) return COLOR_GREEN;
-    if (value < 55) return COLOR_NEUTRAL;
+    if (value < 50) return COLOR_NEUTRAL;
     return COLOR_RED;
   }
 
   // bounce_pct / break_pct: high = good
   if (value < 30) return COLOR_RED;
-  if (value < 55) return COLOR_NEUTRAL;
+  if (value < 50) return COLOR_NEUTRAL;
   return COLOR_GREEN;
 }
 
@@ -722,13 +724,13 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
       : selectedMetric === "false_pct"
         ? [
             { color: COLOR_GREEN, label: "< 30%" },
-            { color: COLOR_NEUTRAL, label: "30-54%" },
-            { color: COLOR_RED, label: "≥ 55%" },
+            { color: COLOR_NEUTRAL, label: "30-49%" },
+            { color: COLOR_RED, label: "≥ 50%" },
           ]
         : [
             { color: COLOR_RED, label: "< 30%" },
-            { color: COLOR_NEUTRAL, label: "30-54%" },
-            { color: COLOR_GREEN, label: "≥ 55%" },
+            { color: COLOR_NEUTRAL, label: "30-49%" },
+            { color: COLOR_GREEN, label: "≥ 50%" },
           ];
 
   return (
@@ -755,10 +757,13 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
               boxShadow: "inset 0 0 0 1.5px var(--warning), 0 0 6px oklch(0.82 0.16 90 / 0.4)",
             }}
           />
-          High-conviction (≥55%)
+          High-conviction (≥50%)
         </span>
-        <span className="flex items-center gap-1.5 opacity-55">
-          <span className="inline-block h-3.5 w-3.5 rounded bg-foreground/25" />
+        <span className="flex items-center gap-1.5">
+          <span
+            className="inline-block h-3.5 w-3.5 rounded"
+            style={{ backgroundColor: COLOR_NEUTRAL, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.25)" }}
+          />
           Low sample (n &lt; min)
         </span>
       </div>
