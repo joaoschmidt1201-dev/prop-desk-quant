@@ -344,9 +344,20 @@ def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 def strategy_family(name: str) -> str:
     n = name.upper()
-    if "TRIPLE CALENDAR" in n or "TRIPLECALENDAR" in n or "TRIPLE CAL" in n or "TRIP CAL" in n:
+    if (
+        "TRIPLE CALENDAR" in n
+        or "TRIPLECALENDAR" in n
+        or "TRIPLE CAL" in n
+        or "TRIP CAL" in n
+        or re.search(r"\bTC\b", n)
+    ):
         return "Triple Calendar"
-    if "DOUBLE CALENDAR" in n or "DOUBLECALENDAR" in n or "DOUBLE CAL" in n:
+    if (
+        "DOUBLE CALENDAR" in n
+        or "DOUBLECALENDAR" in n
+        or "DOUBLE CAL" in n
+        or re.search(r"\bDC\b", n)
+    ):
         return "Double Calendar"
     if "IRON CONDOR" in n or " IC" in n or "IC7" in n or "IC8" in n:
         return "Iron Condor"
@@ -368,6 +379,11 @@ def strategy_family(name: str) -> str:
 
 
 _CALENDAR_DTE_RE = re.compile(r"(\d{1,2})\s*/\s*(\d{1,2})\s*DTE", re.IGNORECASE)
+_CALENDAR_BARE_RE = re.compile(r"\b(\d{1,2})\s*/\s*(\d{1,2})\b")
+_CALENDAR_KEYWORD_RE = re.compile(
+    r"\b(?:TC|DC|TRIPLE\s*CAL(?:ENDAR)?|DOUBLE\s*CAL(?:ENDAR)?|CALENDAR)\b",
+    re.IGNORECASE,
+)
 _STRUCTURE_SUFFIX_RE = re.compile(
     r"\b(?:IC|BWIC|BAT(?:MAN)?|RJL|BWB|PCS|HALF[-\s]?CALL|CALL[-\s]?HALF|"
     r"BullPutCreditSpread|BULL\s*CALL\s*SP|BEAR\s*CALL|BW\s*IC)\s*(\d{1,2})\b",
@@ -387,9 +403,19 @@ def parse_strategy_structure(name: str | None, dte_open: int | None = None) -> s
     recognizable pattern. None when even that is missing.
     """
     if name:
+        # Strict: explicit "DTE" suffix (e.g. "Triple Calendar 21/28DTE").
         m = _CALENDAR_DTE_RE.search(name)
         if m:
             return f"{int(m.group(1))}/{int(m.group(2))}"
+        # Loose: bare "X/Y" when the name carries a calendar keyword
+        # (TC / DC / TRIPLE CAL / DOUBLE CAL / CALENDAR). Catches CZ's
+        # shorthand "FOR TC 01 RUT 7/10; 8/11" where the first pair is the
+        # primary calendar leg.
+        if _CALENDAR_KEYWORD_RE.search(name):
+            m = _CALENDAR_BARE_RE.search(name)
+            if m:
+                return f"{int(m.group(1))}/{int(m.group(2))}"
+        # Single-DTE structures (IC42, BWIC21, etc.)
         m = _STRUCTURE_SUFFIX_RE.search(name)
         if m:
             return str(int(m.group(1)))
