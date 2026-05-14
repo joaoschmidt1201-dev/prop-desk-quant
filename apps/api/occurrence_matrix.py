@@ -20,7 +20,7 @@ from scripts.occurrence_matrix_report import (  # noqa: E402
     universe_tickers,
 )
 
-TF_ORDER = ("D", "W", "1h", "15m", "5m", "2m")
+TF_ORDER = ("W", "D", "1h", "15m", "5m", "2m")
 TF_ALIASES = {
     "d": "D",
     "1d": "D",

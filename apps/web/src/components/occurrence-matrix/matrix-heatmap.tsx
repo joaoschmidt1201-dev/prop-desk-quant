@@ -28,7 +28,7 @@ type Summary = {
 };
 
 export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
-  const [selectedTf, setSelectedTf] = useState(initialData?.tfs[0] ?? "D");
+  const [selectedTf, setSelectedTf] = useState(initialData?.tfs[0] ?? "W");
   const [selectedMetric, setSelectedMetric] = useState<OccurrenceMetricKey>("bounce_pct");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedMas, setSelectedMas] = useState<string[]>(initialData?.mas ?? []);
@@ -215,7 +215,7 @@ function Heatmap({
         <div>
           <h2 className="text-sm font-semibold tracking-tight">Heatmap</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Every cell shows Bounce%, Break%, False% and total events. Heat color follows the selected metric.
+            Every cell shows Bounce%, Break%, False% and total events. Column headers show the tolerance zone used.
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -270,9 +270,14 @@ function CategoryHeatmap({
               {mas.map((ma) => (
                 <th
                   key={ma}
-                  className="min-w-[150px] px-3 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                  className="min-w-[150px] px-3 py-3 text-center"
                 >
-                  {ma}
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {ma}
+                  </div>
+                  <div className="mt-1 text-[10px] font-medium normal-case tracking-normal text-[#f3c969]">
+                    {toleranceLabel(data, selectedTf, ma)}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -389,6 +394,14 @@ function displayCategoryName(name: string): string {
     "Commodities/ETFs": "Commodities / ETFs",
   };
   return labels[name] ?? name;
+}
+
+function toleranceLabel(data: OccurrenceMatrixPayload, tf: string, ma: string): string {
+  const maIndex = data.mas.indexOf(ma);
+  const tolerance = maIndex >= 0 ? data.tolerances[tf]?.[maIndex] : null;
+  if (tolerance == null) return "tol n/a";
+  if (tolerance === 0) return "tol skip";
+  return `tol +/-${tolerance}%`;
 }
 
 function collectSetups(
