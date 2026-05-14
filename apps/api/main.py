@@ -34,6 +34,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+try:
+    from .occurrence_matrix import (
+        build_matrix as build_occurrence_matrix,
+        load_latest_snapshots as load_latest_occurrence_snapshots,
+        matrix_health as occurrence_matrix_health,
+        snapshot_mtimes as occurrence_snapshot_mtimes,
+    )
+except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/api
+    from occurrence_matrix import (
+        build_matrix as build_occurrence_matrix,
+        load_latest_snapshots as load_latest_occurrence_snapshots,
+        matrix_health as occurrence_matrix_health,
+        snapshot_mtimes as occurrence_snapshot_mtimes,
+    )
+
 # ─── Paths & env ──────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +56,10 @@ load_dotenv(REPO_ROOT / "apps" / "api" / ".env")
 load_dotenv(REPO_ROOT / ".env", override=False)
 
 SNAPSHOT_PATH = REPO_ROOT / os.getenv("SNAPSHOT_PATH", "reports/trades_snapshot_latest.json")
+OCCURRENCE_MATRIX_SNAPSHOT_DIR = REPO_ROOT / os.getenv(
+    "OCCURRENCE_MATRIX_SNAPSHOT_DIR",
+    "state/occurrence_matrix_snapshots",
+)
 SNAPSHOT_CACHE_TTL = int(os.getenv("SNAPSHOT_CACHE_TTL", "300"))
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
 GDRIVE_ID = os.getenv("GDRIVE_FILE_ID", "1RIXpDUIq1692_6UwoPFYyrKtukYB2UArCTWvI6Y5Xbk")
@@ -166,6 +185,7 @@ app.add_middleware(
 # ─── Snapshot cache ───────────────────────────────────────────────────────────
 
 _snapshot_cache: dict[str, Any] = {"data": None, "loaded_at": 0.0, "mtime": 0.0}
+_occurrence_matrix_cache: dict[str, Any] = {"data": None, "loaded_at": 0.0, "mtimes": {}}
 _refresh_lock = threading.Lock()
 _refresh_running = {"state": False}
 _refresh_last_status: dict[str, Any] = {
@@ -206,6 +226,32 @@ def load_snapshot(force: bool = False) -> dict[str, Any]:
         _snapshot_cache["loaded_at"] = time.time()
         _snapshot_cache["mtime"] = mtime
     return _snapshot_cache["data"]
+
+
+def load_occurrence_matrix(force: bool = False) -> dict[str, Any]:
+    mtimes = occurrence_snapshot_mtimes(OCCURRENCE_MATRIX_SNAPSHOT_DIR)
+    age = time.time() - _occurrence_matrix_cache["loaded_at"]
+    fresh_enough = (
+        not force
+        and _occurrence_matrix_cache["data"] is not None
+        and age < SNAPSHOT_CACHE_TTL
+        and mtimes == _occurrence_matrix_cache["mtimes"]
+    )
+    if fresh_enough:
+        return _occurrence_matrix_cache["data"]
+
+    try:
+        snapshots = load_latest_occurrence_snapshots(OCCURRENCE_MATRIX_SNAPSHOT_DIR)
+        if not snapshots:
+            raise FileNotFoundError(f"No occurrence matrix snapshots found in {OCCURRENCE_MATRIX_SNAPSHOT_DIR}")
+        matrix = build_occurrence_matrix(snapshots)
+    except Exception as exc:
+        raise HTTPException(503, f"Occurrence Matrix snapshot load failed: {exc}") from exc
+
+    _occurrence_matrix_cache["data"] = matrix
+    _occurrence_matrix_cache["loaded_at"] = time.time()
+    _occurrence_matrix_cache["mtimes"] = mtimes
+    return matrix
 
 
 def snapshot_age_seconds(snap: dict[str, Any]) -> float | None:
@@ -421,6 +467,68 @@ class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     snapshot_age_seconds: float | None
     snapshot_generated_at: str | None
+    occurrence_matrix_oldest_snapshot_age_seconds: float | None = None
+    occurrence_matrix_snapshot_tfs: list[str] = Field(default_factory=list)
+    occurrence_matrix_error: str | None = None
+
+
+class OccurrenceMetric(BaseModel):
+    T: int
+    B: int
+    Bk: int
+    F: int
+    bounce_pct: int | None
+    break_pct: int | None
+    false_pct: int | None
+    low_sample: bool
+    tolerance_pct: float | None
+
+
+class OccurrenceCategory(BaseModel):
+    name: str
+    tickers: list[str]
+
+
+class OccurrenceSnapshotMeta(BaseModel):
+    date: str
+    file: str
+    raw_tf: str
+    age_seconds: float | None
+    has_tolerances: bool
+
+
+class OccurrenceLeaderboardEntry(BaseModel):
+    ticker: str
+    tf: str
+    ma: str
+    total: int
+    bounce_pct: int | None
+    break_pct: int | None
+    false_pct: int | None
+
+
+class OccurrenceLeaderboards(BaseModel):
+    mean_reversion: list[OccurrenceLeaderboardEntry]
+    breakout: list[OccurrenceLeaderboardEntry]
+
+
+class OccurrenceMatrixResponse(BaseModel):
+    date: str | None
+    latest_snapshot_date: str | None
+    oldest_snapshot_date: str | None
+    oldest_snapshot_age_seconds: float | None
+    generated_at: str
+    expected_tfs: list[str]
+    tfs: list[str]
+    mas: list[str]
+    min_sample: int
+    categories: list[OccurrenceCategory]
+    tickers: list[str]
+    dates: dict[str, str]
+    snapshots: dict[str, OccurrenceSnapshotMeta]
+    tolerances: dict[str, list[float | None]]
+    data: dict[str, dict[str, dict[str, OccurrenceMetric]]]
+    leaderboards: OccurrenceLeaderboards
 
 
 class MonthInfo(BaseModel):
@@ -464,17 +572,30 @@ class ChatRequest(BaseModel):
     provider: Literal["anthropic", "openai"] = "openai"
 
 
+def _occurrence_matrix_health_fields() -> dict[str, Any]:
+    try:
+        return {**occurrence_matrix_health(OCCURRENCE_MATRIX_SNAPSHOT_DIR), "occurrence_matrix_error": None}
+    except Exception as exc:
+        return {
+            "occurrence_matrix_oldest_snapshot_age_seconds": None,
+            "occurrence_matrix_snapshot_tfs": [],
+            "occurrence_matrix_error": str(exc),
+        }
+
+
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    occurrence_fields = _occurrence_matrix_health_fields()
     if not SNAPSHOT_PATH.exists():
-        return HealthResponse(snapshot_age_seconds=None, snapshot_generated_at=None)
+        return HealthResponse(snapshot_age_seconds=None, snapshot_generated_at=None, **occurrence_fields)
     snap = load_snapshot()
     return HealthResponse(
         snapshot_age_seconds=snapshot_age_seconds(snap),
         snapshot_generated_at=snap.get("generated_at"),
+        **occurrence_fields,
     )
 
 
@@ -493,6 +614,12 @@ def get_snapshot() -> JSONResponse:
             "Cache-Control": f"max-age={SNAPSHOT_CACHE_TTL}",
         },
     )
+
+
+@app.get("/api/occurrence-matrix", response_model=OccurrenceMatrixResponse)
+def get_occurrence_matrix(response: Response) -> dict[str, Any]:
+    response.headers["Cache-Control"] = f"max-age={SNAPSHOT_CACHE_TTL}"
+    return load_occurrence_matrix()
 
 
 def _trigger_export_script(*, source: str = "manual") -> bool:

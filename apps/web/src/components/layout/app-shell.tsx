@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BarChart3, FlaskConical, LineChart, Radar, Sparkles } from "lucide-react";
+import { Activity, BarChart3, FlaskConical, Grid3X3, LineChart, Radar, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "@/lib/api";
 import { fmtRelativeAge } from "@/lib/format";
@@ -33,6 +33,12 @@ const NAV: NavItem[] = [
     label: "Forwardtests",
     icon: <Radar className="h-4 w-4" />,
     match: (p) => p.startsWith("/forwardtests"),
+  },
+  {
+    href: "/occurrence-matrix",
+    label: "Occurrence Matrix",
+    icon: <Grid3X3 className="h-4 w-4" />,
+    match: (p) => p.startsWith("/occurrence-matrix"),
   },
 ];
 

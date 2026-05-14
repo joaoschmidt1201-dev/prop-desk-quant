@@ -393,6 +393,63 @@ export type ForwardtestDetail = {
   daily_pnls: ForwardtestDailyPnl[];
 };
 
+export type OccurrenceMetric = {
+  T: number;
+  B: number;
+  Bk: number;
+  F: number;
+  bounce_pct: number | null;
+  break_pct: number | null;
+  false_pct: number | null;
+  low_sample: boolean;
+  tolerance_pct: number | null;
+};
+
+export type OccurrenceCategory = {
+  name: string;
+  tickers: string[];
+};
+
+export type OccurrenceSnapshotMeta = {
+  date: string;
+  file: string;
+  raw_tf: string;
+  age_seconds: number | null;
+  has_tolerances: boolean;
+};
+
+export type OccurrenceLeaderboardEntry = {
+  ticker: string;
+  tf: string;
+  ma: string;
+  total: number;
+  bounce_pct: number | null;
+  break_pct: number | null;
+  false_pct: number | null;
+};
+
+export type OccurrenceMatrixPayload = {
+  date: string | null;
+  latest_snapshot_date: string | null;
+  oldest_snapshot_date: string | null;
+  oldest_snapshot_age_seconds: number | null;
+  generated_at: string;
+  expected_tfs: string[];
+  tfs: string[];
+  mas: string[];
+  min_sample: number;
+  categories: OccurrenceCategory[];
+  tickers: string[];
+  dates: Record<string, string>;
+  snapshots: Record<string, OccurrenceSnapshotMeta>;
+  tolerances: Record<string, Array<number | null>>;
+  data: Record<string, Record<string, Record<string, OccurrenceMetric>>>;
+  leaderboards: {
+    mean_reversion: OccurrenceLeaderboardEntry[];
+    breakout: OccurrenceLeaderboardEntry[];
+  };
+};
+
 function qs(filter: Partial<Filter>): string {
   const params = new URLSearchParams();
   if (filter.months?.length) params.set("month", filter.months.join(","));
@@ -422,6 +479,7 @@ export const api = {
   kpis: (filter: Partial<Filter> = {}) => get<Kpis>(`/api/kpis${qs(filter)}`),
   analytics: (filter: Partial<Filter> = {}) => get<Analytics>(`/api/analytics${qs(filter)}`),
   backtests: () => get<{ backtests: BacktestSummary[] }>("/api/backtests"),
+  occurrenceMatrix: () => get<OccurrenceMatrixPayload>("/api/occurrence-matrix"),
   backtest: (id: string, rule?: string, vixFilter?: string) => {
     const params: string[] = [];
     if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);
