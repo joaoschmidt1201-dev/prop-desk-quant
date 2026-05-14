@@ -399,12 +399,9 @@ function HeatCell({
     .filter(Boolean)
     .join("\n");
 
-  const isHighlight = isHighlightValue(metric, selectedMetric);
-  const cellStyle: CSSProperties = isHighlight
-    ? { ...style, boxShadow: "inset 0 0 0 1.5px var(--warning)" }
-    : metric.low_sample
-      ? { ...style, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.18)" }
-      : style;
+  const cellStyle: CSSProperties = metric.low_sample
+    ? { ...style, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.18)" }
+    : style;
 
   return (
     <td
@@ -450,13 +447,6 @@ function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
   if (value < 30) return COLOR_RED;
   if (value < 50) return COLOR_NEUTRAL;
   return COLOR_GREEN;
-}
-
-function isHighlightValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): boolean {
-  if (metric.low_sample) return false;
-  if (selectedMetric === "bounce_pct") return (metric.bounce_pct ?? 0) >= 50;
-  if (selectedMetric === "break_pct") return (metric.break_pct ?? 0) >= 50;
-  return false;
 }
 
 // ============================================================
@@ -624,11 +614,7 @@ function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
           ))}
         </div>
       </div>
-      <div className="flex items-center gap-4">
-        <span className="flex items-center gap-1.5">
-          <span className="block h-3 w-3 rounded" style={{ backgroundColor: COLOR_GREEN, boxShadow: "inset 0 0 0 1.5px var(--warning)" }} />
-          high-conviction (≥50%)
-        </span>
+      <div className="flex items-center gap-3">
         <span className="flex items-center gap-1.5">
           <span className="block h-3 w-3 rounded" style={{ backgroundColor: COLOR_NEUTRAL, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.2)" }} />
           low sample
