@@ -21,8 +21,9 @@ type FiltersProps = {
   selectedMetric: OccurrenceMetricKey;
   onMetricChange: (metric: OccurrenceMetricKey) => void;
   categories: OccurrenceCategory[];
-  selectedCategory: string;
-  onCategoryChange: (category: string) => void;
+  selectedCategories: string[];
+  onCategoryToggle: (category: string) => void;
+  onAllCategories: () => void;
   mas: string[];
   selectedMas: string[];
   onMaToggle: (ma: string) => void;
@@ -37,8 +38,9 @@ export function OccurrenceFilters({
   selectedMetric,
   onMetricChange,
   categories,
-  selectedCategory,
-  onCategoryChange,
+  selectedCategories,
+  onCategoryToggle,
+  onAllCategories,
   mas,
   selectedMas,
   onMaToggle,
@@ -89,9 +91,9 @@ export function OccurrenceFilters({
         <ChipGroup icon={<FolderTree className="h-3 w-3" />} label="Category">
           <button
             type="button"
-            aria-pressed={selectedCategory === "All"}
-            onClick={() => onCategoryChange("All")}
-            className={chipClass(selectedCategory === "All")}
+            aria-pressed={selectedCategories.length === categories.length}
+            onClick={onAllCategories}
+            className={chipClass(selectedCategories.length === categories.length)}
           >
             All
           </button>
@@ -99,9 +101,9 @@ export function OccurrenceFilters({
             <button
               key={category.name}
               type="button"
-              aria-pressed={selectedCategory === category.name}
-              onClick={() => onCategoryChange(category.name)}
-              className={chipClass(selectedCategory === category.name)}
+              aria-pressed={selectedCategories.includes(category.name)}
+              onClick={() => onCategoryToggle(category.name)}
+              className={chipClass(selectedCategories.includes(category.name))}
             >
               {displayCategoryShort(category.name)}
             </button>

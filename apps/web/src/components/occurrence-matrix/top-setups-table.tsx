@@ -1,31 +1,119 @@
 "use client";
 
-import { Crown, Layers, ListOrdered } from "lucide-react";
-import { useMemo, useState } from "react";
-import type { OccurrenceCategory, OccurrenceTopSetupEntry } from "@/lib/api";
+import { Clock, Crown, Layers, ListOrdered } from "lucide-react";
+import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  OccurrenceCategory,
+  OccurrenceMetric,
+  OccurrenceTopSetupEntry,
+} from "@/lib/api";
 
 type TopSetupsTableProps = {
-  topSetups: Record<string, OccurrenceTopSetupEntry[]>;
+  matrix: Record<string, Record<string, Record<string, OccurrenceMetric>>>;
   categories: OccurrenceCategory[];
   tickers: string[];
+  tfs: string[];
+  mas: string[];
   minSample: number;
 };
 
-const ALL = "All";
-
 export function TopSetupsTable({
-  topSetups,
+  matrix,
   categories,
   tickers,
+  tfs,
+  mas,
   minSample,
 }: TopSetupsTableProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>(ALL);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    () => categories.map((c) => c.name),
+  );
+  const [selectedTfs, setSelectedTfs] = useState<string[]>(() => [...tfs]);
+
+  useEffect(() => {
+    if (selectedCategories.length === 0) {
+      setSelectedCategories(categories.map((c) => c.name));
+    }
+  }, [categories, selectedCategories.length]);
+
+  useEffect(() => {
+    if (selectedTfs.length === 0 && tfs.length > 0) {
+      setSelectedTfs([...tfs]);
+    }
+  }, [tfs, selectedTfs.length]);
 
   const visibleTickers = useMemo(() => {
-    if (selectedCategory === ALL) return tickers;
-    const cat = categories.find((c) => c.name === selectedCategory);
-    return cat?.tickers ?? [];
-  }, [selectedCategory, categories, tickers]);
+    if (
+      selectedCategories.length === 0 ||
+      selectedCategories.length === categories.length
+    ) {
+      return tickers;
+    }
+    const set = new Set(selectedCategories);
+    const result: string[] = [];
+    for (const category of categories) {
+      if (set.has(category.name)) result.push(...category.tickers);
+    }
+    return result;
+  }, [selectedCategories, categories, tickers]);
+
+  const topSetups = useMemo(() => {
+    const result: Record<string, OccurrenceTopSetupEntry[]> = {};
+    for (const ticker of tickers) {
+      const tickerData = matrix[ticker];
+      if (!tickerData) {
+        result[ticker] = [];
+        continue;
+      }
+      const setups: OccurrenceTopSetupEntry[] = [];
+      for (const tf of selectedTfs) {
+        const tfData = tickerData[tf];
+        if (!tfData) continue;
+        for (const ma of mas) {
+          const metric = tfData[ma];
+          if (!metric || metric.T < minSample) continue;
+          setups.push({
+            tf,
+            ma,
+            total: metric.T,
+            bounce_pct: metric.bounce_pct,
+            break_pct: metric.break_pct,
+            false_pct: metric.false_pct,
+          });
+        }
+      }
+      setups.sort((a, b) => {
+        const aPct = a.bounce_pct ?? -1;
+        const bPct = b.bounce_pct ?? -1;
+        if (aPct !== bPct) return bPct - aPct;
+        if (a.total !== b.total) return b.total - a.total;
+        if (a.tf !== b.tf) return a.tf < b.tf ? -1 : 1;
+        return a.ma < b.ma ? -1 : 1;
+      });
+      result[ticker] = setups.slice(0, 3);
+    }
+    return result;
+  }, [matrix, tickers, mas, selectedTfs, minSample]);
+
+  function toggleCategory(name: string) {
+    setSelectedCategories((current) => {
+      if (current.includes(name)) {
+        return current.length <= 1 ? current : current.filter((c) => c !== name);
+      }
+      const order = categories.map((c) => c.name);
+      return order.filter((c) => current.includes(c) || c === name);
+    });
+  }
+
+  function toggleTf(tf: string) {
+    setSelectedTfs((current) => {
+      if (current.includes(tf)) {
+        return current.length <= 1 ? current : current.filter((t) => t !== tf);
+      }
+      return tfs.filter((t) => current.includes(t) || t === tf);
+    });
+  }
 
   return (
     <section className="group relative overflow-hidden rounded-xl border border-border/60 bg-gradient-to-b from-card/65 to-card/30 shadow-xl shadow-black/10 backdrop-blur-sm">
@@ -58,32 +146,44 @@ export function TopSetupsTable({
         </span>
       </div>
 
-      <div className="border-b border-border/45 bg-card/20 px-4 py-3">
-        <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/85">
-          <Layers className="h-3 w-3 text-primary/70" />
-          Category
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          <CategoryChip
+      <div className="grid gap-4 border-b border-border/45 bg-card/20 p-4 xl:grid-cols-2">
+        <ChipGroup icon={<Layers className="h-3 w-3" />} label="Category">
+          <Chip
             label="All"
-            active={selectedCategory === ALL}
-            onClick={() => setSelectedCategory(ALL)}
+            active={selectedCategories.length === categories.length}
+            onClick={() => setSelectedCategories(categories.map((c) => c.name))}
           />
           {categories.map((cat) => (
-            <CategoryChip
+            <Chip
               key={cat.name}
               label={shortCategory(cat.name)}
-              active={selectedCategory === cat.name}
-              onClick={() => setSelectedCategory(cat.name)}
+              active={selectedCategories.includes(cat.name)}
+              onClick={() => toggleCategory(cat.name)}
             />
           ))}
-        </div>
+        </ChipGroup>
+
+        <ChipGroup icon={<Clock className="h-3 w-3" />} label="Timeframes">
+          <Chip
+            label="All"
+            active={selectedTfs.length === tfs.length}
+            onClick={() => setSelectedTfs([...tfs])}
+          />
+          {tfs.map((tf) => (
+            <Chip
+              key={tf}
+              label={tf}
+              active={selectedTfs.includes(tf)}
+              onClick={() => toggleTf(tf)}
+            />
+          ))}
+        </ChipGroup>
       </div>
 
       <div className="p-4">
         {visibleTickers.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/45 bg-card/20 p-8 text-center text-xs text-muted-foreground">
-            No tickers in this category.
+            No tickers in the selected categories.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -195,7 +295,10 @@ function SetupCell({
         </div>
       </div>
       <div className="text-right">
-        <div className="text-xl font-bold tabular leading-none" style={{ color: accent }}>
+        <div
+          className="text-xl font-bold tabular leading-none"
+          style={{ color: accent }}
+        >
           {formatPct(entry.bounce_pct)}
         </div>
       </div>
@@ -211,7 +314,27 @@ function EmptyCell() {
   );
 }
 
-function CategoryChip({
+function ChipGroup({
+  icon,
+  label,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/85">
+        <span className="text-primary/70">{icon}</span>
+        {label}
+      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function Chip({
   label,
   active,
   onClick,

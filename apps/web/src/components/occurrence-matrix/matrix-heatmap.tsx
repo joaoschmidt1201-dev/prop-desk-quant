@@ -44,7 +44,9 @@ type Summary = {
 export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
   const [selectedTf, setSelectedTf] = useState(initialData?.tfs[0] ?? "W");
   const [selectedMetric, setSelectedMetric] = useState<OccurrenceMetricKey>("bounce_pct");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialData?.categories.map((c) => c.name) ?? [],
+  );
   const [selectedMas, setSelectedMas] = useState<string[]>(initialData?.mas ?? []);
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
@@ -68,12 +70,19 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
     }
   }, [data, selectedMas.length]);
 
+  useEffect(() => {
+    if (!data) return;
+    if (selectedCategories.length === 0) {
+      setSelectedCategories(data.categories.map((c) => c.name));
+    }
+  }, [data, selectedCategories.length]);
+
   if (isLoading && !data) return <OccurrenceSkeleton />;
   if (isError || !data) return <OccurrenceError />;
 
   const visibleMas = selectedMas.filter((ma) => data.mas.includes(ma));
-  const categoryTickers = getCategoryTickers(data, selectedCategory);
-  const visibleCategories = getVisibleCategories(data, selectedCategory);
+  const categoryTickers = getCategoryTickers(data, selectedCategories);
+  const visibleCategories = getVisibleCategories(data, selectedCategories);
   const missingTfs = data.expected_tfs.filter((tf) => !data.tfs.includes(tf));
   const meanReversion = collectSetups(data, selectedTf, categoryTickers, visibleMas, "bounce_pct");
   const breakout = collectSetups(data, selectedTf, categoryTickers, visibleMas, "break_pct");
@@ -85,6 +94,16 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
         return current.length <= 1 ? current : current.filter((item) => item !== ma);
       }
       return (data?.mas ?? []).filter((item) => current.includes(item) || item === ma);
+    });
+  }
+
+  function toggleCategory(name: string) {
+    setSelectedCategories((current) => {
+      if (current.includes(name)) {
+        return current.length <= 1 ? current : current.filter((item) => item !== name);
+      }
+      const order = data?.categories.map((c) => c.name) ?? [];
+      return order.filter((item) => current.includes(item) || item === name);
     });
   }
 
@@ -102,8 +121,9 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           selectedMetric={selectedMetric}
           onMetricChange={setSelectedMetric}
           categories={data.categories}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
+          selectedCategories={selectedCategories}
+          onCategoryToggle={toggleCategory}
+          onAllCategories={() => setSelectedCategories(data.categories.map((c) => c.name))}
           mas={data.mas}
           selectedMas={visibleMas}
           onMaToggle={toggleMa}
@@ -121,9 +141,11 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
       </div>
       <div className="mt-6 fade-in">
         <TopSetupsTable
-          topSetups={data.top_setups}
+          matrix={data.data}
           categories={data.categories}
           tickers={data.tickers}
+          tfs={data.tfs}
+          mas={data.mas}
           minSample={data.min_sample}
         />
       </div>
@@ -534,15 +556,24 @@ function SubMetric({
   );
 }
 
-function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategory: string): string[] {
-  if (selectedCategory === "All") return data.tickers;
-  return data.categories.find((category) => category.name === selectedCategory)?.tickers ?? data.tickers;
+function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategories: string[]): string[] {
+  if (selectedCategories.length === 0 || selectedCategories.length === data.categories.length) {
+    return data.tickers;
+  }
+  const set = new Set(selectedCategories);
+  const tickers: string[] = [];
+  for (const category of data.categories) {
+    if (set.has(category.name)) tickers.push(...category.tickers);
+  }
+  return tickers;
 }
 
-function getVisibleCategories(data: OccurrenceMatrixPayload, selectedCategory: string): OccurrenceCategory[] {
-  if (selectedCategory === "All") return data.categories;
-  const category = data.categories.find((item) => item.name === selectedCategory);
-  return category ? [category] : data.categories;
+function getVisibleCategories(data: OccurrenceMatrixPayload, selectedCategories: string[]): OccurrenceCategory[] {
+  if (selectedCategories.length === 0 || selectedCategories.length === data.categories.length) {
+    return data.categories;
+  }
+  const set = new Set(selectedCategories);
+  return data.categories.filter((category) => set.has(category.name));
 }
 
 function displayCategoryName(name: string): string {
