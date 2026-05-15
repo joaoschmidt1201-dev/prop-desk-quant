@@ -26,6 +26,7 @@ import {
 } from "@/lib/api";
 import { OccurrenceFilters, type OccurrenceMetricKey } from "./filters";
 import { Leaderboards } from "./leaderboards";
+import { TopSetupsTable } from "./top-setups-table";
 
 type DashboardProps = {
   initialData?: OccurrenceMatrixPayload | null;
@@ -116,6 +117,14 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           categories={visibleCategories}
           mas={visibleMas}
           selectedMetric={selectedMetric}
+        />
+      </div>
+      <div className="mt-6 fade-in">
+        <TopSetupsTable
+          topSetups={data.top_setups}
+          categories={data.categories}
+          tickers={data.tickers}
+          minSample={data.min_sample}
         />
       </div>
       <div className="mt-6 fade-in">

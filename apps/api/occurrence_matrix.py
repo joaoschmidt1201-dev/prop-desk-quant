@@ -161,6 +161,41 @@ def _leaderboard_rows(setups: list[dict[str, Any]], primary: str) -> list[dict[s
     return rows
 
 
+def _top_setups_per_ticker(
+    setups: list[dict[str, Any]],
+    n: int = 3,
+    primary: str = "bounce_pct",
+) -> dict[str, list[dict[str, Any]]]:
+    """Group qualified setups by ticker, sort by primary metric desc, take top N each."""
+    by_ticker: dict[str, list[dict[str, Any]]] = {}
+    for setup in setups:
+        by_ticker.setdefault(setup["ticker"], []).append(setup)
+
+    result: dict[str, list[dict[str, Any]]] = {}
+    for ticker, entries in by_ticker.items():
+        ranked = sorted(
+            entries,
+            key=lambda item: (
+                -(item[primary] if item[primary] is not None else -1),
+                -item["total"],
+                item["tf"],
+                item["ma"],
+            ),
+        )[:n]
+        result[ticker] = [
+            {
+                "tf": entry["tf"],
+                "ma": entry["ma"],
+                "total": entry["total"],
+                "bounce_pct": entry["bounce_pct"],
+                "break_pct": entry["break_pct"],
+                "false_pct": entry["false_pct"],
+            }
+            for entry in ranked
+        ]
+    return result
+
+
 def build_matrix(snapshots: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Build ticker x tf x ma metrics from raw TradingView snapshots."""
     tickers = universe_tickers()
@@ -235,6 +270,7 @@ def build_matrix(snapshots: dict[str, dict[str, Any]]) -> dict[str, Any]:
             "mean_reversion": _leaderboard_rows(setups, "bounce_pct"),
             "breakout": _leaderboard_rows(setups, "break_pct"),
         },
+        "top_setups": _top_setups_per_ticker(setups, n=3, primary="bounce_pct"),
     }
 
 

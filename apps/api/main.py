@@ -538,6 +538,15 @@ class OccurrenceLeaderboards(BaseModel):
     breakout: list[OccurrenceLeaderboardEntry]
 
 
+class OccurrenceTopSetupEntry(BaseModel):
+    tf: str
+    ma: str
+    total: int
+    bounce_pct: int | None
+    break_pct: int | None
+    false_pct: int | None
+
+
 class OccurrenceMatrixResponse(BaseModel):
     date: str | None
     latest_snapshot_date: str | None
@@ -555,6 +564,7 @@ class OccurrenceMatrixResponse(BaseModel):
     tolerances: dict[str, list[float | None]]
     data: dict[str, dict[str, dict[str, OccurrenceMetric]]]
     leaderboards: OccurrenceLeaderboards
+    top_setups: dict[str, list[OccurrenceTopSetupEntry]]
 
 
 class MonthInfo(BaseModel):

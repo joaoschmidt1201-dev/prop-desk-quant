@@ -428,6 +428,15 @@ export type OccurrenceLeaderboardEntry = {
   false_pct: number | null;
 };
 
+export type OccurrenceTopSetupEntry = {
+  tf: string;
+  ma: string;
+  total: number;
+  bounce_pct: number | null;
+  break_pct: number | null;
+  false_pct: number | null;
+};
+
 export type OccurrenceMatrixPayload = {
   date: string | null;
   latest_snapshot_date: string | null;
@@ -448,6 +457,7 @@ export type OccurrenceMatrixPayload = {
     mean_reversion: OccurrenceLeaderboardEntry[];
     breakout: OccurrenceLeaderboardEntry[];
   };
+  top_setups: Record<string, OccurrenceTopSetupEntry[]>;
 };
 
 function qs(filter: Partial<Filter>): string {
