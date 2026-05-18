@@ -42,6 +42,14 @@ except ImportError:
 ROOT      = Path(__file__).parent.parent
 PINE_FILE = ROOT / "tradingview" / "gex_weekly_levels.pine"
 
+# Pine v5 caps compiled code at 80,000 tokens. Each emitted week costs
+# ~3k tokens (one f_draw_week_N function with up to ~10 level-draw calls
+# per ticker). 24 weeks blew the limit (~80,431 tokens). 12 weeks of
+# weekly history is plenty of visual context on a chart and keeps the
+# compiled output around ~40k tokens, with ample headroom for future
+# tickers/levels. The per-ticker JSON histories are NOT truncated.
+PINE_WEEKS_LIMIT = 12
+
 # ─── TICKER CONFIGURATION ─────────────────────────────────────────────────────
 # pine_aliases  : exact syminfo.ticker values to match in Pine
 # pine_contains : substrings to match via str.contains (for futures like ES1!, NQ1!)
@@ -528,6 +536,7 @@ def generate_pine_combined(histories: dict[str, list]) -> str:
     """
     tickers   = list(TICKER_CONFIG.keys())
     all_weeks = sorted(set(e["week"] for entries in histories.values() for e in entries))
+    all_weeks = all_weeks[-PINE_WEEKS_LIMIT:]
     by_week   = {t: {e["week"]: e for e in histories.get(t, [])} for t in tickers}
 
     draw_functions      = []
