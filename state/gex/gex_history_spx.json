@@ -175,5 +175,41 @@
       7400
     ],
     "source_file": "$SPX-gamma-levels-exp-20260515-monthly.csv"
+  },
+  {
+    "week": "2026-05-18",
+    "ticker": "SPX",
+    "expiry": "2026-05-22",
+    "gflip": 7342,
+    "pos": [
+      7500,
+      7525,
+      7550
+    ],
+    "neg": [
+      7300,
+      7355,
+      7250
+    ],
+    "coi": [
+      7500,
+      7400
+    ],
+    "poi": [
+      7300,
+      7400
+    ],
+    "agg": 7400,
+    "pos_zone": 7345,
+    "neg_zone": 7340,
+    "conf": [
+      7300,
+      7340,
+      7342,
+      7345,
+      7400,
+      7500
+    ],
+    "source_file": "$SPX-gamma-levels-exp-20260522-weekly.csv"
   }
 ]
