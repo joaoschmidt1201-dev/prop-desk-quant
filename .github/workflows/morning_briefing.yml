@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     # Permite disparo manual pela aba GitHub Actions (útil para testes)
   schedule:
-    # 11:00 UTC = 8:00 BRT — 2.5h antes da abertura do mercado (10:30 BRT)
-    # Mesmo com 2h de delay do GitHub, chega às 10:00 BRT no pior caso
-    - cron: '0 11 * * 1-5'
+    # 11:07 UTC = 8:07 BRT — 2.5h antes da abertura do mercado (10:30 BRT)
+    # Minuto :07 (não :00) para evitar a janela de pico do scheduler do GitHub,
+    # que frequentemente atrasa em horas ou dropa runs agendados no topo da hora.
+    - cron: '7 11 * * 1-5'
 
 jobs:
   morning-briefing:
