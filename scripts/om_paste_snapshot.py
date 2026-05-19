@@ -23,6 +23,9 @@ Usage:
 
   # Dry run (don't write, just validate and print):
   python scripts/om_paste_snapshot.py 2026-05-19 D --dry-run < pine_paste.txt
+
+  # Merge 2-3 partial slice snapshots (when running with Memory Saver A/B/C):
+  python scripts/om_paste_snapshot.py 2026-05-19 D --merge slice_A.json slice_B.json slice_C.json
 """
 
 from __future__ import annotations
@@ -103,7 +106,78 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Validate and print summary but do not write the snapshot file.",
     )
+    parser.add_argument(
+        "--merge",
+        dest="merge_inputs",
+        nargs="+",
+        help=(
+            "Merge 2-3 partial slice snapshots (JSON files emitted with Memory Saver "
+            "A/B/C). Each file's `tol_idx_slots` lists which tol indices it covers; "
+            "the union must equal [0,1,2,3,4] with no overlaps."
+        ),
+    )
     return parser.parse_args()
+
+
+STRIDE = 20  # 5 MAs × 4 metrics per tolerance level
+
+
+def merge_slices(paths: list[str]) -> dict:
+    """Combine slice snapshots into a single v13 snapshot covering all 5 tol indices."""
+    slices: list[dict] = []
+    for p in paths:
+        snap = json.loads(Path(p).read_text(encoding="utf-8"))
+        slots = snap.get("tol_idx_slots")
+        if not isinstance(slots, list) or not all(isinstance(s, int) for s in slots):
+            raise ValueError(
+                f"{p}: missing or invalid `tol_idx_slots` field — was this snapshot "
+                "produced by Pine v13.2 or later?"
+            )
+        slices.append({"path": p, "slots": slots, "snap": snap})
+
+    # Validate slot coverage: union == {0,1,2,3,4}, no overlap.
+    seen: dict[int, str] = {}
+    for s in slices:
+        for idx in s["slots"]:
+            if idx in seen:
+                raise ValueError(
+                    f"tol_idx={idx} appears in both {seen[idx]} and {s['path']}."
+                )
+            seen[idx] = s["path"]
+    missing = sorted(set(range(5)) - set(seen.keys()))
+    if missing:
+        raise ValueError(f"Missing tol indices in slice union: {missing}")
+
+    # Pick the first slice as the template; verify date/tf/ma agree.
+    base = slices[0]["snap"]
+    for s in slices[1:]:
+        for k in ("d", "tf", "ma"):
+            if s["snap"].get(k) != base.get(k):
+                raise ValueError(
+                    f"{s['path']}: {k}={s['snap'].get(k)!r} disagrees with "
+                    f"{slices[0]['path']}: {k}={base.get(k)!r}."
+                )
+
+    # Merge per ticker. Each ticker has 100 ints; copy the 20-int block at
+    # tol_idx * STRIDE from the slice that owns that tol_idx.
+    merged_data: dict[str, list[int]] = {}
+    base_data = base.get("data", {})
+    tickers = list(base_data.keys())
+    for ticker in tickers:
+        merged = [0] * (5 * STRIDE)
+        for s in slices:
+            arr = s["snap"]["data"].get(ticker, [])
+            if len(arr) != 5 * STRIDE:
+                raise ValueError(
+                    f"{s['path']}: ticker {ticker} has {len(arr)} ints, expected {5 * STRIDE}."
+                )
+            for idx in s["slots"]:
+                start = idx * STRIDE
+                merged[start : start + STRIDE] = arr[start : start + STRIDE]
+        merged_data[ticker] = merged
+
+    out = {**base, "data": merged_data, "tol_idx_slots": [0, 1, 2, 3, 4]}
+    return out
 
 
 def main() -> int:
@@ -123,26 +197,33 @@ def main() -> int:
         )
         return 2
 
-    if args.input_file:
-        raw_text = Path(args.input_file).read_text(encoding="utf-8")
+    if args.merge_inputs:
+        try:
+            payload = merge_slices(args.merge_inputs)
+        except (ValueError, OSError, json.JSONDecodeError) as exc:
+            print(f"ERROR: merge failed: {exc}", file=sys.stderr)
+            return 1
     else:
-        raw_text = sys.stdin.read()
-    if not raw_text.strip():
-        print("ERROR: input is empty (pipe a paste in via stdin or use --file)", file=sys.stderr)
-        return 2
+        if args.input_file:
+            raw_text = Path(args.input_file).read_text(encoding="utf-8")
+        else:
+            raw_text = sys.stdin.read()
+        if not raw_text.strip():
+            print("ERROR: input is empty (pipe a paste in via stdin or use --file)", file=sys.stderr)
+            return 2
 
-    try:
-        payload_str = assemble(raw_text)
-    except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+        try:
+            payload_str = assemble(raw_text)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
 
-    try:
-        payload = json.loads(payload_str)
-    except json.JSONDecodeError as exc:
-        print(f"ERROR: assembled payload is not valid JSON: {exc}", file=sys.stderr)
-        print(f"First 400 chars:\n{payload_str[:400]}", file=sys.stderr)
-        return 1
+        try:
+            payload = json.loads(payload_str)
+        except json.JSONDecodeError as exc:
+            print(f"ERROR: assembled payload is not valid JSON: {exc}", file=sys.stderr)
+            print(f"First 400 chars:\n{payload_str[:400]}", file=sys.stderr)
+            return 1
 
     snap_tf = payload.get("tf")
     if snap_tf is not None and TF_ALIASES.get(str(snap_tf), str(snap_tf)) != tf:

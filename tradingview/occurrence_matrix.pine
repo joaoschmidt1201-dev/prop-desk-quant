@@ -10,7 +10,7 @@
 // all indicators here and reduces memory ~7x.
 indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true, max_bars_back=210)
 
-string ver_num  = "v13.1"
+string ver_num  = "v13.2"
 string ver_date = "2026-05-19"
 
 // ==========================================
@@ -28,8 +28,19 @@ g_qqq    = "Tickers — QQQ Top 10"
 // Tolerance grid: 5 levels per (TF, MA). Index 2 = baseline (same value as v12.8).
 // See get_tol_grid() for the full table. displayTolIdx controls which level the
 // in-Pine table renders; the JSON snapshot always exports all 5 levels.
-displayTolIdx = input.int(2, "Display tolerance level (0..4, baseline=2)", minval=0, maxval=4, group=g_main, tooltip="Which of the 5 tolerance levels to render in the in-chart table. The JSON snapshot exports ALL 5 levels regardless of this setting — the dashboard does the picking on the consumer side.")
+displayTolIdx = input.int(2, "Display tolerance level (0..4, baseline=2)", minval=0, maxval=4, group=g_main, tooltip="Which of the 5 tolerance levels to render in the in-chart table. The JSON snapshot exports the active slice (see Memory Saver). Dashboard picks the level from the merged snapshot.")
 winSize       = input.int(2, "Lookahead Candles", minval=2, group=g_main)
+
+// Memory Saver — when 'All (0-4)' blows Pine's 'Memory limits exceeded',
+// run the indicator 3x picking each slice in turn (A, B, C). Save each
+// pasted JSON separately, then merge with `om_paste_snapshot.py --merge`.
+g_slice  = "Memory Saver — Tolerance Slice"
+tolSlice = input.string("All (0-4)", "Run slice", options=["All (0-4)", "A: 0,1", "B: 2,3", "C: 4 only"], group=g_slice, tooltip="Gates which tolerance levels' state machines run on this pass. 'All' runs the full 5×5=25 state machines per ticker (~725 total). 'A: 0,1' runs 10/ticker; 'B: 2,3' runs 10/ticker; 'C: 4' runs 5/ticker. Inactive levels output zeros so the merger can identify them.")
+sliceActive0 = tolSlice == "All (0-4)" or tolSlice == "A: 0,1"
+sliceActive1 = tolSlice == "All (0-4)" or tolSlice == "A: 0,1"
+sliceActive2 = tolSlice == "All (0-4)" or tolSlice == "B: 2,3"
+sliceActive3 = tolSlice == "All (0-4)" or tolSlice == "B: 2,3"
+sliceActive4 = tolSlice == "All (0-4)" or tolSlice == "C: 4 only"
 
 useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=g_filter)
 useDateFilter    = input.bool(true,  "Filter Start Date?", group=g_filter)
@@ -300,6 +311,23 @@ run_sm(float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
 fmt4(int t, int b, int k, int f) =>
     str.tostring(t) + "," + str.tostring(b) + "," + str.tostring(k) + "," + str.tostring(f)
 
+// Memory-saving wrapper around run_sm. When `active` is false, the inner
+// var-bearing state machine is never invoked — Pine never allocates the
+// history buffers for its [1] references on this call site, slashing memory.
+// Returns zeros so the CSV output cleanly marks the slot as "not in this pass".
+run_sm_gated(bool active, float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
+    int t = 0
+    int b = 0
+    int k = 0
+    int f = 0
+    if active
+        [_t, _b, _k, _f] = run_sm(ma_val, sqz_on, approx_pct, dbg, lbl)
+        t := _t
+        b := _b
+        k := _k
+        f := _f
+    [t, b, k, f]
+
 // ==========================================
 // 4. WRAPPER — calcula squeeze + 5 MAs × 5 tols = 25 state machines por ticker
 // ==========================================
@@ -335,38 +363,39 @@ run_full() =>
     bool dbg_m4   = is_dbg_t and dbgMA == "SMA200"
     bool dbg_m5   = is_dbg_t and dbgMA == "VWAP"
 
-    // Run state machine: 5 MAs × 5 tols = 25 calls. A tolerance of 0 means
-    // "skip this MA on this TF" — we still call run_sm (Pine v5 var-bearing
-    // funcs can't be conditionally invoked) but coerce outputs to 0 below.
-    [m1T_0, m1B_0, m1K_0, m1F_0] = run_sm(ma1, sqz, g1_0 > 0 ? g1_0 : 0.0001, dbg_m1 and dbgTolIdx == 0, "EMA9[0]")
-    [m1T_1, m1B_1, m1K_1, m1F_1] = run_sm(ma1, sqz, g1_1 > 0 ? g1_1 : 0.0001, dbg_m1 and dbgTolIdx == 1, "EMA9[1]")
-    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm(ma1, sqz, g1_2 > 0 ? g1_2 : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
-    [m1T_3, m1B_3, m1K_3, m1F_3] = run_sm(ma1, sqz, g1_3 > 0 ? g1_3 : 0.0001, dbg_m1 and dbgTolIdx == 3, "EMA9[3]")
-    [m1T_4, m1B_4, m1K_4, m1F_4] = run_sm(ma1, sqz, g1_4 > 0 ? g1_4 : 0.0001, dbg_m1 and dbgTolIdx == 4, "EMA9[4]")
+    // Run state machine: 5 MAs × 5 tols = up to 25 calls per ticker. The
+    // gated wrapper SKIPS the inner state machine when the slice is inactive,
+    // so Pine never allocates history buffers for those call sites. This is
+    // how 'Memory Saver — A/B/C' fits the run inside Pine's memory budget.
+    [m1T_0, m1B_0, m1K_0, m1F_0] = run_sm_gated(sliceActive0, ma1, sqz, g1_0 > 0 ? g1_0 : 0.0001, dbg_m1 and dbgTolIdx == 0, "EMA9[0]")
+    [m1T_1, m1B_1, m1K_1, m1F_1] = run_sm_gated(sliceActive1, ma1, sqz, g1_1 > 0 ? g1_1 : 0.0001, dbg_m1 and dbgTolIdx == 1, "EMA9[1]")
+    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm_gated(sliceActive2, ma1, sqz, g1_2 > 0 ? g1_2 : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
+    [m1T_3, m1B_3, m1K_3, m1F_3] = run_sm_gated(sliceActive3, ma1, sqz, g1_3 > 0 ? g1_3 : 0.0001, dbg_m1 and dbgTolIdx == 3, "EMA9[3]")
+    [m1T_4, m1B_4, m1K_4, m1F_4] = run_sm_gated(sliceActive4, ma1, sqz, g1_4 > 0 ? g1_4 : 0.0001, dbg_m1 and dbgTolIdx == 4, "EMA9[4]")
 
-    [m2T_0, m2B_0, m2K_0, m2F_0] = run_sm(ma2, sqz, g2_0 > 0 ? g2_0 : 0.0001, dbg_m2 and dbgTolIdx == 0, "EMA20[0]")
-    [m2T_1, m2B_1, m2K_1, m2F_1] = run_sm(ma2, sqz, g2_1 > 0 ? g2_1 : 0.0001, dbg_m2 and dbgTolIdx == 1, "EMA20[1]")
-    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm(ma2, sqz, g2_2 > 0 ? g2_2 : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
-    [m2T_3, m2B_3, m2K_3, m2F_3] = run_sm(ma2, sqz, g2_3 > 0 ? g2_3 : 0.0001, dbg_m2 and dbgTolIdx == 3, "EMA20[3]")
-    [m2T_4, m2B_4, m2K_4, m2F_4] = run_sm(ma2, sqz, g2_4 > 0 ? g2_4 : 0.0001, dbg_m2 and dbgTolIdx == 4, "EMA20[4]")
+    [m2T_0, m2B_0, m2K_0, m2F_0] = run_sm_gated(sliceActive0, ma2, sqz, g2_0 > 0 ? g2_0 : 0.0001, dbg_m2 and dbgTolIdx == 0, "EMA20[0]")
+    [m2T_1, m2B_1, m2K_1, m2F_1] = run_sm_gated(sliceActive1, ma2, sqz, g2_1 > 0 ? g2_1 : 0.0001, dbg_m2 and dbgTolIdx == 1, "EMA20[1]")
+    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm_gated(sliceActive2, ma2, sqz, g2_2 > 0 ? g2_2 : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
+    [m2T_3, m2B_3, m2K_3, m2F_3] = run_sm_gated(sliceActive3, ma2, sqz, g2_3 > 0 ? g2_3 : 0.0001, dbg_m2 and dbgTolIdx == 3, "EMA20[3]")
+    [m2T_4, m2B_4, m2K_4, m2F_4] = run_sm_gated(sliceActive4, ma2, sqz, g2_4 > 0 ? g2_4 : 0.0001, dbg_m2 and dbgTolIdx == 4, "EMA20[4]")
 
-    [m3T_0, m3B_0, m3K_0, m3F_0] = run_sm(ma3, sqz, g3_0 > 0 ? g3_0 : 0.0001, dbg_m3 and dbgTolIdx == 0, "SMA50[0]")
-    [m3T_1, m3B_1, m3K_1, m3F_1] = run_sm(ma3, sqz, g3_1 > 0 ? g3_1 : 0.0001, dbg_m3 and dbgTolIdx == 1, "SMA50[1]")
-    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm(ma3, sqz, g3_2 > 0 ? g3_2 : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
-    [m3T_3, m3B_3, m3K_3, m3F_3] = run_sm(ma3, sqz, g3_3 > 0 ? g3_3 : 0.0001, dbg_m3 and dbgTolIdx == 3, "SMA50[3]")
-    [m3T_4, m3B_4, m3K_4, m3F_4] = run_sm(ma3, sqz, g3_4 > 0 ? g3_4 : 0.0001, dbg_m3 and dbgTolIdx == 4, "SMA50[4]")
+    [m3T_0, m3B_0, m3K_0, m3F_0] = run_sm_gated(sliceActive0, ma3, sqz, g3_0 > 0 ? g3_0 : 0.0001, dbg_m3 and dbgTolIdx == 0, "SMA50[0]")
+    [m3T_1, m3B_1, m3K_1, m3F_1] = run_sm_gated(sliceActive1, ma3, sqz, g3_1 > 0 ? g3_1 : 0.0001, dbg_m3 and dbgTolIdx == 1, "SMA50[1]")
+    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm_gated(sliceActive2, ma3, sqz, g3_2 > 0 ? g3_2 : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
+    [m3T_3, m3B_3, m3K_3, m3F_3] = run_sm_gated(sliceActive3, ma3, sqz, g3_3 > 0 ? g3_3 : 0.0001, dbg_m3 and dbgTolIdx == 3, "SMA50[3]")
+    [m3T_4, m3B_4, m3K_4, m3F_4] = run_sm_gated(sliceActive4, ma3, sqz, g3_4 > 0 ? g3_4 : 0.0001, dbg_m3 and dbgTolIdx == 4, "SMA50[4]")
 
-    [m4T_0, m4B_0, m4K_0, m4F_0] = run_sm(ma4, sqz, g4_0 > 0 ? g4_0 : 0.0001, dbg_m4 and dbgTolIdx == 0, "SMA200[0]")
-    [m4T_1, m4B_1, m4K_1, m4F_1] = run_sm(ma4, sqz, g4_1 > 0 ? g4_1 : 0.0001, dbg_m4 and dbgTolIdx == 1, "SMA200[1]")
-    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm(ma4, sqz, g4_2 > 0 ? g4_2 : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
-    [m4T_3, m4B_3, m4K_3, m4F_3] = run_sm(ma4, sqz, g4_3 > 0 ? g4_3 : 0.0001, dbg_m4 and dbgTolIdx == 3, "SMA200[3]")
-    [m4T_4, m4B_4, m4K_4, m4F_4] = run_sm(ma4, sqz, g4_4 > 0 ? g4_4 : 0.0001, dbg_m4 and dbgTolIdx == 4, "SMA200[4]")
+    [m4T_0, m4B_0, m4K_0, m4F_0] = run_sm_gated(sliceActive0, ma4, sqz, g4_0 > 0 ? g4_0 : 0.0001, dbg_m4 and dbgTolIdx == 0, "SMA200[0]")
+    [m4T_1, m4B_1, m4K_1, m4F_1] = run_sm_gated(sliceActive1, ma4, sqz, g4_1 > 0 ? g4_1 : 0.0001, dbg_m4 and dbgTolIdx == 1, "SMA200[1]")
+    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm_gated(sliceActive2, ma4, sqz, g4_2 > 0 ? g4_2 : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
+    [m4T_3, m4B_3, m4K_3, m4F_3] = run_sm_gated(sliceActive3, ma4, sqz, g4_3 > 0 ? g4_3 : 0.0001, dbg_m4 and dbgTolIdx == 3, "SMA200[3]")
+    [m4T_4, m4B_4, m4K_4, m4F_4] = run_sm_gated(sliceActive4, ma4, sqz, g4_4 > 0 ? g4_4 : 0.0001, dbg_m4 and dbgTolIdx == 4, "SMA200[4]")
 
-    [m5T_0, m5B_0, m5K_0, m5F_0] = run_sm(ma5, sqz, g5_0 > 0 ? g5_0 : 0.0001, dbg_m5 and dbgTolIdx == 0, "VWAP[0]")
-    [m5T_1, m5B_1, m5K_1, m5F_1] = run_sm(ma5, sqz, g5_1 > 0 ? g5_1 : 0.0001, dbg_m5 and dbgTolIdx == 1, "VWAP[1]")
-    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm(ma5, sqz, g5_2 > 0 ? g5_2 : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
-    [m5T_3, m5B_3, m5K_3, m5F_3] = run_sm(ma5, sqz, g5_3 > 0 ? g5_3 : 0.0001, dbg_m5 and dbgTolIdx == 3, "VWAP[3]")
-    [m5T_4, m5B_4, m5K_4, m5F_4] = run_sm(ma5, sqz, g5_4 > 0 ? g5_4 : 0.0001, dbg_m5 and dbgTolIdx == 4, "VWAP[4]")
+    [m5T_0, m5B_0, m5K_0, m5F_0] = run_sm_gated(sliceActive0, ma5, sqz, g5_0 > 0 ? g5_0 : 0.0001, dbg_m5 and dbgTolIdx == 0, "VWAP[0]")
+    [m5T_1, m5B_1, m5K_1, m5F_1] = run_sm_gated(sliceActive1, ma5, sqz, g5_1 > 0 ? g5_1 : 0.0001, dbg_m5 and dbgTolIdx == 1, "VWAP[1]")
+    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm_gated(sliceActive2, ma5, sqz, g5_2 > 0 ? g5_2 : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
+    [m5T_3, m5B_3, m5K_3, m5F_3] = run_sm_gated(sliceActive3, ma5, sqz, g5_3 > 0 ? g5_3 : 0.0001, dbg_m5 and dbgTolIdx == 3, "VWAP[3]")
+    [m5T_4, m5B_4, m5K_4, m5F_4] = run_sm_gated(sliceActive4, ma5, sqz, g5_4 > 0 ? g5_4 : 0.0001, dbg_m5 and dbgTolIdx == 4, "VWAP[4]")
 
     // Mask: tol == 0 → zero out the 4 counts for that (MA, tol) cell.
     string s = ""
@@ -675,7 +704,8 @@ if must_log
 
     string tol_grid_json = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + "}"
 
-    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json + ",\"schema\":\"v13\",\"data\":{"
+    string slice_json = "[" + (sliceActive0 ? "0" : "") + (sliceActive1 ? (sliceActive0 ? ",1" : "1") : "") + (sliceActive2 ? ",2" : "") + (sliceActive3 ? ",3" : "") + (sliceActive4 ? ",4" : "") + "]"
+    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json + ",\"tol_idx_slots\":" + slice_json + ",\"schema\":\"v13\",\"data\":{"
 
     log.info("--- OM SNAPSHOT BEGIN ---")
     log.info(head)
@@ -720,7 +750,8 @@ if must_alert
     [eg4_0, eg4_1, eg4_2, eg4_3, eg4_4] = get_tol_grid(3)
     [eg5_0, eg5_1, eg5_2, eg5_3, eg5_4] = get_tol_grid(4)
     string tol_grid_json_a = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + "}"
-    string head_a = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json_a + ",\"schema\":\"v13\",\"data\":{"
+    string slice_json_a = "[" + (sliceActive0 ? "0" : "") + (sliceActive1 ? (sliceActive0 ? ",1" : "1") : "") + (sliceActive2 ? ",2" : "") + (sliceActive3 ? ",3" : "") + (sliceActive4 ? ",4" : "") + "]"
+    string head_a = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json_a + ",\"tol_idx_slots\":" + slice_json_a + ",\"schema\":\"v13\",\"data\":{"
     alert("--- OM SNAPSHOT BEGIN ---", alert.freq_once_per_bar_close)
     alert(head_a, alert.freq_once_per_bar_close)
     alert(fmt_row(n01, aa01, false), alert.freq_once_per_bar_close)
