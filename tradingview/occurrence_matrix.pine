@@ -5,8 +5,8 @@
 
 indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true)
 
-string ver_num  = "v12.8"
-string ver_date = "2026-05-14"
+string ver_num  = "v13.0"
+string ver_date = "2026-05-19"
 
 // ==========================================
 // 1. INPUTS
@@ -20,10 +20,11 @@ g_fx     = "Tickers — FX"
 g_comm   = "Tickers — Commodities/ETFs"
 g_qqq    = "Tickers — QQQ Top 10"
 
-// Tolerances are auto-resolved from a SPY-calibrated table per (TF, MA).
-// See get_tol() below. The override input is for ad-hoc debugging only.
-approxOverride = input.float(0.0, "Override tolerance (0 = use table)", step=0.01, group=g_main, tooltip="Leave at 0 to apply the SPY-calibrated table (TF × MA). Set > 0 to force a single value across all MAs (debugging / parity tests).")
-winSize        = input.int(2, "Lookahead Candles", minval=2, group=g_main)
+// Tolerance grid: 5 levels per (TF, MA). Index 2 = baseline (same value as v12.8).
+// See get_tol_grid() for the full table. displayTolIdx controls which level the
+// in-Pine table renders; the JSON snapshot always exports all 5 levels.
+displayTolIdx = input.int(2, "Display tolerance level (0..4, baseline=2)", minval=0, maxval=4, group=g_main, tooltip="Which of the 5 tolerance levels to render in the in-chart table. The JSON snapshot exports ALL 5 levels regardless of this setting — the dashboard does the picking on the consumer side.")
+winSize       = input.int(2, "Lookahead Candles", minval=2, group=g_main)
 
 useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=g_filter)
 useDateFilter    = input.bool(true,  "Filter Start Date?", group=g_filter)
@@ -39,7 +40,6 @@ tableTextSize   = input.string("tiny",         "Table Text Size", options=["tiny
 compactMode     = input.bool(true,  "Compact Mode (hide sample size in cell)", group=g_table, tooltip="Off = '52.3%\\nn=156' (2 lines). On = '52.3%' (1 line, mais denso).")
 minSampleHL     = input.int(20, "Min sample to mark 'best' MA", minval=0, group=g_table, tooltip="Cells with fewer occurrences than this are not eligible for the green highlight (best Bounce%). Avoids noisy small-sample winners.")
 
-// Toggles por grupo de tickers — esconda o que não estiver olhando hoje
 showIdx     = input.bool(true,  "Show Indices/Futures",   group=g_table)
 showCrypto  = input.bool(true,  "Show Crypto",            group=g_table)
 showFX      = input.bool(true,  "Show FX",                group=g_table)
@@ -54,9 +54,10 @@ enableAlert   = input.bool(false, "Enable Friday Close Snapshot Alert (auto mode
 // 1b. DEBUG / PARITY (compare against Occurrence Scanner [ST])
 // ==========================================
 g_debug    = "Debug — Event Log"
-dbgEnable  = input.bool(false, "Enable event log for one ticker + MA", group=g_debug, tooltip="Logs every Bounce/Break/False event with trigger date and end bar. Open View → Pine Logs to read. Use to compare against OS [ST] triangles on chart.")
+dbgEnable  = input.bool(false, "Enable event log for one ticker + MA + tol idx", group=g_debug, tooltip="Logs every Bounce/Break/False event with trigger date and end bar for the (ticker, MA, tol idx) combo selected below. Open View → Pine Logs to read. Use to compare against OS [ST] triangles on chart.")
 dbgTicker  = input.string("SPY", "Ticker to log", options=["ES","SPX","SPY","XSP","NQ","NDX","QQQ","RTY","RUT","IWM","BTC","ETH","EURUSD","EURCHF","GBPUSD","GLD","SLV","USO","EWZ","NVDA","AAPL","MSFT","AMZN","GOOGL","AVGO","GOOG","META","TSLA","BRK.B"], group=g_debug)
 dbgMA      = input.string("SMA200", "MA to log", options=["EMA9","EMA20","SMA50","SMA200","VWAP"], group=g_debug)
+dbgTolIdx  = input.int(2, "Tol idx to log (0..4)", minval=0, maxval=4, group=g_debug)
 
 // 29 tickers (universo definido com CZ)
 t01 = input.symbol("CME_MINI:ES1!",   "ES",   group=g_idx)
@@ -93,7 +94,6 @@ t27 = input.symbol("NASDAQ:META",     "META", group=g_qqq)
 t28 = input.symbol("NASDAQ:TSLA",     "TSLA", group=g_qqq)
 t29 = input.symbol("NYSE:BRK.B",      "BRK.B",group=g_qqq)
 
-// Display labels (curtos pra caber na tabela)
 n01 = "ES"
 n02 = "SPX"
 n03 = "SPY"
@@ -125,38 +125,86 @@ n28 = "TSLA"
 n29 = "BRK.B"
 
 // ==========================================
-// 2. TOLERANCE TABLE — SPY-calibrated (% of MA value)
+// 2. TOLERANCE GRID — 5 levels per (TF, MA), index 2 = baseline (v12.8 values)
 // ==========================================
-// Resolves the touch buffer per (chart_TF, MA_index). MA index: 0=EMA9, 1=EMA20, 2=SMA50, 3=SMA200, 4=VWAP.
-// VWAP is session-anchored, so D/W are intentionally skipped (returns 0 → ticker_csv writes [0,0,0,0]).
-// Override input wins when > 0 (debug / cross-version parity).
-get_tol(int ma_idx) =>
+// Returns [v0, v1, v2, v3, v4] for the given MA index on the chart's timeframe.
+// Index 2 reproduces v12.8's get_tol() exactly. Other indices are "tighter"
+// (0, 1) and "looser" (3, 4) variants the dashboard can flip between.
+// Index conventions: 0=EMA9, 1=EMA20, 2=SMA50, 3=SMA200, 4=VWAP.
+// VWAP D/W is intentionally skipped (returns all zeros → run_full masks output to 0).
+get_tol_grid(int ma_idx) =>
     string p = timeframe.period
-    float t = 0.0
-    if approxOverride > 0.0
-        t := approxOverride
-    else if p == "2"
-        t := 0.02
-    else if p == "5"
-        t := 0.02
+    float v0 = 0.0
+    float v1 = 0.0
+    float v2 = 0.0
+    float v3 = 0.0
+    float v4 = 0.0
+    if p == "2" or p == "5"
+        v0 := 0.01
+        v1 := 0.015
+        v2 := 0.02
+        v3 := 0.05
+        v4 := 0.10
     else if p == "15"
-        t := 0.05
+        v0 := 0.02
+        v1 := 0.03
+        v2 := 0.05
+        v3 := 0.10
+        v4 := 0.15
     else if p == "60"
-        t := 0.1
+        v0 := 0.05
+        v1 := 0.07
+        v2 := 0.10
+        v3 := 0.20
+        v4 := 0.30
     else if p == "D"
-        t := ma_idx == 0 ? 0.2 : ma_idx == 1 ? 0.2 : ma_idx == 2 ? 0.3 : ma_idx == 3 ? 0.3 : 0.0
+        if ma_idx == 0 or ma_idx == 1
+            v0 := 0.10
+            v1 := 0.15
+            v2 := 0.20
+            v3 := 0.30
+            v4 := 0.50
+        else if ma_idx == 2 or ma_idx == 3
+            v0 := 0.15
+            v1 := 0.20
+            v2 := 0.30
+            v3 := 0.50
+            v4 := 0.70
     else if p == "W"
-        t := ma_idx == 0 ? 0.2 : ma_idx == 1 ? 0.3 : ma_idx == 2 ? 0.4 : ma_idx == 3 ? 0.4 : 0.0
+        if ma_idx == 0
+            v0 := 0.10
+            v1 := 0.15
+            v2 := 0.20
+            v3 := 0.30
+            v4 := 0.50
+        else if ma_idx == 1
+            v0 := 0.15
+            v1 := 0.20
+            v2 := 0.30
+            v3 := 0.50
+            v4 := 0.70
+        else if ma_idx == 2 or ma_idx == 3
+            v0 := 0.20
+            v1 := 0.30
+            v2 := 0.40
+            v3 := 0.60
+            v4 := 0.80
     else
-        t := 0.1
-    t
+        v0 := 0.05
+        v1 := 0.07
+        v2 := 0.10
+        v3 := 0.20
+        v4 := 0.30
+    [v0, v1, v2, v3, v4]
+
+// Convenience: returns just the baseline (idx 2) for label / parity helpers.
+get_tol_baseline(int ma_idx) =>
+    [_a, _b, base, _c, _d] = get_tol_grid(ma_idx)
+    base
 
 // ==========================================
 // 3. STATE MACHINE — paridade exata com Occurrence Scanner v10.3
 // ==========================================
-// Recebe a MA já calculada, o estado do squeeze e a tolerância (%),
-// roda a state machine bar-a-bar e retorna [Total, Bounce, Break, False].
-
 run_sm(float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
     var int  cT       = 0
     var int  cB       = 0
@@ -243,11 +291,18 @@ run_sm(float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
 
     [cT, cB, cBk, cF]
 
+// CSV helper — joins one (T, B, Bk, F) tuple with commas.
+fmt4(int t, int b, int k, int f) =>
+    str.tostring(t) + "," + str.tostring(b) + "," + str.tostring(k) + "," + str.tostring(f)
+
 // ==========================================
-// 4. WRAPPER — calcula squeeze + 5 MAs no contexto do símbolo solicitado
+// 4. WRAPPER — calcula squeeze + 5 MAs × 5 tols = 25 state machines por ticker
 // ==========================================
+// Returns a single CSV string with 100 ints (tol_idx outer × ma_idx middle × metric inner).
+// Order: t0m0_T, t0m0_B, t0m0_Bk, t0m0_F, t0m1_T, ..., t0m4_F, t1m0_T, ..., t4m4_F.
+// Returning a string (instead of a 100-tuple) keeps request.security boilerplate
+// to one line per ticker and the DIRECT-fallback override to one line per ticker.
 run_full() =>
-    // Squeeze (mesmos params do v10.3: BB 20/2.0, KC 20/1.5)
     [_, ub, lb] = ta.bb(close, 20, 2.0)
     bk  = ta.sma(close, 20)
     rk  = ta.tr(true)
@@ -262,751 +317,194 @@ run_full() =>
     ma4 = ta.sma(close, sma_long_p)
     ma5 = ta.vwap
 
-    // Per-MA tolerance from SPY-calibrated table (TF auto-resolved)
-    float tol1 = get_tol(0)
-    float tol2 = get_tol(1)
-    float tol3 = get_tol(2)
-    float tol4 = get_tol(3)
-    float tol5 = get_tol(4)
+    [g1_0, g1_1, g1_2, g1_3, g1_4] = get_tol_grid(0)
+    [g2_0, g2_1, g2_2, g2_3, g2_4] = get_tol_grid(1)
+    [g3_0, g3_1, g3_2, g3_3, g3_4] = get_tol_grid(2)
+    [g4_0, g4_1, g4_2, g4_3, g4_4] = get_tol_grid(3)
+    [g5_0, g5_1, g5_2, g5_3, g5_4] = get_tol_grid(4)
 
-    // Debug flags — only the (ticker, MA) pair selected in inputs logs events.
-    // syminfo.ticker inside a request.security() context returns the requested ticker.
-    bool is_dbg_t   = dbgEnable and syminfo.ticker == dbgTicker
-    bool dbg_ema9   = is_dbg_t and dbgMA == "EMA9"
-    bool dbg_ema20  = is_dbg_t and dbgMA == "EMA20"
-    bool dbg_sma50  = is_dbg_t and dbgMA == "SMA50"
-    bool dbg_sma200 = is_dbg_t and dbgMA == "SMA200"
-    bool dbg_vwap   = is_dbg_t and dbgMA == "VWAP"
+    bool is_dbg_t = dbgEnable and syminfo.ticker == dbgTicker
+    bool dbg_m1   = is_dbg_t and dbgMA == "EMA9"
+    bool dbg_m2   = is_dbg_t and dbgMA == "EMA20"
+    bool dbg_m3   = is_dbg_t and dbgMA == "SMA50"
+    bool dbg_m4   = is_dbg_t and dbgMA == "SMA200"
+    bool dbg_m5   = is_dbg_t and dbgMA == "VWAP"
 
-    // Run state machine for all 5 MAs. A tolerance of 0 means "skip this MA on this TF"
-    // (e.g., VWAP on D/W) — we still execute run_sm (Pine v5 can't conditionally call var-bearing
-    // functions) but coerce outputs to 0 so the snapshot stays comparable across TFs.
-    [_t1, _b1, _k1, _f1] = run_sm(ma1, sqz, tol1 > 0 ? tol1 : 0.0001, dbg_ema9,   "EMA9")
-    [_t2, _b2, _k2, _f2] = run_sm(ma2, sqz, tol2 > 0 ? tol2 : 0.0001, dbg_ema20,  "EMA20")
-    [_t3, _b3, _k3, _f3] = run_sm(ma3, sqz, tol3 > 0 ? tol3 : 0.0001, dbg_sma50,  "SMA50")
-    [_t4, _b4, _k4, _f4] = run_sm(ma4, sqz, tol4 > 0 ? tol4 : 0.0001, dbg_sma200, "SMA200")
-    [_t5, _b5, _k5, _f5] = run_sm(ma5, sqz, tol5 > 0 ? tol5 : 0.0001, dbg_vwap,   "VWAP")
+    // Run state machine: 5 MAs × 5 tols = 25 calls. A tolerance of 0 means
+    // "skip this MA on this TF" — we still call run_sm (Pine v5 var-bearing
+    // funcs can't be conditionally invoked) but coerce outputs to 0 below.
+    [m1T_0, m1B_0, m1K_0, m1F_0] = run_sm(ma1, sqz, g1_0 > 0 ? g1_0 : 0.0001, dbg_m1 and dbgTolIdx == 0, "EMA9[0]")
+    [m1T_1, m1B_1, m1K_1, m1F_1] = run_sm(ma1, sqz, g1_1 > 0 ? g1_1 : 0.0001, dbg_m1 and dbgTolIdx == 1, "EMA9[1]")
+    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm(ma1, sqz, g1_2 > 0 ? g1_2 : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
+    [m1T_3, m1B_3, m1K_3, m1F_3] = run_sm(ma1, sqz, g1_3 > 0 ? g1_3 : 0.0001, dbg_m1 and dbgTolIdx == 3, "EMA9[3]")
+    [m1T_4, m1B_4, m1K_4, m1F_4] = run_sm(ma1, sqz, g1_4 > 0 ? g1_4 : 0.0001, dbg_m1 and dbgTolIdx == 4, "EMA9[4]")
 
-    int t1 = tol1 > 0 ? _t1 : 0
-    int b1 = tol1 > 0 ? _b1 : 0
-    int k1 = tol1 > 0 ? _k1 : 0
-    int f1 = tol1 > 0 ? _f1 : 0
-    int t2 = tol2 > 0 ? _t2 : 0
-    int b2 = tol2 > 0 ? _b2 : 0
-    int k2 = tol2 > 0 ? _k2 : 0
-    int f2 = tol2 > 0 ? _f2 : 0
-    int t3 = tol3 > 0 ? _t3 : 0
-    int b3 = tol3 > 0 ? _b3 : 0
-    int k3 = tol3 > 0 ? _k3 : 0
-    int f3 = tol3 > 0 ? _f3 : 0
-    int t4 = tol4 > 0 ? _t4 : 0
-    int b4 = tol4 > 0 ? _b4 : 0
-    int k4 = tol4 > 0 ? _k4 : 0
-    int f4 = tol4 > 0 ? _f4 : 0
-    int t5 = tol5 > 0 ? _t5 : 0
-    int b5 = tol5 > 0 ? _b5 : 0
-    int k5 = tol5 > 0 ? _k5 : 0
-    int f5 = tol5 > 0 ? _f5 : 0
+    [m2T_0, m2B_0, m2K_0, m2F_0] = run_sm(ma2, sqz, g2_0 > 0 ? g2_0 : 0.0001, dbg_m2 and dbgTolIdx == 0, "EMA20[0]")
+    [m2T_1, m2B_1, m2K_1, m2F_1] = run_sm(ma2, sqz, g2_1 > 0 ? g2_1 : 0.0001, dbg_m2 and dbgTolIdx == 1, "EMA20[1]")
+    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm(ma2, sqz, g2_2 > 0 ? g2_2 : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
+    [m2T_3, m2B_3, m2K_3, m2F_3] = run_sm(ma2, sqz, g2_3 > 0 ? g2_3 : 0.0001, dbg_m2 and dbgTolIdx == 3, "EMA20[3]")
+    [m2T_4, m2B_4, m2K_4, m2F_4] = run_sm(ma2, sqz, g2_4 > 0 ? g2_4 : 0.0001, dbg_m2 and dbgTolIdx == 4, "EMA20[4]")
 
-    [t1,b1,k1,f1, t2,b2,k2,f2, t3,b3,k3,f3, t4,b4,k4,f4, t5,b5,k5,f5]
+    [m3T_0, m3B_0, m3K_0, m3F_0] = run_sm(ma3, sqz, g3_0 > 0 ? g3_0 : 0.0001, dbg_m3 and dbgTolIdx == 0, "SMA50[0]")
+    [m3T_1, m3B_1, m3K_1, m3F_1] = run_sm(ma3, sqz, g3_1 > 0 ? g3_1 : 0.0001, dbg_m3 and dbgTolIdx == 1, "SMA50[1]")
+    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm(ma3, sqz, g3_2 > 0 ? g3_2 : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
+    [m3T_3, m3B_3, m3K_3, m3F_3] = run_sm(ma3, sqz, g3_3 > 0 ? g3_3 : 0.0001, dbg_m3 and dbgTolIdx == 3, "SMA50[3]")
+    [m3T_4, m3B_4, m3K_4, m3F_4] = run_sm(ma3, sqz, g3_4 > 0 ? g3_4 : 0.0001, dbg_m3 and dbgTolIdx == 4, "SMA50[4]")
+
+    [m4T_0, m4B_0, m4K_0, m4F_0] = run_sm(ma4, sqz, g4_0 > 0 ? g4_0 : 0.0001, dbg_m4 and dbgTolIdx == 0, "SMA200[0]")
+    [m4T_1, m4B_1, m4K_1, m4F_1] = run_sm(ma4, sqz, g4_1 > 0 ? g4_1 : 0.0001, dbg_m4 and dbgTolIdx == 1, "SMA200[1]")
+    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm(ma4, sqz, g4_2 > 0 ? g4_2 : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
+    [m4T_3, m4B_3, m4K_3, m4F_3] = run_sm(ma4, sqz, g4_3 > 0 ? g4_3 : 0.0001, dbg_m4 and dbgTolIdx == 3, "SMA200[3]")
+    [m4T_4, m4B_4, m4K_4, m4F_4] = run_sm(ma4, sqz, g4_4 > 0 ? g4_4 : 0.0001, dbg_m4 and dbgTolIdx == 4, "SMA200[4]")
+
+    [m5T_0, m5B_0, m5K_0, m5F_0] = run_sm(ma5, sqz, g5_0 > 0 ? g5_0 : 0.0001, dbg_m5 and dbgTolIdx == 0, "VWAP[0]")
+    [m5T_1, m5B_1, m5K_1, m5F_1] = run_sm(ma5, sqz, g5_1 > 0 ? g5_1 : 0.0001, dbg_m5 and dbgTolIdx == 1, "VWAP[1]")
+    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm(ma5, sqz, g5_2 > 0 ? g5_2 : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
+    [m5T_3, m5B_3, m5K_3, m5F_3] = run_sm(ma5, sqz, g5_3 > 0 ? g5_3 : 0.0001, dbg_m5 and dbgTolIdx == 3, "VWAP[3]")
+    [m5T_4, m5B_4, m5K_4, m5F_4] = run_sm(ma5, sqz, g5_4 > 0 ? g5_4 : 0.0001, dbg_m5 and dbgTolIdx == 4, "VWAP[4]")
+
+    // Mask: tol == 0 → zero out the 4 counts for that (MA, tol) cell.
+    string s = ""
+    s := s + fmt4(g1_0 > 0 ? m1T_0 : 0, g1_0 > 0 ? m1B_0 : 0, g1_0 > 0 ? m1K_0 : 0, g1_0 > 0 ? m1F_0 : 0)
+    s := s + "," + fmt4(g2_0 > 0 ? m2T_0 : 0, g2_0 > 0 ? m2B_0 : 0, g2_0 > 0 ? m2K_0 : 0, g2_0 > 0 ? m2F_0 : 0)
+    s := s + "," + fmt4(g3_0 > 0 ? m3T_0 : 0, g3_0 > 0 ? m3B_0 : 0, g3_0 > 0 ? m3K_0 : 0, g3_0 > 0 ? m3F_0 : 0)
+    s := s + "," + fmt4(g4_0 > 0 ? m4T_0 : 0, g4_0 > 0 ? m4B_0 : 0, g4_0 > 0 ? m4K_0 : 0, g4_0 > 0 ? m4F_0 : 0)
+    s := s + "," + fmt4(g5_0 > 0 ? m5T_0 : 0, g5_0 > 0 ? m5B_0 : 0, g5_0 > 0 ? m5K_0 : 0, g5_0 > 0 ? m5F_0 : 0)
+
+    s := s + "," + fmt4(g1_1 > 0 ? m1T_1 : 0, g1_1 > 0 ? m1B_1 : 0, g1_1 > 0 ? m1K_1 : 0, g1_1 > 0 ? m1F_1 : 0)
+    s := s + "," + fmt4(g2_1 > 0 ? m2T_1 : 0, g2_1 > 0 ? m2B_1 : 0, g2_1 > 0 ? m2K_1 : 0, g2_1 > 0 ? m2F_1 : 0)
+    s := s + "," + fmt4(g3_1 > 0 ? m3T_1 : 0, g3_1 > 0 ? m3B_1 : 0, g3_1 > 0 ? m3K_1 : 0, g3_1 > 0 ? m3F_1 : 0)
+    s := s + "," + fmt4(g4_1 > 0 ? m4T_1 : 0, g4_1 > 0 ? m4B_1 : 0, g4_1 > 0 ? m4K_1 : 0, g4_1 > 0 ? m4F_1 : 0)
+    s := s + "," + fmt4(g5_1 > 0 ? m5T_1 : 0, g5_1 > 0 ? m5B_1 : 0, g5_1 > 0 ? m5K_1 : 0, g5_1 > 0 ? m5F_1 : 0)
+
+    s := s + "," + fmt4(g1_2 > 0 ? m1T_2 : 0, g1_2 > 0 ? m1B_2 : 0, g1_2 > 0 ? m1K_2 : 0, g1_2 > 0 ? m1F_2 : 0)
+    s := s + "," + fmt4(g2_2 > 0 ? m2T_2 : 0, g2_2 > 0 ? m2B_2 : 0, g2_2 > 0 ? m2K_2 : 0, g2_2 > 0 ? m2F_2 : 0)
+    s := s + "," + fmt4(g3_2 > 0 ? m3T_2 : 0, g3_2 > 0 ? m3B_2 : 0, g3_2 > 0 ? m3K_2 : 0, g3_2 > 0 ? m3F_2 : 0)
+    s := s + "," + fmt4(g4_2 > 0 ? m4T_2 : 0, g4_2 > 0 ? m4B_2 : 0, g4_2 > 0 ? m4K_2 : 0, g4_2 > 0 ? m4F_2 : 0)
+    s := s + "," + fmt4(g5_2 > 0 ? m5T_2 : 0, g5_2 > 0 ? m5B_2 : 0, g5_2 > 0 ? m5K_2 : 0, g5_2 > 0 ? m5F_2 : 0)
+
+    s := s + "," + fmt4(g1_3 > 0 ? m1T_3 : 0, g1_3 > 0 ? m1B_3 : 0, g1_3 > 0 ? m1K_3 : 0, g1_3 > 0 ? m1F_3 : 0)
+    s := s + "," + fmt4(g2_3 > 0 ? m2T_3 : 0, g2_3 > 0 ? m2B_3 : 0, g2_3 > 0 ? m2K_3 : 0, g2_3 > 0 ? m2F_3 : 0)
+    s := s + "," + fmt4(g3_3 > 0 ? m3T_3 : 0, g3_3 > 0 ? m3B_3 : 0, g3_3 > 0 ? m3K_3 : 0, g3_3 > 0 ? m3F_3 : 0)
+    s := s + "," + fmt4(g4_3 > 0 ? m4T_3 : 0, g4_3 > 0 ? m4B_3 : 0, g4_3 > 0 ? m4K_3 : 0, g4_3 > 0 ? m4F_3 : 0)
+    s := s + "," + fmt4(g5_3 > 0 ? m5T_3 : 0, g5_3 > 0 ? m5B_3 : 0, g5_3 > 0 ? m5K_3 : 0, g5_3 > 0 ? m5F_3 : 0)
+
+    s := s + "," + fmt4(g1_4 > 0 ? m1T_4 : 0, g1_4 > 0 ? m1B_4 : 0, g1_4 > 0 ? m1K_4 : 0, g1_4 > 0 ? m1F_4 : 0)
+    s := s + "," + fmt4(g2_4 > 0 ? m2T_4 : 0, g2_4 > 0 ? m2B_4 : 0, g2_4 > 0 ? m2K_4 : 0, g2_4 > 0 ? m2F_4 : 0)
+    s := s + "," + fmt4(g3_4 > 0 ? m3T_4 : 0, g3_4 > 0 ? m3B_4 : 0, g3_4 > 0 ? m3K_4 : 0, g3_4 > 0 ? m3F_4 : 0)
+    s := s + "," + fmt4(g4_4 > 0 ? m4T_4 : 0, g4_4 > 0 ? m4B_4 : 0, g4_4 > 0 ? m4K_4 : 0, g4_4 > 0 ? m4F_4 : 0)
+    s := s + "," + fmt4(g5_4 > 0 ? m5T_4 : 0, g5_4 > 0 ? m5B_4 : 0, g5_4 > 0 ? m5K_4 : 0, g5_4 > 0 ? m5F_4 : 0)
+
+    s
 
 // ==========================================
 // 5. RUN PER TICKER (29 calls — within Pine's 40-security limit)
 // ==========================================
-[a01_t1,a01_b1,a01_k1,a01_f1, a01_t2,a01_b2,a01_k2,a01_f2, a01_t3,a01_b3,a01_k3,a01_f3, a01_t4,a01_b4,a01_k4,a01_f4, a01_t5,a01_b5,a01_k5,a01_f5] = request.security(t01, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a02_t1,a02_b1,a02_k1,a02_f1, a02_t2,a02_b2,a02_k2,a02_f2, a02_t3,a02_b3,a02_k3,a02_f3, a02_t4,a02_b4,a02_k4,a02_f4, a02_t5,a02_b5,a02_k5,a02_f5] = request.security(t02, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a03_t1,a03_b1,a03_k1,a03_f1, a03_t2,a03_b2,a03_k2,a03_f2, a03_t3,a03_b3,a03_k3,a03_f3, a03_t4,a03_b4,a03_k4,a03_f4, a03_t5,a03_b5,a03_k5,a03_f5] = request.security(t03, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a04_t1,a04_b1,a04_k1,a04_f1, a04_t2,a04_b2,a04_k2,a04_f2, a04_t3,a04_b3,a04_k3,a04_f3, a04_t4,a04_b4,a04_k4,a04_f4, a04_t5,a04_b5,a04_k5,a04_f5] = request.security(t04, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a05_t1,a05_b1,a05_k1,a05_f1, a05_t2,a05_b2,a05_k2,a05_f2, a05_t3,a05_b3,a05_k3,a05_f3, a05_t4,a05_b4,a05_k4,a05_f4, a05_t5,a05_b5,a05_k5,a05_f5] = request.security(t05, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a06_t1,a06_b1,a06_k1,a06_f1, a06_t2,a06_b2,a06_k2,a06_f2, a06_t3,a06_b3,a06_k3,a06_f3, a06_t4,a06_b4,a06_k4,a06_f4, a06_t5,a06_b5,a06_k5,a06_f5] = request.security(t06, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a07_t1,a07_b1,a07_k1,a07_f1, a07_t2,a07_b2,a07_k2,a07_f2, a07_t3,a07_b3,a07_k3,a07_f3, a07_t4,a07_b4,a07_k4,a07_f4, a07_t5,a07_b5,a07_k5,a07_f5] = request.security(t07, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a08_t1,a08_b1,a08_k1,a08_f1, a08_t2,a08_b2,a08_k2,a08_f2, a08_t3,a08_b3,a08_k3,a08_f3, a08_t4,a08_b4,a08_k4,a08_f4, a08_t5,a08_b5,a08_k5,a08_f5] = request.security(t08, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a09_t1,a09_b1,a09_k1,a09_f1, a09_t2,a09_b2,a09_k2,a09_f2, a09_t3,a09_b3,a09_k3,a09_f3, a09_t4,a09_b4,a09_k4,a09_f4, a09_t5,a09_b5,a09_k5,a09_f5] = request.security(t09, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a10_t1,a10_b1,a10_k1,a10_f1, a10_t2,a10_b2,a10_k2,a10_f2, a10_t3,a10_b3,a10_k3,a10_f3, a10_t4,a10_b4,a10_k4,a10_f4, a10_t5,a10_b5,a10_k5,a10_f5] = request.security(t10, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-
-[a11_t1,a11_b1,a11_k1,a11_f1, a11_t2,a11_b2,a11_k2,a11_f2, a11_t3,a11_b3,a11_k3,a11_f3, a11_t4,a11_b4,a11_k4,a11_f4, a11_t5,a11_b5,a11_k5,a11_f5] = request.security(t11, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a12_t1,a12_b1,a12_k1,a12_f1, a12_t2,a12_b2,a12_k2,a12_f2, a12_t3,a12_b3,a12_k3,a12_f3, a12_t4,a12_b4,a12_k4,a12_f4, a12_t5,a12_b5,a12_k5,a12_f5] = request.security(t12, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-
-[a13_t1,a13_b1,a13_k1,a13_f1, a13_t2,a13_b2,a13_k2,a13_f2, a13_t3,a13_b3,a13_k3,a13_f3, a13_t4,a13_b4,a13_k4,a13_f4, a13_t5,a13_b5,a13_k5,a13_f5] = request.security(t13, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a14_t1,a14_b1,a14_k1,a14_f1, a14_t2,a14_b2,a14_k2,a14_f2, a14_t3,a14_b3,a14_k3,a14_f3, a14_t4,a14_b4,a14_k4,a14_f4, a14_t5,a14_b5,a14_k5,a14_f5] = request.security(t14, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a15_t1,a15_b1,a15_k1,a15_f1, a15_t2,a15_b2,a15_k2,a15_f2, a15_t3,a15_b3,a15_k3,a15_f3, a15_t4,a15_b4,a15_k4,a15_f4, a15_t5,a15_b5,a15_k5,a15_f5] = request.security(t15, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-
-[a16_t1,a16_b1,a16_k1,a16_f1, a16_t2,a16_b2,a16_k2,a16_f2, a16_t3,a16_b3,a16_k3,a16_f3, a16_t4,a16_b4,a16_k4,a16_f4, a16_t5,a16_b5,a16_k5,a16_f5] = request.security(t16, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a17_t1,a17_b1,a17_k1,a17_f1, a17_t2,a17_b2,a17_k2,a17_f2, a17_t3,a17_b3,a17_k3,a17_f3, a17_t4,a17_b4,a17_k4,a17_f4, a17_t5,a17_b5,a17_k5,a17_f5] = request.security(t17, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a18_t1,a18_b1,a18_k1,a18_f1, a18_t2,a18_b2,a18_k2,a18_f2, a18_t3,a18_b3,a18_k3,a18_f3, a18_t4,a18_b4,a18_k4,a18_f4, a18_t5,a18_b5,a18_k5,a18_f5] = request.security(t18, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a19_t1,a19_b1,a19_k1,a19_f1, a19_t2,a19_b2,a19_k2,a19_f2, a19_t3,a19_b3,a19_k3,a19_f3, a19_t4,a19_b4,a19_k4,a19_f4, a19_t5,a19_b5,a19_k5,a19_f5] = request.security(t19, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-
-[a20_t1,a20_b1,a20_k1,a20_f1, a20_t2,a20_b2,a20_k2,a20_f2, a20_t3,a20_b3,a20_k3,a20_f3, a20_t4,a20_b4,a20_k4,a20_f4, a20_t5,a20_b5,a20_k5,a20_f5] = request.security(t20, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a21_t1,a21_b1,a21_k1,a21_f1, a21_t2,a21_b2,a21_k2,a21_f2, a21_t3,a21_b3,a21_k3,a21_f3, a21_t4,a21_b4,a21_k4,a21_f4, a21_t5,a21_b5,a21_k5,a21_f5] = request.security(t21, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a22_t1,a22_b1,a22_k1,a22_f1, a22_t2,a22_b2,a22_k2,a22_f2, a22_t3,a22_b3,a22_k3,a22_f3, a22_t4,a22_b4,a22_k4,a22_f4, a22_t5,a22_b5,a22_k5,a22_f5] = request.security(t22, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a23_t1,a23_b1,a23_k1,a23_f1, a23_t2,a23_b2,a23_k2,a23_f2, a23_t3,a23_b3,a23_k3,a23_f3, a23_t4,a23_b4,a23_k4,a23_f4, a23_t5,a23_b5,a23_k5,a23_f5] = request.security(t23, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a24_t1,a24_b1,a24_k1,a24_f1, a24_t2,a24_b2,a24_k2,a24_f2, a24_t3,a24_b3,a24_k3,a24_f3, a24_t4,a24_b4,a24_k4,a24_f4, a24_t5,a24_b5,a24_k5,a24_f5] = request.security(t24, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a25_t1,a25_b1,a25_k1,a25_f1, a25_t2,a25_b2,a25_k2,a25_f2, a25_t3,a25_b3,a25_k3,a25_f3, a25_t4,a25_b4,a25_k4,a25_f4, a25_t5,a25_b5,a25_k5,a25_f5] = request.security(t25, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a26_t1,a26_b1,a26_k1,a26_f1, a26_t2,a26_b2,a26_k2,a26_f2, a26_t3,a26_b3,a26_k3,a26_f3, a26_t4,a26_b4,a26_k4,a26_f4, a26_t5,a26_b5,a26_k5,a26_f5] = request.security(t26, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a27_t1,a27_b1,a27_k1,a27_f1, a27_t2,a27_b2,a27_k2,a27_f2, a27_t3,a27_b3,a27_k3,a27_f3, a27_t4,a27_b4,a27_k4,a27_f4, a27_t5,a27_b5,a27_k5,a27_f5] = request.security(t27, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a28_t1,a28_b1,a28_k1,a28_f1, a28_t2,a28_b2,a28_k2,a28_f2, a28_t3,a28_b3,a28_k3,a28_f3, a28_t4,a28_b4,a28_k4,a28_f4, a28_t5,a28_b5,a28_k5,a28_f5] = request.security(t28, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-[a29_t1,a29_b1,a29_k1,a29_f1, a29_t2,a29_b2,a29_k2,a29_f2, a29_t3,a29_b3,a29_k3,a29_f3, a29_t4,a29_b4,a29_k4,a29_f4, a29_t5,a29_b5,a29_k5,a29_f5] = request.security(t29, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a01 = request.security(t01, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a02 = request.security(t02, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a03 = request.security(t03, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a04 = request.security(t04, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a05 = request.security(t05, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a06 = request.security(t06, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a07 = request.security(t07, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a08 = request.security(t08, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a09 = request.security(t09, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a10 = request.security(t10, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a11 = request.security(t11, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a12 = request.security(t12, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a13 = request.security(t13, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a14 = request.security(t14, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a15 = request.security(t15, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a16 = request.security(t16, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a17 = request.security(t17, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a18 = request.security(t18, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a19 = request.security(t19, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a20 = request.security(t20, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a21 = request.security(t21, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a22 = request.security(t22, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a23 = request.security(t23, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a24 = request.security(t24, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a25 = request.security(t25, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a26 = request.security(t26, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a27 = request.security(t27, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a28 = request.security(t28, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a29 = request.security(t29, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
 // ==========================================
-// 5b. DIRECT FALLBACK FOR CHART TICKER
+// 5b. DIRECT FALLBACK FOR CHART TICKER (mutable copies for override)
 // ==========================================
-// request.security has documented quirks (bar history init, timezone/session
-// edges, var state propagation) that cause it to detect events the chart base
-// wouldn't see. To guarantee bit-identical parity with OS [ST] for the ticker
-// you are currently auditing on the chart, recompute that ticker directly
-// (no request.security) and override its row's values in the table.
-[d_t1,d_b1,d_k1,d_f1, d_t2,d_b2,d_k2,d_f2, d_t3,d_b3,d_k3,d_f3, d_t4,d_b4,d_k4,d_f4, d_t5,d_b5,d_k5,d_f5] = run_full()
+// request.security has documented quirks (var state propagation, history init) that
+// can cause ~1-2 phantom events vs the chart base. To guarantee parity with OS [ST]
+// for the ticker the user is auditing on the chart, we recompute that ticker's
+// payload directly (no request.security) and override the aNN string for it.
+string d_str = run_full()
 string chartId = syminfo.tickerid
 
-// === DIAGNOSTIC LOG (one-shot on last bar) ===
-// Helps catch ticker-id mismatches between chart and inputs (e.g., "AMEX:SPY" vs "BATS:SPY").
-// If chart's symbol doesn't match any tNN, the DIRECT fallback won't trigger and the table
-// row will show request.security values (potentially divergent vs OS [ST]).
+var string aa01 = na
+var string aa02 = na
+var string aa03 = na
+var string aa04 = na
+var string aa05 = na
+var string aa06 = na
+var string aa07 = na
+var string aa08 = na
+var string aa09 = na
+var string aa10 = na
+var string aa11 = na
+var string aa12 = na
+var string aa13 = na
+var string aa14 = na
+var string aa15 = na
+var string aa16 = na
+var string aa17 = na
+var string aa18 = na
+var string aa19 = na
+var string aa20 = na
+var string aa21 = na
+var string aa22 = na
+var string aa23 = na
+var string aa24 = na
+var string aa25 = na
+var string aa26 = na
+var string aa27 = na
+var string aa28 = na
+var string aa29 = na
+
+aa01 := str.contains(chartId, t01) ? d_str : a01
+aa02 := str.contains(chartId, t02) ? d_str : a02
+aa03 := str.contains(chartId, t03) ? d_str : a03
+aa04 := str.contains(chartId, t04) ? d_str : a04
+aa05 := str.contains(chartId, t05) ? d_str : a05
+aa06 := str.contains(chartId, t06) ? d_str : a06
+aa07 := str.contains(chartId, t07) ? d_str : a07
+aa08 := str.contains(chartId, t08) ? d_str : a08
+aa09 := str.contains(chartId, t09) ? d_str : a09
+aa10 := str.contains(chartId, t10) ? d_str : a10
+aa11 := str.contains(chartId, t11) ? d_str : a11
+aa12 := str.contains(chartId, t12) ? d_str : a12
+aa13 := str.contains(chartId, t13) ? d_str : a13
+aa14 := str.contains(chartId, t14) ? d_str : a14
+aa15 := str.contains(chartId, t15) ? d_str : a15
+aa16 := str.contains(chartId, t16) ? d_str : a16
+aa17 := str.contains(chartId, t17) ? d_str : a17
+aa18 := str.contains(chartId, t18) ? d_str : a18
+aa19 := str.contains(chartId, t19) ? d_str : a19
+aa20 := str.contains(chartId, t20) ? d_str : a20
+aa21 := str.contains(chartId, t21) ? d_str : a21
+aa22 := str.contains(chartId, t22) ? d_str : a22
+aa23 := str.contains(chartId, t23) ? d_str : a23
+aa24 := str.contains(chartId, t24) ? d_str : a24
+aa25 := str.contains(chartId, t25) ? d_str : a25
+aa26 := str.contains(chartId, t26) ? d_str : a26
+aa27 := str.contains(chartId, t27) ? d_str : a27
+aa28 := str.contains(chartId, t28) ? d_str : a28
+aa29 := str.contains(chartId, t29) ? d_str : a29
+
 if barstate.islast and dbgEnable
     log.info("CHART-ID = '" + chartId + "' | syminfo.ticker = '" + syminfo.ticker + "'")
-    log.info("Inputs: t01='" + t01 + "' t02='" + t02 + "' t03='" + t03 + "' t04='" + t04 + "' t05='" + t05 + "' t06='" + t06 + "' t07='" + t07 + "' t08='" + t08 + "' t09='" + t09 + "' t10='" + t10 + "'")
-    log.info("Match check: str.contains(chartId, t03) is " + str.tostring(str.contains(chartId, t03)) + " | direct SMA200: T=" + str.tostring(d_t4) + " B=" + str.tostring(d_b4) + " Bk=" + str.tostring(d_k4) + " F=" + str.tostring(d_f4))
-
-if str.contains(chartId, t01)
-    a01_t1 := d_t1
-    a01_b1 := d_b1
-    a01_k1 := d_k1
-    a01_f1 := d_f1
-    a01_t2 := d_t2
-    a01_b2 := d_b2
-    a01_k2 := d_k2
-    a01_f2 := d_f2
-    a01_t3 := d_t3
-    a01_b3 := d_b3
-    a01_k3 := d_k3
-    a01_f3 := d_f3
-    a01_t4 := d_t4
-    a01_b4 := d_b4
-    a01_k4 := d_k4
-    a01_f4 := d_f4
-    a01_t5 := d_t5
-    a01_b5 := d_b5
-    a01_k5 := d_k5
-    a01_f5 := d_f5
-
-if str.contains(chartId, t02)
-    a02_t1 := d_t1
-    a02_b1 := d_b1
-    a02_k1 := d_k1
-    a02_f1 := d_f1
-    a02_t2 := d_t2
-    a02_b2 := d_b2
-    a02_k2 := d_k2
-    a02_f2 := d_f2
-    a02_t3 := d_t3
-    a02_b3 := d_b3
-    a02_k3 := d_k3
-    a02_f3 := d_f3
-    a02_t4 := d_t4
-    a02_b4 := d_b4
-    a02_k4 := d_k4
-    a02_f4 := d_f4
-    a02_t5 := d_t5
-    a02_b5 := d_b5
-    a02_k5 := d_k5
-    a02_f5 := d_f5
-
-if str.contains(chartId, t03)
-    a03_t1 := d_t1
-    a03_b1 := d_b1
-    a03_k1 := d_k1
-    a03_f1 := d_f1
-    a03_t2 := d_t2
-    a03_b2 := d_b2
-    a03_k2 := d_k2
-    a03_f2 := d_f2
-    a03_t3 := d_t3
-    a03_b3 := d_b3
-    a03_k3 := d_k3
-    a03_f3 := d_f3
-    a03_t4 := d_t4
-    a03_b4 := d_b4
-    a03_k4 := d_k4
-    a03_f4 := d_f4
-    a03_t5 := d_t5
-    a03_b5 := d_b5
-    a03_k5 := d_k5
-    a03_f5 := d_f5
-
-if str.contains(chartId, t04)
-    a04_t1 := d_t1
-    a04_b1 := d_b1
-    a04_k1 := d_k1
-    a04_f1 := d_f1
-    a04_t2 := d_t2
-    a04_b2 := d_b2
-    a04_k2 := d_k2
-    a04_f2 := d_f2
-    a04_t3 := d_t3
-    a04_b3 := d_b3
-    a04_k3 := d_k3
-    a04_f3 := d_f3
-    a04_t4 := d_t4
-    a04_b4 := d_b4
-    a04_k4 := d_k4
-    a04_f4 := d_f4
-    a04_t5 := d_t5
-    a04_b5 := d_b5
-    a04_k5 := d_k5
-    a04_f5 := d_f5
-
-if str.contains(chartId, t05)
-    a05_t1 := d_t1
-    a05_b1 := d_b1
-    a05_k1 := d_k1
-    a05_f1 := d_f1
-    a05_t2 := d_t2
-    a05_b2 := d_b2
-    a05_k2 := d_k2
-    a05_f2 := d_f2
-    a05_t3 := d_t3
-    a05_b3 := d_b3
-    a05_k3 := d_k3
-    a05_f3 := d_f3
-    a05_t4 := d_t4
-    a05_b4 := d_b4
-    a05_k4 := d_k4
-    a05_f4 := d_f4
-    a05_t5 := d_t5
-    a05_b5 := d_b5
-    a05_k5 := d_k5
-    a05_f5 := d_f5
-
-if str.contains(chartId, t06)
-    a06_t1 := d_t1
-    a06_b1 := d_b1
-    a06_k1 := d_k1
-    a06_f1 := d_f1
-    a06_t2 := d_t2
-    a06_b2 := d_b2
-    a06_k2 := d_k2
-    a06_f2 := d_f2
-    a06_t3 := d_t3
-    a06_b3 := d_b3
-    a06_k3 := d_k3
-    a06_f3 := d_f3
-    a06_t4 := d_t4
-    a06_b4 := d_b4
-    a06_k4 := d_k4
-    a06_f4 := d_f4
-    a06_t5 := d_t5
-    a06_b5 := d_b5
-    a06_k5 := d_k5
-    a06_f5 := d_f5
-
-if str.contains(chartId, t07)
-    a07_t1 := d_t1
-    a07_b1 := d_b1
-    a07_k1 := d_k1
-    a07_f1 := d_f1
-    a07_t2 := d_t2
-    a07_b2 := d_b2
-    a07_k2 := d_k2
-    a07_f2 := d_f2
-    a07_t3 := d_t3
-    a07_b3 := d_b3
-    a07_k3 := d_k3
-    a07_f3 := d_f3
-    a07_t4 := d_t4
-    a07_b4 := d_b4
-    a07_k4 := d_k4
-    a07_f4 := d_f4
-    a07_t5 := d_t5
-    a07_b5 := d_b5
-    a07_k5 := d_k5
-    a07_f5 := d_f5
-
-if str.contains(chartId, t08)
-    a08_t1 := d_t1
-    a08_b1 := d_b1
-    a08_k1 := d_k1
-    a08_f1 := d_f1
-    a08_t2 := d_t2
-    a08_b2 := d_b2
-    a08_k2 := d_k2
-    a08_f2 := d_f2
-    a08_t3 := d_t3
-    a08_b3 := d_b3
-    a08_k3 := d_k3
-    a08_f3 := d_f3
-    a08_t4 := d_t4
-    a08_b4 := d_b4
-    a08_k4 := d_k4
-    a08_f4 := d_f4
-    a08_t5 := d_t5
-    a08_b5 := d_b5
-    a08_k5 := d_k5
-    a08_f5 := d_f5
-
-if str.contains(chartId, t09)
-    a09_t1 := d_t1
-    a09_b1 := d_b1
-    a09_k1 := d_k1
-    a09_f1 := d_f1
-    a09_t2 := d_t2
-    a09_b2 := d_b2
-    a09_k2 := d_k2
-    a09_f2 := d_f2
-    a09_t3 := d_t3
-    a09_b3 := d_b3
-    a09_k3 := d_k3
-    a09_f3 := d_f3
-    a09_t4 := d_t4
-    a09_b4 := d_b4
-    a09_k4 := d_k4
-    a09_f4 := d_f4
-    a09_t5 := d_t5
-    a09_b5 := d_b5
-    a09_k5 := d_k5
-    a09_f5 := d_f5
-
-if str.contains(chartId, t10)
-    a10_t1 := d_t1
-    a10_b1 := d_b1
-    a10_k1 := d_k1
-    a10_f1 := d_f1
-    a10_t2 := d_t2
-    a10_b2 := d_b2
-    a10_k2 := d_k2
-    a10_f2 := d_f2
-    a10_t3 := d_t3
-    a10_b3 := d_b3
-    a10_k3 := d_k3
-    a10_f3 := d_f3
-    a10_t4 := d_t4
-    a10_b4 := d_b4
-    a10_k4 := d_k4
-    a10_f4 := d_f4
-    a10_t5 := d_t5
-    a10_b5 := d_b5
-    a10_k5 := d_k5
-    a10_f5 := d_f5
-
-if str.contains(chartId, t11)
-    a11_t1 := d_t1
-    a11_b1 := d_b1
-    a11_k1 := d_k1
-    a11_f1 := d_f1
-    a11_t2 := d_t2
-    a11_b2 := d_b2
-    a11_k2 := d_k2
-    a11_f2 := d_f2
-    a11_t3 := d_t3
-    a11_b3 := d_b3
-    a11_k3 := d_k3
-    a11_f3 := d_f3
-    a11_t4 := d_t4
-    a11_b4 := d_b4
-    a11_k4 := d_k4
-    a11_f4 := d_f4
-    a11_t5 := d_t5
-    a11_b5 := d_b5
-    a11_k5 := d_k5
-    a11_f5 := d_f5
-
-if str.contains(chartId, t12)
-    a12_t1 := d_t1
-    a12_b1 := d_b1
-    a12_k1 := d_k1
-    a12_f1 := d_f1
-    a12_t2 := d_t2
-    a12_b2 := d_b2
-    a12_k2 := d_k2
-    a12_f2 := d_f2
-    a12_t3 := d_t3
-    a12_b3 := d_b3
-    a12_k3 := d_k3
-    a12_f3 := d_f3
-    a12_t4 := d_t4
-    a12_b4 := d_b4
-    a12_k4 := d_k4
-    a12_f4 := d_f4
-    a12_t5 := d_t5
-    a12_b5 := d_b5
-    a12_k5 := d_k5
-    a12_f5 := d_f5
-
-if str.contains(chartId, t13)
-    a13_t1 := d_t1
-    a13_b1 := d_b1
-    a13_k1 := d_k1
-    a13_f1 := d_f1
-    a13_t2 := d_t2
-    a13_b2 := d_b2
-    a13_k2 := d_k2
-    a13_f2 := d_f2
-    a13_t3 := d_t3
-    a13_b3 := d_b3
-    a13_k3 := d_k3
-    a13_f3 := d_f3
-    a13_t4 := d_t4
-    a13_b4 := d_b4
-    a13_k4 := d_k4
-    a13_f4 := d_f4
-    a13_t5 := d_t5
-    a13_b5 := d_b5
-    a13_k5 := d_k5
-    a13_f5 := d_f5
-
-if str.contains(chartId, t14)
-    a14_t1 := d_t1
-    a14_b1 := d_b1
-    a14_k1 := d_k1
-    a14_f1 := d_f1
-    a14_t2 := d_t2
-    a14_b2 := d_b2
-    a14_k2 := d_k2
-    a14_f2 := d_f2
-    a14_t3 := d_t3
-    a14_b3 := d_b3
-    a14_k3 := d_k3
-    a14_f3 := d_f3
-    a14_t4 := d_t4
-    a14_b4 := d_b4
-    a14_k4 := d_k4
-    a14_f4 := d_f4
-    a14_t5 := d_t5
-    a14_b5 := d_b5
-    a14_k5 := d_k5
-    a14_f5 := d_f5
-
-if str.contains(chartId, t15)
-    a15_t1 := d_t1
-    a15_b1 := d_b1
-    a15_k1 := d_k1
-    a15_f1 := d_f1
-    a15_t2 := d_t2
-    a15_b2 := d_b2
-    a15_k2 := d_k2
-    a15_f2 := d_f2
-    a15_t3 := d_t3
-    a15_b3 := d_b3
-    a15_k3 := d_k3
-    a15_f3 := d_f3
-    a15_t4 := d_t4
-    a15_b4 := d_b4
-    a15_k4 := d_k4
-    a15_f4 := d_f4
-    a15_t5 := d_t5
-    a15_b5 := d_b5
-    a15_k5 := d_k5
-    a15_f5 := d_f5
-
-if str.contains(chartId, t16)
-    a16_t1 := d_t1
-    a16_b1 := d_b1
-    a16_k1 := d_k1
-    a16_f1 := d_f1
-    a16_t2 := d_t2
-    a16_b2 := d_b2
-    a16_k2 := d_k2
-    a16_f2 := d_f2
-    a16_t3 := d_t3
-    a16_b3 := d_b3
-    a16_k3 := d_k3
-    a16_f3 := d_f3
-    a16_t4 := d_t4
-    a16_b4 := d_b4
-    a16_k4 := d_k4
-    a16_f4 := d_f4
-    a16_t5 := d_t5
-    a16_b5 := d_b5
-    a16_k5 := d_k5
-    a16_f5 := d_f5
-
-if str.contains(chartId, t17)
-    a17_t1 := d_t1
-    a17_b1 := d_b1
-    a17_k1 := d_k1
-    a17_f1 := d_f1
-    a17_t2 := d_t2
-    a17_b2 := d_b2
-    a17_k2 := d_k2
-    a17_f2 := d_f2
-    a17_t3 := d_t3
-    a17_b3 := d_b3
-    a17_k3 := d_k3
-    a17_f3 := d_f3
-    a17_t4 := d_t4
-    a17_b4 := d_b4
-    a17_k4 := d_k4
-    a17_f4 := d_f4
-    a17_t5 := d_t5
-    a17_b5 := d_b5
-    a17_k5 := d_k5
-    a17_f5 := d_f5
-
-if str.contains(chartId, t18)
-    a18_t1 := d_t1
-    a18_b1 := d_b1
-    a18_k1 := d_k1
-    a18_f1 := d_f1
-    a18_t2 := d_t2
-    a18_b2 := d_b2
-    a18_k2 := d_k2
-    a18_f2 := d_f2
-    a18_t3 := d_t3
-    a18_b3 := d_b3
-    a18_k3 := d_k3
-    a18_f3 := d_f3
-    a18_t4 := d_t4
-    a18_b4 := d_b4
-    a18_k4 := d_k4
-    a18_f4 := d_f4
-    a18_t5 := d_t5
-    a18_b5 := d_b5
-    a18_k5 := d_k5
-    a18_f5 := d_f5
-
-if str.contains(chartId, t19)
-    a19_t1 := d_t1
-    a19_b1 := d_b1
-    a19_k1 := d_k1
-    a19_f1 := d_f1
-    a19_t2 := d_t2
-    a19_b2 := d_b2
-    a19_k2 := d_k2
-    a19_f2 := d_f2
-    a19_t3 := d_t3
-    a19_b3 := d_b3
-    a19_k3 := d_k3
-    a19_f3 := d_f3
-    a19_t4 := d_t4
-    a19_b4 := d_b4
-    a19_k4 := d_k4
-    a19_f4 := d_f4
-    a19_t5 := d_t5
-    a19_b5 := d_b5
-    a19_k5 := d_k5
-    a19_f5 := d_f5
-
-if str.contains(chartId, t20)
-    a20_t1 := d_t1
-    a20_b1 := d_b1
-    a20_k1 := d_k1
-    a20_f1 := d_f1
-    a20_t2 := d_t2
-    a20_b2 := d_b2
-    a20_k2 := d_k2
-    a20_f2 := d_f2
-    a20_t3 := d_t3
-    a20_b3 := d_b3
-    a20_k3 := d_k3
-    a20_f3 := d_f3
-    a20_t4 := d_t4
-    a20_b4 := d_b4
-    a20_k4 := d_k4
-    a20_f4 := d_f4
-    a20_t5 := d_t5
-    a20_b5 := d_b5
-    a20_k5 := d_k5
-    a20_f5 := d_f5
-
-if str.contains(chartId, t21)
-    a21_t1 := d_t1
-    a21_b1 := d_b1
-    a21_k1 := d_k1
-    a21_f1 := d_f1
-    a21_t2 := d_t2
-    a21_b2 := d_b2
-    a21_k2 := d_k2
-    a21_f2 := d_f2
-    a21_t3 := d_t3
-    a21_b3 := d_b3
-    a21_k3 := d_k3
-    a21_f3 := d_f3
-    a21_t4 := d_t4
-    a21_b4 := d_b4
-    a21_k4 := d_k4
-    a21_f4 := d_f4
-    a21_t5 := d_t5
-    a21_b5 := d_b5
-    a21_k5 := d_k5
-    a21_f5 := d_f5
-
-if str.contains(chartId, t22)
-    a22_t1 := d_t1
-    a22_b1 := d_b1
-    a22_k1 := d_k1
-    a22_f1 := d_f1
-    a22_t2 := d_t2
-    a22_b2 := d_b2
-    a22_k2 := d_k2
-    a22_f2 := d_f2
-    a22_t3 := d_t3
-    a22_b3 := d_b3
-    a22_k3 := d_k3
-    a22_f3 := d_f3
-    a22_t4 := d_t4
-    a22_b4 := d_b4
-    a22_k4 := d_k4
-    a22_f4 := d_f4
-    a22_t5 := d_t5
-    a22_b5 := d_b5
-    a22_k5 := d_k5
-    a22_f5 := d_f5
-
-if str.contains(chartId, t23)
-    a23_t1 := d_t1
-    a23_b1 := d_b1
-    a23_k1 := d_k1
-    a23_f1 := d_f1
-    a23_t2 := d_t2
-    a23_b2 := d_b2
-    a23_k2 := d_k2
-    a23_f2 := d_f2
-    a23_t3 := d_t3
-    a23_b3 := d_b3
-    a23_k3 := d_k3
-    a23_f3 := d_f3
-    a23_t4 := d_t4
-    a23_b4 := d_b4
-    a23_k4 := d_k4
-    a23_f4 := d_f4
-    a23_t5 := d_t5
-    a23_b5 := d_b5
-    a23_k5 := d_k5
-    a23_f5 := d_f5
-
-if str.contains(chartId, t24)
-    a24_t1 := d_t1
-    a24_b1 := d_b1
-    a24_k1 := d_k1
-    a24_f1 := d_f1
-    a24_t2 := d_t2
-    a24_b2 := d_b2
-    a24_k2 := d_k2
-    a24_f2 := d_f2
-    a24_t3 := d_t3
-    a24_b3 := d_b3
-    a24_k3 := d_k3
-    a24_f3 := d_f3
-    a24_t4 := d_t4
-    a24_b4 := d_b4
-    a24_k4 := d_k4
-    a24_f4 := d_f4
-    a24_t5 := d_t5
-    a24_b5 := d_b5
-    a24_k5 := d_k5
-    a24_f5 := d_f5
-
-if str.contains(chartId, t25)
-    a25_t1 := d_t1
-    a25_b1 := d_b1
-    a25_k1 := d_k1
-    a25_f1 := d_f1
-    a25_t2 := d_t2
-    a25_b2 := d_b2
-    a25_k2 := d_k2
-    a25_f2 := d_f2
-    a25_t3 := d_t3
-    a25_b3 := d_b3
-    a25_k3 := d_k3
-    a25_f3 := d_f3
-    a25_t4 := d_t4
-    a25_b4 := d_b4
-    a25_k4 := d_k4
-    a25_f4 := d_f4
-    a25_t5 := d_t5
-    a25_b5 := d_b5
-    a25_k5 := d_k5
-    a25_f5 := d_f5
-
-if str.contains(chartId, t26)
-    a26_t1 := d_t1
-    a26_b1 := d_b1
-    a26_k1 := d_k1
-    a26_f1 := d_f1
-    a26_t2 := d_t2
-    a26_b2 := d_b2
-    a26_k2 := d_k2
-    a26_f2 := d_f2
-    a26_t3 := d_t3
-    a26_b3 := d_b3
-    a26_k3 := d_k3
-    a26_f3 := d_f3
-    a26_t4 := d_t4
-    a26_b4 := d_b4
-    a26_k4 := d_k4
-    a26_f4 := d_f4
-    a26_t5 := d_t5
-    a26_b5 := d_b5
-    a26_k5 := d_k5
-    a26_f5 := d_f5
-
-if str.contains(chartId, t27)
-    a27_t1 := d_t1
-    a27_b1 := d_b1
-    a27_k1 := d_k1
-    a27_f1 := d_f1
-    a27_t2 := d_t2
-    a27_b2 := d_b2
-    a27_k2 := d_k2
-    a27_f2 := d_f2
-    a27_t3 := d_t3
-    a27_b3 := d_b3
-    a27_k3 := d_k3
-    a27_f3 := d_f3
-    a27_t4 := d_t4
-    a27_b4 := d_b4
-    a27_k4 := d_k4
-    a27_f4 := d_f4
-    a27_t5 := d_t5
-    a27_b5 := d_b5
-    a27_k5 := d_k5
-    a27_f5 := d_f5
-
-if str.contains(chartId, t28)
-    a28_t1 := d_t1
-    a28_b1 := d_b1
-    a28_k1 := d_k1
-    a28_f1 := d_f1
-    a28_t2 := d_t2
-    a28_b2 := d_b2
-    a28_k2 := d_k2
-    a28_f2 := d_f2
-    a28_t3 := d_t3
-    a28_b3 := d_b3
-    a28_k3 := d_k3
-    a28_f3 := d_f3
-    a28_t4 := d_t4
-    a28_b4 := d_b4
-    a28_k4 := d_k4
-    a28_f4 := d_f4
-    a28_t5 := d_t5
-    a28_b5 := d_b5
-    a28_k5 := d_k5
-    a28_f5 := d_f5
-
-if str.contains(chartId, t29)
-    a29_t1 := d_t1
-    a29_b1 := d_b1
-    a29_k1 := d_k1
-    a29_f1 := d_f1
-    a29_t2 := d_t2
-    a29_b2 := d_b2
-    a29_k2 := d_k2
-    a29_f2 := d_f2
-    a29_t3 := d_t3
-    a29_b3 := d_b3
-    a29_k3 := d_k3
-    a29_f3 := d_f3
-    a29_t4 := d_t4
-    a29_b4 := d_b4
-    a29_k4 := d_k4
-    a29_f4 := d_f4
-    a29_t5 := d_t5
-    a29_b5 := d_b5
-    a29_k5 := d_k5
-    a29_f5 := d_f5
 
 // ==========================================
-// 6. TABLE RENDERING
+// 6. TABLE RENDERING (parses CSV strings on the last bar, shows displayTolIdx slice)
 // ==========================================
 position_of(string s) =>
     s == "top_right"     ? position.top_right     :
@@ -1020,23 +518,38 @@ position_of(string s) =>
 text_size_of(string s) =>
     s == "tiny" ? size.tiny : s == "small" ? size.small : size.normal
 
-// 30 rows = 1 header + 29 tickers; 6 cols = ticker name + 5 MAs
 var table tbl = table.new(position_of(tablePos), 6, 30, bgcolor=color.new(color.black, 70), border_width=1, border_color=color.new(color.gray, 60))
 
-// Renderiza uma célula (Bounce% + n=Total). Highlight verde se for o "best" da linha.
+// Parses one ticker's CSV string and returns the (T, B, Bk, F) tuple for the
+// requested (tol_idx, ma_idx). Order in the CSV: tol outer × ma middle × metric inner.
+parse_cell(string csv, int tol_idx, int ma_idx) =>
+    string[] arr = str.split(csv, ",")
+    int start = tol_idx * 20 + ma_idx * 4
+    int n = array.size(arr)
+    int t = start     < n ? math.round(str.tonumber(array.get(arr, start)))     : 0
+    int b = start + 1 < n ? math.round(str.tonumber(array.get(arr, start + 1))) : 0
+    int k = start + 2 < n ? math.round(str.tonumber(array.get(arr, start + 2))) : 0
+    int f = start + 3 < n ? math.round(str.tonumber(array.get(arr, start + 3))) : 0
+    [t, b, k, f]
+
 fmt_cell(int col_idx, int row_idx, int t, float r, int best_col, string sz) =>
     if t == 0
         table.cell(tbl, col_idx, row_idx, "—", text_color=color.new(color.gray, 30), bgcolor=color.new(color.black, 90), text_size=sz)
     else
-        string txt = str.tostring(math.round(r, 1)) + "%\nn=" + str.tostring(t)
+        string txt = compactMode ? (str.tostring(math.round(r, 1)) + "%") : (str.tostring(math.round(r, 1)) + "%\nn=" + str.tostring(t))
         bool is_best = col_idx == best_col
         color bg = is_best ? color.new(color.green, 60) : color.new(color.black, 90)
         color fg = is_best ? color.new(color.lime, 0)   : color.new(color.white, 0)
         table.cell(tbl, col_idx, row_idx, txt, text_color=fg, bgcolor=bg, text_size=sz)
 
-// Renderiza uma linha completa, calcula o "best Bounce%" considerando minSampleHL
-render_row(int row, string name, int t1, int b1, int t2, int b2, int t3, int b3, int t4, int b4, int t5, int b5, string sz) =>
+render_row_from_csv(int row, string name, string csv, int tol_idx, string sz) =>
     table.cell(tbl, 0, row, name, text_color=color.new(color.white, 0), bgcolor=color.new(color.black, 50), text_size=sz)
+
+    [t1, b1, _k1, _f1] = parse_cell(csv, tol_idx, 0)
+    [t2, b2, _k2, _f2] = parse_cell(csv, tol_idx, 1)
+    [t3, b3, _k3, _f3] = parse_cell(csv, tol_idx, 2)
+    [t4, b4, _k4, _f4] = parse_cell(csv, tol_idx, 3)
+    [t5, b5, _k5, _f5] = parse_cell(csv, tol_idx, 4)
 
     float r1 = t1 > 0 ? b1 * 100.0 / t1 : -1.0
     float r2 = t2 > 0 ? b2 * 100.0 / t2 : -1.0
@@ -1070,14 +583,25 @@ render_row(int row, string name, int t1, int b1, int t2, int b2, int t3, int b3,
 
 if barstate.islast
     string sz = tableTextSize
+    int    di = displayTolIdx
 
-    // Header — MA name + tolerance applied on this TF (auto-resolved)
-    string tf_label = "[" + timeframe.period + "]"
-    string tol_label_1 = "\n±" + str.tostring(get_tol(0)) + "%"
-    string tol_label_2 = "\n±" + str.tostring(get_tol(1)) + "%"
-    string tol_label_3 = "\n±" + str.tostring(get_tol(2)) + "%"
-    string tol_label_4 = "\n±" + str.tostring(get_tol(3)) + "%"
-    string tol_label_5 = get_tol(4) > 0 ? ("\n±" + str.tostring(get_tol(4)) + "%") : "\n(skip)"
+    string tf_label = "[" + timeframe.period + " · tol idx " + str.tostring(di) + "]"
+    [_g1_0, _g1_1, _g1_2, _g1_3, _g1_4] = get_tol_grid(0)
+    [_g2_0, _g2_1, _g2_2, _g2_3, _g2_4] = get_tol_grid(1)
+    [_g3_0, _g3_1, _g3_2, _g3_3, _g3_4] = get_tol_grid(2)
+    [_g4_0, _g4_1, _g4_2, _g4_3, _g4_4] = get_tol_grid(3)
+    [_g5_0, _g5_1, _g5_2, _g5_3, _g5_4] = get_tol_grid(4)
+    float vis_t1 = di == 0 ? _g1_0 : di == 1 ? _g1_1 : di == 2 ? _g1_2 : di == 3 ? _g1_3 : _g1_4
+    float vis_t2 = di == 0 ? _g2_0 : di == 1 ? _g2_1 : di == 2 ? _g2_2 : di == 3 ? _g2_3 : _g2_4
+    float vis_t3 = di == 0 ? _g3_0 : di == 1 ? _g3_1 : di == 2 ? _g3_2 : di == 3 ? _g3_3 : _g3_4
+    float vis_t4 = di == 0 ? _g4_0 : di == 1 ? _g4_1 : di == 2 ? _g4_2 : di == 3 ? _g4_3 : _g4_4
+    float vis_t5 = di == 0 ? _g5_0 : di == 1 ? _g5_1 : di == 2 ? _g5_2 : di == 3 ? _g5_3 : _g5_4
+
+    string tol_label_1 = "\n±" + str.tostring(vis_t1) + "%"
+    string tol_label_2 = "\n±" + str.tostring(vis_t2) + "%"
+    string tol_label_3 = "\n±" + str.tostring(vis_t3) + "%"
+    string tol_label_4 = "\n±" + str.tostring(vis_t4) + "%"
+    string tol_label_5 = vis_t5 > 0 ? ("\n±" + str.tostring(vis_t5) + "%") : "\n(skip)"
     table.cell(tbl, 0, 0, "Ticker " + tf_label, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
     table.cell(tbl, 1, 0, "EMA " + str.tostring(ema_fast_p) + tol_label_1, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
     table.cell(tbl, 2, 0, "EMA " + str.tostring(ema_slow_p) + tol_label_2, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
@@ -1085,84 +609,91 @@ if barstate.islast
     table.cell(tbl, 4, 0, "SMA " + str.tostring(sma_long_p) + tol_label_4, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
     table.cell(tbl, 5, 0, "VWAP"                            + tol_label_5, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
 
-    // 29 ticker rows
-    render_row( 1, n01, a01_t1,a01_b1, a01_t2,a01_b2, a01_t3,a01_b3, a01_t4,a01_b4, a01_t5,a01_b5, sz)
-    render_row( 2, n02, a02_t1,a02_b1, a02_t2,a02_b2, a02_t3,a02_b3, a02_t4,a02_b4, a02_t5,a02_b5, sz)
-    render_row( 3, n03, a03_t1,a03_b1, a03_t2,a03_b2, a03_t3,a03_b3, a03_t4,a03_b4, a03_t5,a03_b5, sz)
-    render_row( 4, n04, a04_t1,a04_b1, a04_t2,a04_b2, a04_t3,a04_b3, a04_t4,a04_b4, a04_t5,a04_b5, sz)
-    render_row( 5, n05, a05_t1,a05_b1, a05_t2,a05_b2, a05_t3,a05_b3, a05_t4,a05_b4, a05_t5,a05_b5, sz)
-    render_row( 6, n06, a06_t1,a06_b1, a06_t2,a06_b2, a06_t3,a06_b3, a06_t4,a06_b4, a06_t5,a06_b5, sz)
-    render_row( 7, n07, a07_t1,a07_b1, a07_t2,a07_b2, a07_t3,a07_b3, a07_t4,a07_b4, a07_t5,a07_b5, sz)
-    render_row( 8, n08, a08_t1,a08_b1, a08_t2,a08_b2, a08_t3,a08_b3, a08_t4,a08_b4, a08_t5,a08_b5, sz)
-    render_row( 9, n09, a09_t1,a09_b1, a09_t2,a09_b2, a09_t3,a09_b3, a09_t4,a09_b4, a09_t5,a09_b5, sz)
-    render_row(10, n10, a10_t1,a10_b1, a10_t2,a10_b2, a10_t3,a10_b3, a10_t4,a10_b4, a10_t5,a10_b5, sz)
-    render_row(11, n11, a11_t1,a11_b1, a11_t2,a11_b2, a11_t3,a11_b3, a11_t4,a11_b4, a11_t5,a11_b5, sz)
-    render_row(12, n12, a12_t1,a12_b1, a12_t2,a12_b2, a12_t3,a12_b3, a12_t4,a12_b4, a12_t5,a12_b5, sz)
-    render_row(13, n13, a13_t1,a13_b1, a13_t2,a13_b2, a13_t3,a13_b3, a13_t4,a13_b4, a13_t5,a13_b5, sz)
-    render_row(14, n14, a14_t1,a14_b1, a14_t2,a14_b2, a14_t3,a14_b3, a14_t4,a14_b4, a14_t5,a14_b5, sz)
-    render_row(15, n15, a15_t1,a15_b1, a15_t2,a15_b2, a15_t3,a15_b3, a15_t4,a15_b4, a15_t5,a15_b5, sz)
-    render_row(16, n16, a16_t1,a16_b1, a16_t2,a16_b2, a16_t3,a16_b3, a16_t4,a16_b4, a16_t5,a16_b5, sz)
-    render_row(17, n17, a17_t1,a17_b1, a17_t2,a17_b2, a17_t3,a17_b3, a17_t4,a17_b4, a17_t5,a17_b5, sz)
-    render_row(18, n18, a18_t1,a18_b1, a18_t2,a18_b2, a18_t3,a18_b3, a18_t4,a18_b4, a18_t5,a18_b5, sz)
-    render_row(19, n19, a19_t1,a19_b1, a19_t2,a19_b2, a19_t3,a19_b3, a19_t4,a19_b4, a19_t5,a19_b5, sz)
-    render_row(20, n20, a20_t1,a20_b1, a20_t2,a20_b2, a20_t3,a20_b3, a20_t4,a20_b4, a20_t5,a20_b5, sz)
-    render_row(21, n21, a21_t1,a21_b1, a21_t2,a21_b2, a21_t3,a21_b3, a21_t4,a21_b4, a21_t5,a21_b5, sz)
-    render_row(22, n22, a22_t1,a22_b1, a22_t2,a22_b2, a22_t3,a22_b3, a22_t4,a22_b4, a22_t5,a22_b5, sz)
-    render_row(23, n23, a23_t1,a23_b1, a23_t2,a23_b2, a23_t3,a23_b3, a23_t4,a23_b4, a23_t5,a23_b5, sz)
-    render_row(24, n24, a24_t1,a24_b1, a24_t2,a24_b2, a24_t3,a24_b3, a24_t4,a24_b4, a24_t5,a24_b5, sz)
-    render_row(25, n25, a25_t1,a25_b1, a25_t2,a25_b2, a25_t3,a25_b3, a25_t4,a25_b4, a25_t5,a25_b5, sz)
-    render_row(26, n26, a26_t1,a26_b1, a26_t2,a26_b2, a26_t3,a26_b3, a26_t4,a26_b4, a26_t5,a26_b5, sz)
-    render_row(27, n27, a27_t1,a27_b1, a27_t2,a27_b2, a27_t3,a27_b3, a27_t4,a27_b4, a27_t5,a27_b5, sz)
-    render_row(28, n28, a28_t1,a28_b1, a28_t2,a28_b2, a28_t3,a28_b3, a28_t4,a28_b4, a28_t5,a28_b5, sz)
-    render_row(29, n29, a29_t1,a29_b1, a29_t2,a29_b2, a29_t3,a29_b3, a29_t4,a29_b4, a29_t5,a29_b5, sz)
+    render_row_from_csv( 1, n01, aa01, di, sz)
+    render_row_from_csv( 2, n02, aa02, di, sz)
+    render_row_from_csv( 3, n03, aa03, di, sz)
+    render_row_from_csv( 4, n04, aa04, di, sz)
+    render_row_from_csv( 5, n05, aa05, di, sz)
+    render_row_from_csv( 6, n06, aa06, di, sz)
+    render_row_from_csv( 7, n07, aa07, di, sz)
+    render_row_from_csv( 8, n08, aa08, di, sz)
+    render_row_from_csv( 9, n09, aa09, di, sz)
+    render_row_from_csv(10, n10, aa10, di, sz)
+    render_row_from_csv(11, n11, aa11, di, sz)
+    render_row_from_csv(12, n12, aa12, di, sz)
+    render_row_from_csv(13, n13, aa13, di, sz)
+    render_row_from_csv(14, n14, aa14, di, sz)
+    render_row_from_csv(15, n15, aa15, di, sz)
+    render_row_from_csv(16, n16, aa16, di, sz)
+    render_row_from_csv(17, n17, aa17, di, sz)
+    render_row_from_csv(18, n18, aa18, di, sz)
+    render_row_from_csv(19, n19, aa19, di, sz)
+    render_row_from_csv(20, n20, aa20, di, sz)
+    render_row_from_csv(21, n21, aa21, di, sz)
+    render_row_from_csv(22, n22, aa22, di, sz)
+    render_row_from_csv(23, n23, aa23, di, sz)
+    render_row_from_csv(24, n24, aa24, di, sz)
+    render_row_from_csv(25, n25, aa25, di, sz)
+    render_row_from_csv(26, n26, aa26, di, sz)
+    render_row_from_csv(27, n27, aa27, di, sz)
+    render_row_from_csv(28, n28, aa28, di, sz)
+    render_row_from_csv(29, n29, aa29, di, sz)
 
 // ==========================================
-// 7. FRIDAY CLOSE SNAPSHOT ALERT
+// 7. SNAPSHOT EXPORT
 // ==========================================
-// Empacota Total/Bounce/Break/False de 1 ticker (5 MAs = 20 ints) em CSV
-ticker_csv(int t1, int b1, int k1, int f1, int t2, int b2, int k2, int f2, int t3, int b3, int k3, int f3, int t4, int b4, int k4, int f4, int t5, int b5, int k5, int f5) =>
-    str.tostring(t1) + "," + str.tostring(b1) + "," + str.tostring(k1) + "," + str.tostring(f1) + "," + str.tostring(t2) + "," + str.tostring(b2) + "," + str.tostring(k2) + "," + str.tostring(f2) + "," + str.tostring(t3) + "," + str.tostring(b3) + "," + str.tostring(k3) + "," + str.tostring(f3) + "," + str.tostring(t4) + "," + str.tostring(b4) + "," + str.tostring(k4) + "," + str.tostring(f4) + "," + str.tostring(t5) + "," + str.tostring(b5) + "," + str.tostring(k5) + "," + str.tostring(f5)
-
-// Trigger conditions
-// - must_log: imprime no Pine Logs assim que o chart carrega (modo manual, copy/paste)
-// - must_alert: dispara webhook na Sexta D1 close (modo automatizado, requer alert configurado)
+// Schema v13 (new): {"d":"...", "tf":"...", "ma":[...], "tol_grid":{MA:[v0..v4],...}, "data":{TICKER:[100 ints]}}
+// The 100 ints per ticker follow tol_idx outer × ma_idx middle × metric (T,B,Bk,F) inner.
+// Backend supports both v13 and v12.x (legacy "tolerances" with 20 ints/ticker).
 is_friday_close = dayofweek == dayofweek.friday and timeframe.period == "D"
 must_log        = printSnapshot and barstate.islast
 must_alert      = enableAlert  and is_friday_close
 
+// Serialize a single tol grid (5 floats) as JSON array.
+fmt_grid(float v0, float v1, float v2, float v3, float v4) =>
+    "[" + str.tostring(v0) + "," + str.tostring(v1) + "," + str.tostring(v2) + "," + str.tostring(v3) + "," + str.tostring(v4) + "]"
+
 if must_log or must_alert
-    string tol_csv = str.tostring(get_tol(0)) + "," + str.tostring(get_tol(1)) + "," + str.tostring(get_tol(2)) + "," + str.tostring(get_tol(3)) + "," + str.tostring(get_tol(4))
-    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tolerances\":[" + tol_csv + "],\"data\":{"
+    [eg1_0, eg1_1, eg1_2, eg1_3, eg1_4] = get_tol_grid(0)
+    [eg2_0, eg2_1, eg2_2, eg2_3, eg2_4] = get_tol_grid(1)
+    [eg3_0, eg3_1, eg3_2, eg3_3, eg3_4] = get_tol_grid(2)
+    [eg4_0, eg4_1, eg4_2, eg4_3, eg4_4] = get_tol_grid(3)
+    [eg5_0, eg5_1, eg5_2, eg5_3, eg5_4] = get_tol_grid(4)
+
+    string tol_grid_json = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + "}"
+
+    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json + ",\"schema\":\"v13\",\"data\":{"
+
     string body = ""
-    body := body + "\""+n01+"\":["+ticker_csv(a01_t1,a01_b1,a01_k1,a01_f1,a01_t2,a01_b2,a01_k2,a01_f2,a01_t3,a01_b3,a01_k3,a01_f3,a01_t4,a01_b4,a01_k4,a01_f4,a01_t5,a01_b5,a01_k5,a01_f5)+"]"
-    body := body + ",\""+n02+"\":["+ticker_csv(a02_t1,a02_b1,a02_k1,a02_f1,a02_t2,a02_b2,a02_k2,a02_f2,a02_t3,a02_b3,a02_k3,a02_f3,a02_t4,a02_b4,a02_k4,a02_f4,a02_t5,a02_b5,a02_k5,a02_f5)+"]"
-    body := body + ",\""+n03+"\":["+ticker_csv(a03_t1,a03_b1,a03_k1,a03_f1,a03_t2,a03_b2,a03_k2,a03_f2,a03_t3,a03_b3,a03_k3,a03_f3,a03_t4,a03_b4,a03_k4,a03_f4,a03_t5,a03_b5,a03_k5,a03_f5)+"]"
-    body := body + ",\""+n04+"\":["+ticker_csv(a04_t1,a04_b1,a04_k1,a04_f1,a04_t2,a04_b2,a04_k2,a04_f2,a04_t3,a04_b3,a04_k3,a04_f3,a04_t4,a04_b4,a04_k4,a04_f4,a04_t5,a04_b5,a04_k5,a04_f5)+"]"
-    body := body + ",\""+n05+"\":["+ticker_csv(a05_t1,a05_b1,a05_k1,a05_f1,a05_t2,a05_b2,a05_k2,a05_f2,a05_t3,a05_b3,a05_k3,a05_f3,a05_t4,a05_b4,a05_k4,a05_f4,a05_t5,a05_b5,a05_k5,a05_f5)+"]"
-    body := body + ",\""+n06+"\":["+ticker_csv(a06_t1,a06_b1,a06_k1,a06_f1,a06_t2,a06_b2,a06_k2,a06_f2,a06_t3,a06_b3,a06_k3,a06_f3,a06_t4,a06_b4,a06_k4,a06_f4,a06_t5,a06_b5,a06_k5,a06_f5)+"]"
-    body := body + ",\""+n07+"\":["+ticker_csv(a07_t1,a07_b1,a07_k1,a07_f1,a07_t2,a07_b2,a07_k2,a07_f2,a07_t3,a07_b3,a07_k3,a07_f3,a07_t4,a07_b4,a07_k4,a07_f4,a07_t5,a07_b5,a07_k5,a07_f5)+"]"
-    body := body + ",\""+n08+"\":["+ticker_csv(a08_t1,a08_b1,a08_k1,a08_f1,a08_t2,a08_b2,a08_k2,a08_f2,a08_t3,a08_b3,a08_k3,a08_f3,a08_t4,a08_b4,a08_k4,a08_f4,a08_t5,a08_b5,a08_k5,a08_f5)+"]"
-    body := body + ",\""+n09+"\":["+ticker_csv(a09_t1,a09_b1,a09_k1,a09_f1,a09_t2,a09_b2,a09_k2,a09_f2,a09_t3,a09_b3,a09_k3,a09_f3,a09_t4,a09_b4,a09_k4,a09_f4,a09_t5,a09_b5,a09_k5,a09_f5)+"]"
-    body := body + ",\""+n10+"\":["+ticker_csv(a10_t1,a10_b1,a10_k1,a10_f1,a10_t2,a10_b2,a10_k2,a10_f2,a10_t3,a10_b3,a10_k3,a10_f3,a10_t4,a10_b4,a10_k4,a10_f4,a10_t5,a10_b5,a10_k5,a10_f5)+"]"
-    body := body + ",\""+n11+"\":["+ticker_csv(a11_t1,a11_b1,a11_k1,a11_f1,a11_t2,a11_b2,a11_k2,a11_f2,a11_t3,a11_b3,a11_k3,a11_f3,a11_t4,a11_b4,a11_k4,a11_f4,a11_t5,a11_b5,a11_k5,a11_f5)+"]"
-    body := body + ",\""+n12+"\":["+ticker_csv(a12_t1,a12_b1,a12_k1,a12_f1,a12_t2,a12_b2,a12_k2,a12_f2,a12_t3,a12_b3,a12_k3,a12_f3,a12_t4,a12_b4,a12_k4,a12_f4,a12_t5,a12_b5,a12_k5,a12_f5)+"]"
-    body := body + ",\""+n13+"\":["+ticker_csv(a13_t1,a13_b1,a13_k1,a13_f1,a13_t2,a13_b2,a13_k2,a13_f2,a13_t3,a13_b3,a13_k3,a13_f3,a13_t4,a13_b4,a13_k4,a13_f4,a13_t5,a13_b5,a13_k5,a13_f5)+"]"
-    body := body + ",\""+n14+"\":["+ticker_csv(a14_t1,a14_b1,a14_k1,a14_f1,a14_t2,a14_b2,a14_k2,a14_f2,a14_t3,a14_b3,a14_k3,a14_f3,a14_t4,a14_b4,a14_k4,a14_f4,a14_t5,a14_b5,a14_k5,a14_f5)+"]"
-    body := body + ",\""+n15+"\":["+ticker_csv(a15_t1,a15_b1,a15_k1,a15_f1,a15_t2,a15_b2,a15_k2,a15_f2,a15_t3,a15_b3,a15_k3,a15_f3,a15_t4,a15_b4,a15_k4,a15_f4,a15_t5,a15_b5,a15_k5,a15_f5)+"]"
-    body := body + ",\""+n16+"\":["+ticker_csv(a16_t1,a16_b1,a16_k1,a16_f1,a16_t2,a16_b2,a16_k2,a16_f2,a16_t3,a16_b3,a16_k3,a16_f3,a16_t4,a16_b4,a16_k4,a16_f4,a16_t5,a16_b5,a16_k5,a16_f5)+"]"
-    body := body + ",\""+n17+"\":["+ticker_csv(a17_t1,a17_b1,a17_k1,a17_f1,a17_t2,a17_b2,a17_k2,a17_f2,a17_t3,a17_b3,a17_k3,a17_f3,a17_t4,a17_b4,a17_k4,a17_f4,a17_t5,a17_b5,a17_k5,a17_f5)+"]"
-    body := body + ",\""+n18+"\":["+ticker_csv(a18_t1,a18_b1,a18_k1,a18_f1,a18_t2,a18_b2,a18_k2,a18_f2,a18_t3,a18_b3,a18_k3,a18_f3,a18_t4,a18_b4,a18_k4,a18_f4,a18_t5,a18_b5,a18_k5,a18_f5)+"]"
-    body := body + ",\""+n19+"\":["+ticker_csv(a19_t1,a19_b1,a19_k1,a19_f1,a19_t2,a19_b2,a19_k2,a19_f2,a19_t3,a19_b3,a19_k3,a19_f3,a19_t4,a19_b4,a19_k4,a19_f4,a19_t5,a19_b5,a19_k5,a19_f5)+"]"
-    body := body + ",\""+n20+"\":["+ticker_csv(a20_t1,a20_b1,a20_k1,a20_f1,a20_t2,a20_b2,a20_k2,a20_f2,a20_t3,a20_b3,a20_k3,a20_f3,a20_t4,a20_b4,a20_k4,a20_f4,a20_t5,a20_b5,a20_k5,a20_f5)+"]"
-    body := body + ",\""+n21+"\":["+ticker_csv(a21_t1,a21_b1,a21_k1,a21_f1,a21_t2,a21_b2,a21_k2,a21_f2,a21_t3,a21_b3,a21_k3,a21_f3,a21_t4,a21_b4,a21_k4,a21_f4,a21_t5,a21_b5,a21_k5,a21_f5)+"]"
-    body := body + ",\""+n22+"\":["+ticker_csv(a22_t1,a22_b1,a22_k1,a22_f1,a22_t2,a22_b2,a22_k2,a22_f2,a22_t3,a22_b3,a22_k3,a22_f3,a22_t4,a22_b4,a22_k4,a22_f4,a22_t5,a22_b5,a22_k5,a22_f5)+"]"
-    body := body + ",\""+n23+"\":["+ticker_csv(a23_t1,a23_b1,a23_k1,a23_f1,a23_t2,a23_b2,a23_k2,a23_f2,a23_t3,a23_b3,a23_k3,a23_f3,a23_t4,a23_b4,a23_k4,a23_f4,a23_t5,a23_b5,a23_k5,a23_f5)+"]"
-    body := body + ",\""+n24+"\":["+ticker_csv(a24_t1,a24_b1,a24_k1,a24_f1,a24_t2,a24_b2,a24_k2,a24_f2,a24_t3,a24_b3,a24_k3,a24_f3,a24_t4,a24_b4,a24_k4,a24_f4,a24_t5,a24_b5,a24_k5,a24_f5)+"]"
-    body := body + ",\""+n25+"\":["+ticker_csv(a25_t1,a25_b1,a25_k1,a25_f1,a25_t2,a25_b2,a25_k2,a25_f2,a25_t3,a25_b3,a25_k3,a25_f3,a25_t4,a25_b4,a25_k4,a25_f4,a25_t5,a25_b5,a25_k5,a25_f5)+"]"
-    body := body + ",\""+n26+"\":["+ticker_csv(a26_t1,a26_b1,a26_k1,a26_f1,a26_t2,a26_b2,a26_k2,a26_f2,a26_t3,a26_b3,a26_k3,a26_f3,a26_t4,a26_b4,a26_k4,a26_f4,a26_t5,a26_b5,a26_k5,a26_f5)+"]"
-    body := body + ",\""+n27+"\":["+ticker_csv(a27_t1,a27_b1,a27_k1,a27_f1,a27_t2,a27_b2,a27_k2,a27_f2,a27_t3,a27_b3,a27_k3,a27_f3,a27_t4,a27_b4,a27_k4,a27_f4,a27_t5,a27_b5,a27_k5,a27_f5)+"]"
-    body := body + ",\""+n28+"\":["+ticker_csv(a28_t1,a28_b1,a28_k1,a28_f1,a28_t2,a28_b2,a28_k2,a28_f2,a28_t3,a28_b3,a28_k3,a28_f3,a28_t4,a28_b4,a28_k4,a28_f4,a28_t5,a28_b5,a28_k5,a28_f5)+"]"
-    body := body + ",\""+n29+"\":["+ticker_csv(a29_t1,a29_b1,a29_k1,a29_f1,a29_t2,a29_b2,a29_k2,a29_f2,a29_t3,a29_b3,a29_k3,a29_f3,a29_t4,a29_b4,a29_k4,a29_f4,a29_t5,a29_b5,a29_k5,a29_f5)+"]"
+    body := body + "\""+n01+"\":["+aa01+"]"
+    body := body + ",\""+n02+"\":["+aa02+"]"
+    body := body + ",\""+n03+"\":["+aa03+"]"
+    body := body + ",\""+n04+"\":["+aa04+"]"
+    body := body + ",\""+n05+"\":["+aa05+"]"
+    body := body + ",\""+n06+"\":["+aa06+"]"
+    body := body + ",\""+n07+"\":["+aa07+"]"
+    body := body + ",\""+n08+"\":["+aa08+"]"
+    body := body + ",\""+n09+"\":["+aa09+"]"
+    body := body + ",\""+n10+"\":["+aa10+"]"
+    body := body + ",\""+n11+"\":["+aa11+"]"
+    body := body + ",\""+n12+"\":["+aa12+"]"
+    body := body + ",\""+n13+"\":["+aa13+"]"
+    body := body + ",\""+n14+"\":["+aa14+"]"
+    body := body + ",\""+n15+"\":["+aa15+"]"
+    body := body + ",\""+n16+"\":["+aa16+"]"
+    body := body + ",\""+n17+"\":["+aa17+"]"
+    body := body + ",\""+n18+"\":["+aa18+"]"
+    body := body + ",\""+n19+"\":["+aa19+"]"
+    body := body + ",\""+n20+"\":["+aa20+"]"
+    body := body + ",\""+n21+"\":["+aa21+"]"
+    body := body + ",\""+n22+"\":["+aa22+"]"
+    body := body + ",\""+n23+"\":["+aa23+"]"
+    body := body + ",\""+n24+"\":["+aa24+"]"
+    body := body + ",\""+n25+"\":["+aa25+"]"
+    body := body + ",\""+n26+"\":["+aa26+"]"
+    body := body + ",\""+n27+"\":["+aa27+"]"
+    body := body + ",\""+n28+"\":["+aa28+"]"
+    body := body + ",\""+n29+"\":["+aa29+"]"
 
     string payload = head + body + "}}"
     if must_log
@@ -1173,22 +704,12 @@ if must_log or must_alert
 // ==========================================
 // 8. DIRECT-CHART PARITY TEST (bypasses request.security)
 // ==========================================
-// Runs the SAME state machine directly on the chart's symbol (no request.security
-// wrapper). Use this to isolate whether the discrepancy vs OS [ST] comes from
-// request.security history-leak / initialization quirks.
-//
-// HOW TO USE:
-//   1. Enable "Enable event log" in the Debug group.
-//   2. Set "MA to log" to the MA you want to validate (e.g., SMA200).
-//   3. Set "Override tolerance" to the same value used in OS [ST] (e.g., 0.4).
-//   4. Open Pine Logs. Compare:
-//      - "DIRECT-<MA>" lines  → no request.security path
-//      - "<MA>" lines          → via request.security (for the same ticker, if it matches dbgTicker)
-//   5. If DIRECT matches OS [ST] but the request.security path doesn't, the bug is in the wrapper.
-
+// Runs the SAME state machine directly on the chart's symbol using (dbgMA, dbgTolIdx)
+// to isolate whether discrepancy vs OS [ST] comes from the request.security wrapper.
 if dbgEnable
-    int dbg_idx = dbgMA == "EMA9" ? 0 : dbgMA == "EMA20" ? 1 : dbgMA == "SMA50" ? 2 : dbgMA == "SMA200" ? 3 : 4
-    float dbg_tol = approxOverride > 0.0 ? approxOverride : get_tol(dbg_idx)
+    int dbg_ma_idx = dbgMA == "EMA9" ? 0 : dbgMA == "EMA20" ? 1 : dbgMA == "SMA50" ? 2 : dbgMA == "SMA200" ? 3 : 4
+    [_dg0, _dg1, _dg2, _dg3, _dg4] = get_tol_grid(dbg_ma_idx)
+    float dbg_tol = dbgTolIdx == 0 ? _dg0 : dbgTolIdx == 1 ? _dg1 : dbgTolIdx == 2 ? _dg2 : dbgTolIdx == 3 ? _dg3 : _dg4
 
     float dbg_ma = dbgMA == "EMA9"   ? ta.ema(close, ema_fast_p) :
                    dbgMA == "EMA20"  ? ta.ema(close, ema_slow_p) :
@@ -1196,7 +717,6 @@ if dbgEnable
                    dbgMA == "SMA200" ? ta.sma(close, sma_long_p) :
                                        ta.vwap
 
-    // Squeeze (identical params to run_full)
     [_dm, _dub, _dlb] = ta.bb(close, 20, 2.0)
     _dbk  = ta.sma(close, 20)
     _drk  = ta.tr(true)
@@ -1205,7 +725,7 @@ if dbgEnable
     _dlkc = _dbk - _dark * 1.5
     bool dbg_sqz = (_dub < _dukc) and (_dlb > _dlkc)
 
-    [d_t, d_b, d_k, d_f] = run_sm(dbg_ma, dbg_sqz, dbg_tol > 0 ? dbg_tol : 0.0001, true, "DIRECT-" + dbgMA)
+    [d_t, d_b, d_k, d_f] = run_sm(dbg_ma, dbg_sqz, dbg_tol > 0 ? dbg_tol : 0.0001, true, "DIRECT-" + dbgMA + "[" + str.tostring(dbgTolIdx) + "]")
 
     if barstate.islast
-        log.info("=== DIRECT-CHART | " + syminfo.ticker + " " + timeframe.period + " " + dbgMA + " tol=" + str.tostring(dbg_tol) + "% | Total=" + str.tostring(d_t) + " Bounce=" + str.tostring(d_b) + " Break=" + str.tostring(d_k) + " False=" + str.tostring(d_f) + " ===")
+        log.info("=== DIRECT-CHART | " + syminfo.ticker + " " + timeframe.period + " " + dbgMA + " tol_idx=" + str.tostring(dbgTolIdx) + " tol=" + str.tostring(dbg_tol) + "% | Total=" + str.tostring(d_t) + " Bounce=" + str.tostring(d_b) + " Break=" + str.tostring(d_k) + " False=" + str.tostring(d_f) + " ===")
