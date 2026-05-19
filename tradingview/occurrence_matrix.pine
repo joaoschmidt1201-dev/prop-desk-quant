@@ -3,9 +3,14 @@
 // State machine PARITY: bit-identical to occurrence_scanner.pine — counts must match
 //@version=5
 
-indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true)
+// max_bars_back=210: caps history retention to ~210 bars per series reference.
+// SMA200 needs the deepest lookback (200 bars); the state machine only uses
+// [1] refs. Default is 1500 — which times 725 state machines × multiple [1]
+// refs each = the "Memory limits exceeded" runtime error. 210 is enough for
+// all indicators here and reduces memory ~7x.
+indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true, max_bars_back=210)
 
-string ver_num  = "v13.0"
+string ver_num  = "v13.1"
 string ver_date = "2026-05-19"
 
 // ==========================================
