@@ -416,6 +416,8 @@ export type OccurrenceSnapshotMeta = {
   raw_tf: string;
   age_seconds: number | null;
   has_tolerances: boolean;
+  grid_size?: number;
+  selected_tol_idx?: number;
 };
 
 export type OccurrenceLeaderboardEntry = {
@@ -452,6 +454,9 @@ export type OccurrenceMatrixPayload = {
   dates: Record<string, string>;
   snapshots: Record<string, OccurrenceSnapshotMeta>;
   tolerances: Record<string, Array<number | null>>;
+  tol_grids?: Record<string, Record<string, Array<number | null>>>;
+  grid_sizes?: Record<string, number>;
+  selected_tol_idx?: Record<string, number>;
   data: Record<string, Record<string, Record<string, OccurrenceMetric>>>;
   leaderboards: {
     mean_reversion: OccurrenceLeaderboardEntry[];
@@ -489,7 +494,14 @@ export const api = {
   kpis: (filter: Partial<Filter> = {}) => get<Kpis>(`/api/kpis${qs(filter)}`),
   analytics: (filter: Partial<Filter> = {}) => get<Analytics>(`/api/analytics${qs(filter)}`),
   backtests: () => get<{ backtests: BacktestSummary[] }>("/api/backtests"),
-  occurrenceMatrix: () => get<OccurrenceMatrixPayload>("/api/occurrence-matrix"),
+  occurrenceMatrix: (tolIdxByTf: Record<string, number> = {}) => {
+    const params = new URLSearchParams();
+    for (const [tf, idx] of Object.entries(tolIdxByTf)) {
+      params.set(`tol_idx_${tf}`, String(idx));
+    }
+    const q = params.toString();
+    return get<OccurrenceMatrixPayload>(`/api/occurrence-matrix${q ? `?${q}` : ""}`);
+  },
   backtest: (id: string, rule?: string, vixFilter?: string) => {
     const params: string[] = [];
     if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);

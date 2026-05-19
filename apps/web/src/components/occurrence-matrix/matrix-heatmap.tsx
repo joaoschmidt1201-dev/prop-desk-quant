@@ -26,6 +26,7 @@ import {
 } from "@/lib/api";
 import { OccurrenceFilters, type OccurrenceMetricKey } from "./filters";
 import { Leaderboards } from "./leaderboards";
+import { ToleranceSelector } from "./tolerance-selector";
 import { TopSetupsTable } from "./top-setups-table";
 
 type DashboardProps = {
@@ -48,11 +49,12 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
     initialData?.categories.map((c) => c.name) ?? [],
   );
   const [selectedMas, setSelectedMas] = useState<string[]>(initialData?.mas ?? []);
+  const [tolIdxByTf, setTolIdxByTf] = useState<Record<string, number>>({});
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ["occurrence-matrix"],
-    queryFn: () => api.occurrenceMatrix(),
-    initialData: initialData ?? undefined,
+    queryKey: ["occurrence-matrix", tolIdxByTf],
+    queryFn: () => api.occurrenceMatrix(tolIdxByTf),
+    initialData: Object.keys(tolIdxByTf).length === 0 ? (initialData ?? undefined) : undefined,
     refetchInterval: 300_000,
   });
 
@@ -128,6 +130,15 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           selectedMas={visibleMas}
           onMaToggle={toggleMa}
           onAllMas={() => setSelectedMas(data.mas)}
+        />
+      </div>
+      <div className="mt-3 fade-in">
+        <ToleranceSelector
+          tfs={data.tfs}
+          tolGrids={data.tol_grids}
+          gridSizes={data.grid_sizes}
+          selectedTolIdx={data.selected_tol_idx ?? {}}
+          onChange={(tf, idx) => setTolIdxByTf((prev) => ({ ...prev, [tf]: idx }))}
         />
       </div>
       <div className="mt-6 fade-in">
