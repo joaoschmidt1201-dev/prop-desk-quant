@@ -98,6 +98,19 @@ def load_snapshot(path: Path, expected_tf: str) -> dict:
     return raw
 
 
+def snapshot_grid_size(values_len: int) -> int:
+    """Infer the number of tolerance levels packed into a ticker's values array.
+
+    v12.x snapshots emit 20 ints/ticker (5 MAs × 4 metrics, single tolerance).
+    v13 snapshots emit 100 ints/ticker (5 tols × 5 MAs × 4 metrics).
+    Anything else is invalid.
+    """
+    stride = len(MA_NAMES) * 4  # 20
+    if values_len % stride != 0:
+        raise ValueError(f"Snapshot values length {values_len} is not a multiple of {stride}.")
+    return values_len // stride
+
+
 def validate_snapshot_data(path: Path, data: dict) -> None:
     expected = universe_tickers()
     actual = list(data.keys())
@@ -107,31 +120,100 @@ def validate_snapshot_data(path: Path, data: dict) -> None:
         extra = [ticker for ticker in actual if ticker not in expected]
         raise ValueError(f"Snapshot {path} ticker mismatch. Missing={missing}; Extra={extra}")
 
+    stride = len(MA_NAMES) * 4
+    grid_size: int | None = None
+
     for ticker in expected:
         values = data[ticker]
-        if not isinstance(values, list) or len(values) != len(MA_NAMES) * 4:
-            raise ValueError(f"Snapshot {path} ticker {ticker} must have 20 values.")
+        if not isinstance(values, list):
+            raise ValueError(f"Snapshot {path} ticker {ticker} must be a list.")
+        if len(values) % stride != 0 or len(values) == 0:
+            raise ValueError(
+                f"Snapshot {path} ticker {ticker} has {len(values)} values; "
+                f"expected a positive multiple of {stride} (1 or more tolerance levels)."
+            )
+        ticker_grid = len(values) // stride
+        if grid_size is None:
+            grid_size = ticker_grid
+        elif ticker_grid != grid_size:
+            raise ValueError(
+                f"Snapshot {path} has inconsistent grid sizes across tickers "
+                f"(saw {grid_size} and {ticker_grid})."
+            )
 
         for value in values:
             if not isinstance(value, int):
                 raise ValueError(f"Snapshot {path} ticker {ticker} has non-integer value: {value!r}")
 
-        for ma_index, ma_name in enumerate(MA_NAMES):
-            total, bounce, break_count, false_count = count_block(values, ma_index)
-            if bounce + break_count + false_count != total:
-                raise ValueError(
-                    f"Snapshot {path} ticker {ticker} {ma_name} violates B+Bk+F==T: "
-                    f"{bounce}+{break_count}+{false_count}!={total}"
-                )
+        for tol_idx in range(ticker_grid):
+            for ma_index, ma_name in enumerate(MA_NAMES):
+                total, bounce, break_count, false_count = count_block(values, ma_index, tol_idx)
+                if bounce + break_count + false_count != total:
+                    raise ValueError(
+                        f"Snapshot {path} ticker {ticker} {ma_name} (tol_idx={tol_idx}) "
+                        f"violates B+Bk+F==T: {bounce}+{break_count}+{false_count}!={total}"
+                    )
 
 
-def count_block(values: list[int], ma_index: int) -> tuple[int, int, int, int]:
-    start = ma_index * 4
+def count_block(values: list[int], ma_index: int, tol_idx: int = 0) -> tuple[int, int, int, int]:
+    """Slice (T, B, Bk, F) for the given (MA, tolerance) cell.
+
+    v12.x snapshots have a single tolerance level (tol_idx=0 reads the only block).
+    v13 snapshots have 5 tolerance levels (tol_idx 0..4); index 2 is the baseline.
+    """
+    stride = len(MA_NAMES) * 4  # 20
+    start = tol_idx * stride + ma_index * 4
+    if start + 4 > len(values):
+        return 0, 0, 0, 0
     total = values[start]
     bounce = values[start + 1]
     break_count = values[start + 2]
     false_count = values[start + 3]
     return total, bounce, break_count, false_count
+
+
+def baseline_tol_idx(grid_size: int) -> int:
+    """Canonical tolerance level used by the CZ-facing report.
+
+    For multi-level grids (v13) we use idx 2 (the center / baseline).
+    For single-level grids (v12.x) the only option is idx 0.
+    """
+    return grid_size // 2 if grid_size > 1 else 0
+
+
+def snapshot_baseline_view(snapshot: dict) -> dict:
+    """Return a shallow copy of `snapshot` where each ticker's values array
+    is truncated to the baseline tolerance slice (20 ints).
+
+    For v12.x snapshots this is a no-op. For v13 snapshots it picks the
+    baseline (idx 2) so the existing rendering helpers — which expect a
+    single 20-int block per ticker — keep working unchanged.
+    """
+    stride = len(MA_NAMES) * 4
+    data = snapshot.get("data", {})
+    if not isinstance(data, dict) or not data:
+        return snapshot
+
+    grid_sizes = {
+        len(values) // stride
+        for values in data.values()
+        if isinstance(values, list) and len(values) >= stride
+    }
+    if not grid_sizes or grid_sizes == {1}:
+        return snapshot
+
+    grid_size = next(iter(grid_sizes))
+    baseline_idx = baseline_tol_idx(grid_size)
+    start = baseline_idx * stride
+    end = start + stride
+
+    new_data = {}
+    for ticker, values in data.items():
+        if isinstance(values, list) and len(values) >= end:
+            new_data[ticker] = values[start:end]
+        else:
+            new_data[ticker] = values
+    return {**snapshot, "data": new_data}
 
 
 def pct(part: int, total: int) -> int:
@@ -1075,6 +1157,13 @@ def main() -> None:
 
     daily_snapshot = load_snapshot(daily_path, "D")
     weekly_snapshot = load_snapshot(weekly_path, "W")
+
+    # The CZ-facing report always renders the baseline tolerance slice.
+    # For v13 snapshots (5 levels per cell) this picks idx 2; for v12.x
+    # (single level) this is a no-op.
+    daily_snapshot = snapshot_baseline_view(daily_snapshot)
+    weekly_snapshot = snapshot_baseline_view(weekly_snapshot)
+
     latest_date = latest_report_date(daily_snapshot, weekly_snapshot)
 
     md_path, html_path, pdf_path = output_paths(args, latest_date)

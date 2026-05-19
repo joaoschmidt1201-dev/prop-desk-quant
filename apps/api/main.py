@@ -185,7 +185,7 @@ app.add_middleware(
 # ─── Snapshot cache ───────────────────────────────────────────────────────────
 
 _snapshot_cache: dict[str, Any] = {"data": None, "loaded_at": 0.0, "mtime": 0.0}
-_occurrence_matrix_cache: dict[str, Any] = {"data": None, "loaded_at": 0.0, "mtimes": {}}
+_occurrence_matrix_cache: dict[str, Any] = {"snapshots": None, "loaded_at": 0.0, "mtimes": {}}
 _refresh_lock = threading.Lock()
 _refresh_running = {"state": False}
 _refresh_last_status: dict[str, Any] = {
@@ -228,30 +228,44 @@ def load_snapshot(force: bool = False) -> dict[str, Any]:
     return _snapshot_cache["data"]
 
 
-def load_occurrence_matrix(force: bool = False) -> dict[str, Any]:
+def load_occurrence_matrix(
+    tol_idx_by_tf: dict[str, int] | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Build the matrix view for the requested tolerance selection.
+
+    Snapshots themselves are cached (TTL + mtime keyed); the matrix is
+    rebuilt per request because `tol_idx_by_tf` varies cheaply and the
+    aggregation is sub-millisecond on 29 tickers × 6 TFs × 5 MAs.
+    """
     mtimes = occurrence_snapshot_mtimes(OCCURRENCE_MATRIX_SNAPSHOT_DIR)
     age = time.time() - _occurrence_matrix_cache["loaded_at"]
-    fresh_enough = (
+    snapshots_fresh = (
         not force
-        and _occurrence_matrix_cache["data"] is not None
+        and _occurrence_matrix_cache["snapshots"] is not None
         and age < SNAPSHOT_CACHE_TTL
         and mtimes == _occurrence_matrix_cache["mtimes"]
     )
-    if fresh_enough:
-        return _occurrence_matrix_cache["data"]
 
+    if not snapshots_fresh:
+        try:
+            snapshots = load_latest_occurrence_snapshots(OCCURRENCE_MATRIX_SNAPSHOT_DIR)
+            if not snapshots:
+                raise FileNotFoundError(
+                    f"No occurrence matrix snapshots found in {OCCURRENCE_MATRIX_SNAPSHOT_DIR}"
+                )
+        except Exception as exc:
+            raise HTTPException(503, f"Occurrence Matrix snapshot load failed: {exc}") from exc
+
+        _occurrence_matrix_cache["snapshots"] = snapshots
+        _occurrence_matrix_cache["loaded_at"] = time.time()
+        _occurrence_matrix_cache["mtimes"] = mtimes
+
+    snapshots = _occurrence_matrix_cache["snapshots"]
     try:
-        snapshots = load_latest_occurrence_snapshots(OCCURRENCE_MATRIX_SNAPSHOT_DIR)
-        if not snapshots:
-            raise FileNotFoundError(f"No occurrence matrix snapshots found in {OCCURRENCE_MATRIX_SNAPSHOT_DIR}")
-        matrix = build_occurrence_matrix(snapshots)
+        return build_occurrence_matrix(snapshots, tol_idx_by_tf)
     except Exception as exc:
-        raise HTTPException(503, f"Occurrence Matrix snapshot load failed: {exc}") from exc
-
-    _occurrence_matrix_cache["data"] = matrix
-    _occurrence_matrix_cache["loaded_at"] = time.time()
-    _occurrence_matrix_cache["mtimes"] = mtimes
-    return matrix
+        raise HTTPException(503, f"Occurrence Matrix build failed: {exc}") from exc
 
 
 def snapshot_age_seconds(snap: dict[str, Any]) -> float | None:
@@ -521,6 +535,8 @@ class OccurrenceSnapshotMeta(BaseModel):
     raw_tf: str
     age_seconds: float | None
     has_tolerances: bool
+    grid_size: int = 1
+    selected_tol_idx: int = 0
 
 
 class OccurrenceLeaderboardEntry(BaseModel):
@@ -562,6 +578,9 @@ class OccurrenceMatrixResponse(BaseModel):
     dates: dict[str, str]
     snapshots: dict[str, OccurrenceSnapshotMeta]
     tolerances: dict[str, list[float | None]]
+    tol_grids: dict[str, dict[str, list[float | None]]] = Field(default_factory=dict)
+    grid_sizes: dict[str, int] = Field(default_factory=dict)
+    selected_tol_idx: dict[str, int] = Field(default_factory=dict)
     data: dict[str, dict[str, dict[str, OccurrenceMetric]]]
     leaderboards: OccurrenceLeaderboards
     top_setups: dict[str, list[OccurrenceTopSetupEntry]]
@@ -653,9 +672,29 @@ def get_snapshot() -> JSONResponse:
 
 
 @app.get("/api/occurrence-matrix", response_model=OccurrenceMatrixResponse)
-def get_occurrence_matrix(response: Response) -> dict[str, Any]:
-    response.headers["Cache-Control"] = f"max-age={SNAPSHOT_CACHE_TTL}"
-    return load_occurrence_matrix()
+def get_occurrence_matrix(
+    response: Response,
+    tol_idx_2m: int | None = None,
+    tol_idx_5m: int | None = None,
+    tol_idx_15m: int | None = None,
+    tol_idx_1h: int | None = None,
+    tol_idx_d: int | None = Query(None, alias="tol_idx_D"),
+    tol_idx_w: int | None = Query(None, alias="tol_idx_W"),
+) -> dict[str, Any]:
+    # No-cache when the client picks an explicit tolerance level so that
+    # changing the selector in the dashboard returns fresh data every time.
+    requested = {
+        "2m": tol_idx_2m,
+        "5m": tol_idx_5m,
+        "15m": tol_idx_15m,
+        "1h": tol_idx_1h,
+        "D": tol_idx_d,
+        "W": tol_idx_w,
+    }
+    tol_idx_by_tf = {tf: idx for tf, idx in requested.items() if idx is not None}
+    any_override = bool(tol_idx_by_tf)
+    response.headers["Cache-Control"] = "no-store" if any_override else f"max-age={SNAPSHOT_CACHE_TTL}"
+    return load_occurrence_matrix(tol_idx_by_tf=tol_idx_by_tf)
 
 
 def _trigger_export_script(*, source: str = "manual") -> bool:
