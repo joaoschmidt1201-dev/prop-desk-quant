@@ -1,0 +1,827 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Built on top of "Occurrence Scanner [ST]" v10.3 by © BigGuavaTrading
+// State machine PARITY: bit-identical to occurrence_scanner.pine — counts must match
+//@version=5
+
+// === AUTO-GENERATED FROM tradingview/occurrence_matrix.pine ===
+// Slice: A
+// DO NOT EDIT MANUALLY. Re-generate with:
+//   python scripts/build_om_slices.py
+// ================================================================
+// max_bars_back=210: caps history retention to ~210 bars per series reference.
+// SMA200 needs the deepest lookback (200 bars); the state machine only uses
+// [1] refs. Default is 1500 — which times 725 state machines × multiple [1]
+// refs each = the "Memory limits exceeded" runtime error. 210 is enough for
+// all indicators here and reduces memory ~7x.
+indicator("Occurrence Matrix [ST] — Slice A 0,1", shorttitle="OM Slice A 0,1", overlay=true, max_bars_back=210)
+
+string ver_num  = "v13.3-a"
+string ver_date = "2026-05-19"
+
+// ==========================================
+// 1. INPUTS
+// ==========================================
+g_main   = "Main"
+g_filter = "Filters"
+g_table  = "Table"
+g_idx    = "Tickers — Indices/Futures"
+g_crypto = "Tickers — Crypto"
+g_fx     = "Tickers — FX"
+g_comm   = "Tickers — Commodities/ETFs"
+g_qqq    = "Tickers — QQQ Top 10"
+
+// Tolerance grid: 5 levels per (TF, MA). Index 2 = baseline (same value as v12.8).
+// See get_tol_grid() for the full table. displayTolIdx controls which level the
+// in-Pine table renders; the JSON snapshot always exports all 5 levels.
+displayTolIdx = input.int(2, "Display tolerance level (0..4, baseline=2)", minval=0, maxval=4, group=g_main, tooltip="Which of the 5 tolerance levels to render in the in-chart table. The JSON snapshot exports the active slice (see Memory Saver). Dashboard picks the level from the merged snapshot.")
+winSize       = input.int(2, "Lookahead Candles", minval=2, group=g_main)
+
+// Memory Saver — when 'All (0-4)' blows Pine's 'Memory limits exceeded',
+// run the indicator 3x picking each slice in turn (A, B, C). Save each
+// pasted JSON separately, then merge with `om_paste_snapshot.py --merge`.
+g_slice  = "Memory Saver — Tolerance Slice"
+tolSlice = input.string("All (0-4)", "Run slice", options=["All (0-4)", "A: 0,1", "B: 2,3", "C: 4 only"], group=g_slice, tooltip="Gates which tolerance levels' state machines run on this pass. 'All' runs the full 5×5=25 state machines per ticker (~725 total). 'A: 0,1' runs 10/ticker; 'B: 2,3' runs 10/ticker; 'C: 4' runs 5/ticker. Inactive levels output zeros so the merger can identify them.")
+sliceActive0 = true
+sliceActive1 = true
+sliceActive2 = false
+sliceActive3 = false
+sliceActive4 = false
+
+useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=g_filter)
+useDateFilter    = input.bool(true,  "Filter Start Date?", group=g_filter)
+startDate        = input.time(timestamp("01 Jan 2018 00:00 +0000"), "Start Date", group=g_filter, tooltip="Older start dates require more bars per security. If the script times out on load, push this forward (e.g. 2020).")
+
+ema_fast_p = input.int(9,   "EMA fast period",  group=g_main)
+ema_slow_p = input.int(20,  "EMA slow period",  group=g_main)
+sma_mid_p  = input.int(50,  "SMA mid period",   group=g_main)
+sma_long_p = input.int(200, "SMA long period",  group=g_main)
+
+tablePos        = input.string("middle_right", "Table Position", options=["top_right", "middle_right", "bottom_right", "top_left", "middle_left", "bottom_left"], group=g_table)
+tableTextSize   = input.string("tiny",         "Table Text Size", options=["tiny", "small", "normal"], group=g_table)
+compactMode     = input.bool(true,  "Compact Mode (hide sample size in cell)", group=g_table, tooltip="Off = '52.3%\\nn=156' (2 lines). On = '52.3%' (1 line, mais denso).")
+minSampleHL     = input.int(20, "Min sample to mark 'best' MA", minval=0, group=g_table, tooltip="Cells with fewer occurrences than this are not eligible for the green highlight (best Bounce%). Avoids noisy small-sample winners.")
+
+showIdx     = input.bool(true,  "Show Indices/Futures",   group=g_table)
+showCrypto  = input.bool(true,  "Show Crypto",            group=g_table)
+showFX      = input.bool(true,  "Show FX",                group=g_table)
+showComm    = input.bool(true,  "Show Commodities/ETFs",  group=g_table)
+showQQQ     = input.bool(false, "Show QQQ Top 10",        group=g_table, tooltip="Default off — these are read-only references (zero idiosyncratic risk policy).")
+
+g_alert       = "Snapshot Export"
+printSnapshot = input.bool(true,  "Print snapshot to Pine Logs (manual mode)", group=g_alert, tooltip="Quando ligado: imprime o payload JSON no painel Pine Logs assim que o chart termina de carregar. Use pra copiar manualmente sem precisar configurar webhook. Abra View → Pine Logs no Pine Editor.")
+enableAlert   = input.bool(false, "Enable Friday Close Snapshot Alert (auto mode)", group=g_alert, tooltip="Quando ligado: dispara alert() com payload JSON no fechamento de Sexta D1. Configure 1 alert no TV (Add alert → condition 'Any alert() function call') apontando pro webhook. Use em chart D1 de SPY ou outro asset com sessão US.")
+
+// ==========================================
+// 1b. DEBUG / PARITY (compare against Occurrence Scanner [ST])
+// ==========================================
+g_debug    = "Debug — Event Log"
+dbgEnable  = input.bool(false, "Enable event log for one ticker + MA + tol idx", group=g_debug, tooltip="Logs every Bounce/Break/False event with trigger date and end bar for the (ticker, MA, tol idx) combo selected below. Open View → Pine Logs to read. Use to compare against OS [ST] triangles on chart.")
+dbgTicker  = input.string("SPY", "Ticker to log", options=["ES","SPX","SPY","XSP","NQ","NDX","QQQ","RTY","RUT","IWM","BTC","ETH","EURUSD","EURCHF","GBPUSD","GLD","SLV","USO","EWZ","NVDA","AAPL","MSFT","AMZN","GOOGL","AVGO","GOOG","META","TSLA","BRK.B"], group=g_debug)
+dbgMA      = input.string("SMA200", "MA to log", options=["EMA9","EMA20","SMA50","SMA200","VWAP"], group=g_debug)
+dbgTolIdx  = input.int(2, "Tol idx to log (0..4)", minval=0, maxval=4, group=g_debug)
+
+// 29 tickers (universo definido com CZ)
+t01 = input.symbol("CME_MINI:ES1!",   "ES",   group=g_idx)
+t02 = input.symbol("SP:SPX",          "SPX",  group=g_idx)
+t03 = input.symbol("AMEX:SPY",        "SPY",  group=g_idx)
+t04 = input.symbol("CBOE:XSP",        "XSP",  group=g_idx)
+t05 = input.symbol("CME_MINI:NQ1!",   "NQ",   group=g_idx)
+t06 = input.symbol("NASDAQ:NDX",      "NDX",  group=g_idx)
+t07 = input.symbol("NASDAQ:QQQ",      "QQQ",  group=g_idx)
+t08 = input.symbol("CME_MINI:RTY1!",  "RTY",  group=g_idx)
+t09 = input.symbol("TVC:RUT",         "RUT",  group=g_idx)
+t10 = input.symbol("AMEX:IWM",        "IWM",  group=g_idx)
+
+t11 = input.symbol("BINANCE:BTCUSDT", "BTC",  group=g_crypto)
+t12 = input.symbol("BINANCE:ETHUSDT", "ETH",  group=g_crypto)
+
+t13 = input.symbol("FX:EURUSD",       "EURUSD", group=g_fx)
+t14 = input.symbol("FX:EURCHF",       "EURCHF", group=g_fx)
+t15 = input.symbol("FX:GBPUSD",       "GBPUSD", group=g_fx)
+
+t16 = input.symbol("AMEX:GLD",        "GLD",  group=g_comm)
+t17 = input.symbol("AMEX:SLV",        "SLV",  group=g_comm)
+t18 = input.symbol("AMEX:USO",        "USO",  group=g_comm)
+t19 = input.symbol("AMEX:EWZ",        "EWZ",  group=g_comm)
+
+t20 = input.symbol("NASDAQ:NVDA",     "NVDA", group=g_qqq)
+t21 = input.symbol("NASDAQ:AAPL",     "AAPL", group=g_qqq)
+t22 = input.symbol("NASDAQ:MSFT",     "MSFT", group=g_qqq)
+t23 = input.symbol("NASDAQ:AMZN",     "AMZN", group=g_qqq)
+t24 = input.symbol("NASDAQ:GOOGL",    "GOOGL",group=g_qqq)
+t25 = input.symbol("NASDAQ:AVGO",     "AVGO", group=g_qqq)
+t26 = input.symbol("NASDAQ:GOOG",     "GOOG", group=g_qqq)
+t27 = input.symbol("NASDAQ:META",     "META", group=g_qqq)
+t28 = input.symbol("NASDAQ:TSLA",     "TSLA", group=g_qqq)
+t29 = input.symbol("NYSE:BRK.B",      "BRK.B",group=g_qqq)
+
+n01 = "ES"
+n02 = "SPX"
+n03 = "SPY"
+n04 = "XSP"
+n05 = "NQ"
+n06 = "NDX"
+n07 = "QQQ"
+n08 = "RTY"
+n09 = "RUT"
+n10 = "IWM"
+n11 = "BTC"
+n12 = "ETH"
+n13 = "EURUSD"
+n14 = "EURCHF"
+n15 = "GBPUSD"
+n16 = "GLD"
+n17 = "SLV"
+n18 = "USO"
+n19 = "EWZ"
+n20 = "NVDA"
+n21 = "AAPL"
+n22 = "MSFT"
+n23 = "AMZN"
+n24 = "GOOGL"
+n25 = "AVGO"
+n26 = "GOOG"
+n27 = "META"
+n28 = "TSLA"
+n29 = "BRK.B"
+
+// ==========================================
+// 2. TOLERANCE GRID — 5 levels per (TF, MA), index 2 = baseline (v12.8 values)
+// ==========================================
+// Returns [v0, v1, v2, v3, v4] for the given MA index on the chart's timeframe.
+// Index 2 reproduces v12.8's get_tol() exactly. Other indices are "tighter"
+// (0, 1) and "looser" (3, 4) variants the dashboard can flip between.
+// Index conventions: 0=EMA9, 1=EMA20, 2=SMA50, 3=SMA200, 4=VWAP.
+// VWAP D/W is intentionally skipped (returns all zeros → run_full masks output to 0).
+get_tol_grid(int ma_idx) =>
+    string p = timeframe.period
+    float v0 = 0.0
+    float v1 = 0.0
+    float v2 = 0.0
+    float v3 = 0.0
+    float v4 = 0.0
+    if p == "2" or p == "5"
+        v0 := 0.01
+        v1 := 0.015
+        v2 := 0.02
+        v3 := 0.05
+        v4 := 0.10
+    else if p == "15"
+        v0 := 0.02
+        v1 := 0.03
+        v2 := 0.05
+        v3 := 0.10
+        v4 := 0.15
+    else if p == "60"
+        v0 := 0.05
+        v1 := 0.07
+        v2 := 0.10
+        v3 := 0.20
+        v4 := 0.30
+    else if p == "D"
+        if ma_idx == 0 or ma_idx == 1
+            v0 := 0.10
+            v1 := 0.15
+            v2 := 0.20
+            v3 := 0.30
+            v4 := 0.50
+        else if ma_idx == 2 or ma_idx == 3
+            v0 := 0.15
+            v1 := 0.20
+            v2 := 0.30
+            v3 := 0.50
+            v4 := 0.70
+    else if p == "W"
+        if ma_idx == 0
+            v0 := 0.10
+            v1 := 0.15
+            v2 := 0.20
+            v3 := 0.30
+            v4 := 0.50
+        else if ma_idx == 1
+            v0 := 0.15
+            v1 := 0.20
+            v2 := 0.30
+            v3 := 0.50
+            v4 := 0.70
+        else if ma_idx == 2 or ma_idx == 3
+            v0 := 0.20
+            v1 := 0.30
+            v2 := 0.40
+            v3 := 0.60
+            v4 := 0.80
+    else
+        v0 := 0.05
+        v1 := 0.07
+        v2 := 0.10
+        v3 := 0.20
+        v4 := 0.30
+    [v0, v1, v2, v3, v4]
+
+// Convenience: returns just the baseline (idx 2) for label / parity helpers.
+get_tol_baseline(int ma_idx) =>
+    [_a, _b, base, _c, _d] = get_tol_grid(ma_idx)
+    base
+
+// ==========================================
+// 3. STATE MACHINE — paridade exata com Occurrence Scanner v10.3
+// ==========================================
+run_sm(float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
+    var int  cT       = 0
+    var int  cB       = 0
+    var int  cBk      = 0
+    var int  cF       = 0
+    var bool in_event = false
+    var int  timer    = 0
+    var bool ts       = false
+    var int  tr_idx   = 0
+    var int  tr_time  = 0
+    var int  cv       = 0
+    var bool vio      = false
+    var bool ew       = false
+
+    upper_buf = ma_val * (1 + approx_pct / 100)
+    lower_buf = ma_val * (1 - approx_pct / 100)
+
+    bool touched = (low <= upper_buf and high >= lower_buf)
+    bool crossed = ta.crossover(close, ma_val) or ta.crossunder(close, ma_val)
+    bool ok_date = not useDateFilter or time >= startDate
+    bool ok_vol  = not useSqueezeFilter or not sqz_on
+
+    if (touched or crossed) and not in_event and ok_date and ok_vol
+        in_event := true
+        timer    := 0
+        ts       := close[1] > ma_val[1]
+        tr_idx   := bar_index
+        tr_time  := time
+        vio      := false
+        ew       := false
+        bool out_strict = ts ? close < lower_buf : close > upper_buf
+        cv := out_strict ? 1 : 0
+        if cv == 1
+            vio := true
+
+    if in_event
+        if useSqueezeFilter and sqz_on
+            in_event := false
+            cv := 0
+            ew := false
+        else
+            if bar_index > tr_idx
+                timer += 1
+
+            bool ps = ts ? close < lower_buf : close > upper_buf
+            bool pr = ts ? close < ma_val    : close > ma_val
+
+            if bar_index > tr_idx
+                if cv == 0
+                    if ps
+                        cv  := cv + 1
+                        vio := true
+                else
+                    if pr
+                        cv := cv + 1
+                    else
+                        cv := 0
+
+            if cv >= 2
+                cBk := cBk + 1
+                cT  := cT  + 1
+                if dbg
+                    log.info(lbl + " | BREAK  | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
+                in_event := false
+                cv := 0
+                ew := false
+            else if timer >= winSize
+                if cv == 1 and not ew
+                    ew := true
+                else
+                    if not vio
+                        cB := cB + 1
+                        cT := cT + 1
+                        if dbg
+                            log.info(lbl + " | BOUNCE | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
+                    else
+                        cF := cF + 1
+                        cT := cT + 1
+                        if dbg
+                            log.info(lbl + " | FALSE  | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
+                    in_event := false
+                    cv := 0
+                    ew := false
+
+    [cT, cB, cBk, cF]
+
+// CSV helper — joins one (T, B, Bk, F) tuple with commas.
+fmt4(int t, int b, int k, int f) =>
+    str.tostring(t) + "," + str.tostring(b) + "," + str.tostring(k) + "," + str.tostring(f)
+
+// Memory-saving wrapper around run_sm. When `active` is false, the inner
+// var-bearing state machine is never invoked — Pine never allocates the
+// history buffers for its [1] references on this call site, slashing memory.
+// Returns zeros so the CSV output cleanly marks the slot as "not in this pass".
+run_sm_gated(bool active, float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
+    int t = 0
+    int b = 0
+    int k = 0
+    int f = 0
+    if active
+        [_t, _b, _k, _f] = run_sm(ma_val, sqz_on, approx_pct, dbg, lbl)
+        t := _t
+        b := _b
+        k := _k
+        f := _f
+    [t, b, k, f]
+
+// ==========================================
+// 4. WRAPPER — calcula squeeze + 5 MAs × 5 tols = 25 state machines por ticker
+// ==========================================
+// Returns a single CSV string with 100 ints (tol_idx outer × ma_idx middle × metric inner).
+// Order: t0m0_T, t0m0_B, t0m0_Bk, t0m0_F, t0m1_T, ..., t0m4_F, t1m0_T, ..., t4m4_F.
+// Returning a string (instead of a 100-tuple) keeps request.security boilerplate
+// to one line per ticker and the DIRECT-fallback override to one line per ticker.
+run_full() =>
+    [_, ub, lb] = ta.bb(close, 20, 2.0)
+    bk  = ta.sma(close, 20)
+    rk  = ta.tr(true)
+    ark = ta.sma(rk, 20)
+    ukc = bk + ark * 1.5
+    lkc = bk - ark * 1.5
+    bool sqz = (ub < ukc) and (lb > lkc)
+
+    ma1 = ta.ema(close, ema_fast_p)
+    ma2 = ta.ema(close, ema_slow_p)
+    ma3 = ta.sma(close, sma_mid_p)
+    ma4 = ta.sma(close, sma_long_p)
+    ma5 = ta.vwap
+
+    [g1_0, g1_1, g1_2, g1_3, g1_4] = get_tol_grid(0)
+    [g2_0, g2_1, g2_2, g2_3, g2_4] = get_tol_grid(1)
+    [g3_0, g3_1, g3_2, g3_3, g3_4] = get_tol_grid(2)
+    [g4_0, g4_1, g4_2, g4_3, g4_4] = get_tol_grid(3)
+    [g5_0, g5_1, g5_2, g5_3, g5_4] = get_tol_grid(4)
+
+    bool is_dbg_t = dbgEnable and syminfo.ticker == dbgTicker
+    bool dbg_m1   = is_dbg_t and dbgMA == "EMA9"
+    bool dbg_m2   = is_dbg_t and dbgMA == "EMA20"
+    bool dbg_m3   = is_dbg_t and dbgMA == "SMA50"
+    bool dbg_m4   = is_dbg_t and dbgMA == "SMA200"
+    bool dbg_m5   = is_dbg_t and dbgMA == "VWAP"
+
+    // Run state machine: 5 MAs × 5 tols = up to 25 calls per ticker. The
+    // gated wrapper SKIPS the inner state machine when the slice is inactive,
+    // so Pine never allocates history buffers for those call sites. This is
+    // how 'Memory Saver — A/B/C' fits the run inside Pine's memory budget.
+    [m1T_0, m1B_0, m1K_0, m1F_0] = run_sm(ma1, sqz, g1_0 > 0 ? g1_0 : 0.0001, dbg_m1 and dbgTolIdx == 0, "EMA9[0]")
+    [m1T_1, m1B_1, m1K_1, m1F_1] = run_sm(ma1, sqz, g1_1 > 0 ? g1_1 : 0.0001, dbg_m1 and dbgTolIdx == 1, "EMA9[1]")
+    int m1T_2 = 0
+    int m1B_2 = 0
+    int m1K_2 = 0
+    int m1F_2 = 0
+    int m1T_3 = 0
+    int m1B_3 = 0
+    int m1K_3 = 0
+    int m1F_3 = 0
+    int m1T_4 = 0
+    int m1B_4 = 0
+    int m1K_4 = 0
+    int m1F_4 = 0
+
+    [m2T_0, m2B_0, m2K_0, m2F_0] = run_sm(ma2, sqz, g2_0 > 0 ? g2_0 : 0.0001, dbg_m2 and dbgTolIdx == 0, "EMA20[0]")
+    [m2T_1, m2B_1, m2K_1, m2F_1] = run_sm(ma2, sqz, g2_1 > 0 ? g2_1 : 0.0001, dbg_m2 and dbgTolIdx == 1, "EMA20[1]")
+    int m2T_2 = 0
+    int m2B_2 = 0
+    int m2K_2 = 0
+    int m2F_2 = 0
+    int m2T_3 = 0
+    int m2B_3 = 0
+    int m2K_3 = 0
+    int m2F_3 = 0
+    int m2T_4 = 0
+    int m2B_4 = 0
+    int m2K_4 = 0
+    int m2F_4 = 0
+
+    [m3T_0, m3B_0, m3K_0, m3F_0] = run_sm(ma3, sqz, g3_0 > 0 ? g3_0 : 0.0001, dbg_m3 and dbgTolIdx == 0, "SMA50[0]")
+    [m3T_1, m3B_1, m3K_1, m3F_1] = run_sm(ma3, sqz, g3_1 > 0 ? g3_1 : 0.0001, dbg_m3 and dbgTolIdx == 1, "SMA50[1]")
+    int m3T_2 = 0
+    int m3B_2 = 0
+    int m3K_2 = 0
+    int m3F_2 = 0
+    int m3T_3 = 0
+    int m3B_3 = 0
+    int m3K_3 = 0
+    int m3F_3 = 0
+    int m3T_4 = 0
+    int m3B_4 = 0
+    int m3K_4 = 0
+    int m3F_4 = 0
+
+    [m4T_0, m4B_0, m4K_0, m4F_0] = run_sm(ma4, sqz, g4_0 > 0 ? g4_0 : 0.0001, dbg_m4 and dbgTolIdx == 0, "SMA200[0]")
+    [m4T_1, m4B_1, m4K_1, m4F_1] = run_sm(ma4, sqz, g4_1 > 0 ? g4_1 : 0.0001, dbg_m4 and dbgTolIdx == 1, "SMA200[1]")
+    int m4T_2 = 0
+    int m4B_2 = 0
+    int m4K_2 = 0
+    int m4F_2 = 0
+    int m4T_3 = 0
+    int m4B_3 = 0
+    int m4K_3 = 0
+    int m4F_3 = 0
+    int m4T_4 = 0
+    int m4B_4 = 0
+    int m4K_4 = 0
+    int m4F_4 = 0
+
+    [m5T_0, m5B_0, m5K_0, m5F_0] = run_sm(ma5, sqz, g5_0 > 0 ? g5_0 : 0.0001, dbg_m5 and dbgTolIdx == 0, "VWAP[0]")
+    [m5T_1, m5B_1, m5K_1, m5F_1] = run_sm(ma5, sqz, g5_1 > 0 ? g5_1 : 0.0001, dbg_m5 and dbgTolIdx == 1, "VWAP[1]")
+    int m5T_2 = 0
+    int m5B_2 = 0
+    int m5K_2 = 0
+    int m5F_2 = 0
+    int m5T_3 = 0
+    int m5B_3 = 0
+    int m5K_3 = 0
+    int m5F_3 = 0
+    int m5T_4 = 0
+    int m5B_4 = 0
+    int m5K_4 = 0
+    int m5F_4 = 0
+
+    // Mask: tol == 0 → zero out the 4 counts for that (MA, tol) cell.
+    string s = ""
+    s := s + fmt4(g1_0 > 0 ? m1T_0 : 0, g1_0 > 0 ? m1B_0 : 0, g1_0 > 0 ? m1K_0 : 0, g1_0 > 0 ? m1F_0 : 0)
+    s := s + "," + fmt4(g2_0 > 0 ? m2T_0 : 0, g2_0 > 0 ? m2B_0 : 0, g2_0 > 0 ? m2K_0 : 0, g2_0 > 0 ? m2F_0 : 0)
+    s := s + "," + fmt4(g3_0 > 0 ? m3T_0 : 0, g3_0 > 0 ? m3B_0 : 0, g3_0 > 0 ? m3K_0 : 0, g3_0 > 0 ? m3F_0 : 0)
+    s := s + "," + fmt4(g4_0 > 0 ? m4T_0 : 0, g4_0 > 0 ? m4B_0 : 0, g4_0 > 0 ? m4K_0 : 0, g4_0 > 0 ? m4F_0 : 0)
+    s := s + "," + fmt4(g5_0 > 0 ? m5T_0 : 0, g5_0 > 0 ? m5B_0 : 0, g5_0 > 0 ? m5K_0 : 0, g5_0 > 0 ? m5F_0 : 0)
+
+    s := s + "," + fmt4(g1_1 > 0 ? m1T_1 : 0, g1_1 > 0 ? m1B_1 : 0, g1_1 > 0 ? m1K_1 : 0, g1_1 > 0 ? m1F_1 : 0)
+    s := s + "," + fmt4(g2_1 > 0 ? m2T_1 : 0, g2_1 > 0 ? m2B_1 : 0, g2_1 > 0 ? m2K_1 : 0, g2_1 > 0 ? m2F_1 : 0)
+    s := s + "," + fmt4(g3_1 > 0 ? m3T_1 : 0, g3_1 > 0 ? m3B_1 : 0, g3_1 > 0 ? m3K_1 : 0, g3_1 > 0 ? m3F_1 : 0)
+    s := s + "," + fmt4(g4_1 > 0 ? m4T_1 : 0, g4_1 > 0 ? m4B_1 : 0, g4_1 > 0 ? m4K_1 : 0, g4_1 > 0 ? m4F_1 : 0)
+    s := s + "," + fmt4(g5_1 > 0 ? m5T_1 : 0, g5_1 > 0 ? m5B_1 : 0, g5_1 > 0 ? m5K_1 : 0, g5_1 > 0 ? m5F_1 : 0)
+
+    s := s + "," + fmt4(g1_2 > 0 ? m1T_2 : 0, g1_2 > 0 ? m1B_2 : 0, g1_2 > 0 ? m1K_2 : 0, g1_2 > 0 ? m1F_2 : 0)
+    s := s + "," + fmt4(g2_2 > 0 ? m2T_2 : 0, g2_2 > 0 ? m2B_2 : 0, g2_2 > 0 ? m2K_2 : 0, g2_2 > 0 ? m2F_2 : 0)
+    s := s + "," + fmt4(g3_2 > 0 ? m3T_2 : 0, g3_2 > 0 ? m3B_2 : 0, g3_2 > 0 ? m3K_2 : 0, g3_2 > 0 ? m3F_2 : 0)
+    s := s + "," + fmt4(g4_2 > 0 ? m4T_2 : 0, g4_2 > 0 ? m4B_2 : 0, g4_2 > 0 ? m4K_2 : 0, g4_2 > 0 ? m4F_2 : 0)
+    s := s + "," + fmt4(g5_2 > 0 ? m5T_2 : 0, g5_2 > 0 ? m5B_2 : 0, g5_2 > 0 ? m5K_2 : 0, g5_2 > 0 ? m5F_2 : 0)
+
+    s := s + "," + fmt4(g1_3 > 0 ? m1T_3 : 0, g1_3 > 0 ? m1B_3 : 0, g1_3 > 0 ? m1K_3 : 0, g1_3 > 0 ? m1F_3 : 0)
+    s := s + "," + fmt4(g2_3 > 0 ? m2T_3 : 0, g2_3 > 0 ? m2B_3 : 0, g2_3 > 0 ? m2K_3 : 0, g2_3 > 0 ? m2F_3 : 0)
+    s := s + "," + fmt4(g3_3 > 0 ? m3T_3 : 0, g3_3 > 0 ? m3B_3 : 0, g3_3 > 0 ? m3K_3 : 0, g3_3 > 0 ? m3F_3 : 0)
+    s := s + "," + fmt4(g4_3 > 0 ? m4T_3 : 0, g4_3 > 0 ? m4B_3 : 0, g4_3 > 0 ? m4K_3 : 0, g4_3 > 0 ? m4F_3 : 0)
+    s := s + "," + fmt4(g5_3 > 0 ? m5T_3 : 0, g5_3 > 0 ? m5B_3 : 0, g5_3 > 0 ? m5K_3 : 0, g5_3 > 0 ? m5F_3 : 0)
+
+    s := s + "," + fmt4(g1_4 > 0 ? m1T_4 : 0, g1_4 > 0 ? m1B_4 : 0, g1_4 > 0 ? m1K_4 : 0, g1_4 > 0 ? m1F_4 : 0)
+    s := s + "," + fmt4(g2_4 > 0 ? m2T_4 : 0, g2_4 > 0 ? m2B_4 : 0, g2_4 > 0 ? m2K_4 : 0, g2_4 > 0 ? m2F_4 : 0)
+    s := s + "," + fmt4(g3_4 > 0 ? m3T_4 : 0, g3_4 > 0 ? m3B_4 : 0, g3_4 > 0 ? m3K_4 : 0, g3_4 > 0 ? m3F_4 : 0)
+    s := s + "," + fmt4(g4_4 > 0 ? m4T_4 : 0, g4_4 > 0 ? m4B_4 : 0, g4_4 > 0 ? m4K_4 : 0, g4_4 > 0 ? m4F_4 : 0)
+    s := s + "," + fmt4(g5_4 > 0 ? m5T_4 : 0, g5_4 > 0 ? m5B_4 : 0, g5_4 > 0 ? m5K_4 : 0, g5_4 > 0 ? m5F_4 : 0)
+
+    s
+
+// ==========================================
+// 5. RUN PER TICKER (29 calls — within Pine's 40-security limit)
+// ==========================================
+a01 = request.security(t01, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a02 = request.security(t02, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a03 = request.security(t03, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a04 = request.security(t04, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a05 = request.security(t05, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a06 = request.security(t06, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a07 = request.security(t07, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a08 = request.security(t08, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a09 = request.security(t09, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a10 = request.security(t10, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a11 = request.security(t11, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a12 = request.security(t12, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a13 = request.security(t13, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a14 = request.security(t14, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a15 = request.security(t15, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a16 = request.security(t16, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a17 = request.security(t17, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a18 = request.security(t18, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a19 = request.security(t19, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a20 = request.security(t20, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a21 = request.security(t21, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a22 = request.security(t22, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a23 = request.security(t23, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a24 = request.security(t24, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a25 = request.security(t25, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a26 = request.security(t26, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a27 = request.security(t27, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a28 = request.security(t28, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+a29 = request.security(t29, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+
+// ==========================================
+// 5b. NO DIRECT FALLBACK (slice file — chart-ticker parity disabled to save memory)
+// ==========================================
+aa01 = a01
+aa02 = a02
+aa03 = a03
+aa04 = a04
+aa05 = a05
+aa06 = a06
+aa07 = a07
+aa08 = a08
+aa09 = a09
+aa10 = a10
+aa11 = a11
+aa12 = a12
+aa13 = a13
+aa14 = a14
+aa15 = a15
+aa16 = a16
+aa17 = a17
+aa18 = a18
+aa19 = a19
+aa20 = a20
+aa21 = a21
+aa22 = a22
+aa23 = a23
+aa24 = a24
+aa25 = a25
+aa26 = a26
+aa27 = a27
+aa28 = a28
+aa29 = a29
+
+
+// ==========================================
+// 6. TABLE RENDERING (parses CSV strings on the last bar, shows displayTolIdx slice)
+// ==========================================
+position_of(string s) =>
+    s == "top_right"     ? position.top_right     :
+      s == "middle_right"  ? position.middle_right  :
+      s == "bottom_right"  ? position.bottom_right  :
+      s == "top_left"      ? position.top_left      :
+      s == "middle_left"   ? position.middle_left   :
+      s == "bottom_left"   ? position.bottom_left   :
+                             position.middle_right
+
+text_size_of(string s) =>
+    s == "tiny" ? size.tiny : s == "small" ? size.small : size.normal
+
+var table tbl = table.new(position_of(tablePos), 6, 30, bgcolor=color.new(color.black, 70), border_width=1, border_color=color.new(color.gray, 60))
+
+// Parses one ticker's CSV string and returns the (T, B, Bk, F) tuple for the
+// requested (tol_idx, ma_idx). Order in the CSV: tol outer × ma middle × metric inner.
+parse_cell(string csv, int tol_idx, int ma_idx) =>
+    string[] arr = str.split(csv, ",")
+    int start = tol_idx * 20 + ma_idx * 4
+    int n = array.size(arr)
+    int t = start     < n ? math.round(str.tonumber(array.get(arr, start)))     : 0
+    int b = start + 1 < n ? math.round(str.tonumber(array.get(arr, start + 1))) : 0
+    int k = start + 2 < n ? math.round(str.tonumber(array.get(arr, start + 2))) : 0
+    int f = start + 3 < n ? math.round(str.tonumber(array.get(arr, start + 3))) : 0
+    [t, b, k, f]
+
+fmt_cell(int col_idx, int row_idx, int t, float r, int best_col, string sz) =>
+    if t == 0
+        table.cell(tbl, col_idx, row_idx, "—", text_color=color.new(color.gray, 30), bgcolor=color.new(color.black, 90), text_size=sz)
+    else
+        string txt = compactMode ? (str.tostring(math.round(r, 1)) + "%") : (str.tostring(math.round(r, 1)) + "%\nn=" + str.tostring(t))
+        bool is_best = col_idx == best_col
+        color bg = is_best ? color.new(color.green, 60) : color.new(color.black, 90)
+        color fg = is_best ? color.new(color.lime, 0)   : color.new(color.white, 0)
+        table.cell(tbl, col_idx, row_idx, txt, text_color=fg, bgcolor=bg, text_size=sz)
+
+render_row_from_csv(int row, string name, string csv, int tol_idx, string sz) =>
+    table.cell(tbl, 0, row, name, text_color=color.new(color.white, 0), bgcolor=color.new(color.black, 50), text_size=sz)
+
+    [t1, b1, _k1, _f1] = parse_cell(csv, tol_idx, 0)
+    [t2, b2, _k2, _f2] = parse_cell(csv, tol_idx, 1)
+    [t3, b3, _k3, _f3] = parse_cell(csv, tol_idx, 2)
+    [t4, b4, _k4, _f4] = parse_cell(csv, tol_idx, 3)
+    [t5, b5, _k5, _f5] = parse_cell(csv, tol_idx, 4)
+
+    float r1 = t1 > 0 ? b1 * 100.0 / t1 : -1.0
+    float r2 = t2 > 0 ? b2 * 100.0 / t2 : -1.0
+    float r3 = t3 > 0 ? b3 * 100.0 / t3 : -1.0
+    float r4 = t4 > 0 ? b4 * 100.0 / t4 : -1.0
+    float r5 = t5 > 0 ? b5 * 100.0 / t5 : -1.0
+
+    int   best_col = 0
+    float best_val = -1.0
+    if t1 >= minSampleHL and r1 > best_val
+        best_val := r1
+        best_col := 1
+    if t2 >= minSampleHL and r2 > best_val
+        best_val := r2
+        best_col := 2
+    if t3 >= minSampleHL and r3 > best_val
+        best_val := r3
+        best_col := 3
+    if t4 >= minSampleHL and r4 > best_val
+        best_val := r4
+        best_col := 4
+    if t5 >= minSampleHL and r5 > best_val
+        best_val := r5
+        best_col := 5
+
+    fmt_cell(1, row, t1, r1, best_col, sz)
+    fmt_cell(2, row, t2, r2, best_col, sz)
+    fmt_cell(3, row, t3, r3, best_col, sz)
+    fmt_cell(4, row, t4, r4, best_col, sz)
+    fmt_cell(5, row, t5, r5, best_col, sz)
+
+if barstate.islast
+    string sz = tableTextSize
+    int    di = displayTolIdx
+
+    string tf_label = "[" + timeframe.period + " · tol idx " + str.tostring(di) + "]"
+    [_g1_0, _g1_1, _g1_2, _g1_3, _g1_4] = get_tol_grid(0)
+    [_g2_0, _g2_1, _g2_2, _g2_3, _g2_4] = get_tol_grid(1)
+    [_g3_0, _g3_1, _g3_2, _g3_3, _g3_4] = get_tol_grid(2)
+    [_g4_0, _g4_1, _g4_2, _g4_3, _g4_4] = get_tol_grid(3)
+    [_g5_0, _g5_1, _g5_2, _g5_3, _g5_4] = get_tol_grid(4)
+    float vis_t1 = di == 0 ? _g1_0 : di == 1 ? _g1_1 : di == 2 ? _g1_2 : di == 3 ? _g1_3 : _g1_4
+    float vis_t2 = di == 0 ? _g2_0 : di == 1 ? _g2_1 : di == 2 ? _g2_2 : di == 3 ? _g2_3 : _g2_4
+    float vis_t3 = di == 0 ? _g3_0 : di == 1 ? _g3_1 : di == 2 ? _g3_2 : di == 3 ? _g3_3 : _g3_4
+    float vis_t4 = di == 0 ? _g4_0 : di == 1 ? _g4_1 : di == 2 ? _g4_2 : di == 3 ? _g4_3 : _g4_4
+    float vis_t5 = di == 0 ? _g5_0 : di == 1 ? _g5_1 : di == 2 ? _g5_2 : di == 3 ? _g5_3 : _g5_4
+
+    string tol_label_1 = "\n±" + str.tostring(vis_t1) + "%"
+    string tol_label_2 = "\n±" + str.tostring(vis_t2) + "%"
+    string tol_label_3 = "\n±" + str.tostring(vis_t3) + "%"
+    string tol_label_4 = "\n±" + str.tostring(vis_t4) + "%"
+    string tol_label_5 = vis_t5 > 0 ? ("\n±" + str.tostring(vis_t5) + "%") : "\n(skip)"
+    table.cell(tbl, 0, 0, "Ticker " + tf_label, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 1, 0, "EMA " + str.tostring(ema_fast_p) + tol_label_1, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 2, 0, "EMA " + str.tostring(ema_slow_p) + tol_label_2, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 3, 0, "SMA " + str.tostring(sma_mid_p)  + tol_label_3, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 4, 0, "SMA " + str.tostring(sma_long_p) + tol_label_4, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+    table.cell(tbl, 5, 0, "VWAP"                            + tol_label_5, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
+
+    render_row_from_csv( 1, n01, aa01, di, sz)
+    render_row_from_csv( 2, n02, aa02, di, sz)
+    render_row_from_csv( 3, n03, aa03, di, sz)
+    render_row_from_csv( 4, n04, aa04, di, sz)
+    render_row_from_csv( 5, n05, aa05, di, sz)
+    render_row_from_csv( 6, n06, aa06, di, sz)
+    render_row_from_csv( 7, n07, aa07, di, sz)
+    render_row_from_csv( 8, n08, aa08, di, sz)
+    render_row_from_csv( 9, n09, aa09, di, sz)
+    render_row_from_csv(10, n10, aa10, di, sz)
+    render_row_from_csv(11, n11, aa11, di, sz)
+    render_row_from_csv(12, n12, aa12, di, sz)
+    render_row_from_csv(13, n13, aa13, di, sz)
+    render_row_from_csv(14, n14, aa14, di, sz)
+    render_row_from_csv(15, n15, aa15, di, sz)
+    render_row_from_csv(16, n16, aa16, di, sz)
+    render_row_from_csv(17, n17, aa17, di, sz)
+    render_row_from_csv(18, n18, aa18, di, sz)
+    render_row_from_csv(19, n19, aa19, di, sz)
+    render_row_from_csv(20, n20, aa20, di, sz)
+    render_row_from_csv(21, n21, aa21, di, sz)
+    render_row_from_csv(22, n22, aa22, di, sz)
+    render_row_from_csv(23, n23, aa23, di, sz)
+    render_row_from_csv(24, n24, aa24, di, sz)
+    render_row_from_csv(25, n25, aa25, di, sz)
+    render_row_from_csv(26, n26, aa26, di, sz)
+    render_row_from_csv(27, n27, aa27, di, sz)
+    render_row_from_csv(28, n28, aa28, di, sz)
+    render_row_from_csv(29, n29, aa29, di, sz)
+
+// ==========================================
+// 7. SNAPSHOT EXPORT
+// ==========================================
+// Schema v13 (new): {"d":"...", "tf":"...", "ma":[...], "tol_grid":{MA:[v0..v4],...}, "data":{TICKER:[100 ints]}}
+// The 100 ints per ticker follow tol_idx outer × ma_idx middle × metric (T,B,Bk,F) inner.
+// Backend supports both v13 and v12.x (legacy "tolerances" with 20 ints/ticker).
+is_friday_close = dayofweek == dayofweek.friday and timeframe.period == "D"
+must_log        = printSnapshot and barstate.islast
+must_alert      = enableAlert  and is_friday_close
+
+// Serialize a single tol grid (5 floats) as JSON array.
+fmt_grid(float v0, float v1, float v2, float v3, float v4) =>
+    "[" + str.tostring(v0) + "," + str.tostring(v1) + "," + str.tostring(v2) + "," + str.tostring(v3) + "," + str.tostring(v4) + "]"
+
+// Per-ticker JSON fragment ("TICKER":[100 ints]) is ~400 chars and stays well
+// under Pine v5's 4096-char-per-string limit. The full payload (~12KB) does
+// NOT fit in a single Pine string, so we emit it line-by-line in Pine Logs
+// (head + 29 ticker rows + footer, with BEGIN/END markers). Use
+// `python scripts/om_paste_snapshot.py <DATE> <TF>` to assemble + validate.
+fmt_row(string name, string row, bool with_leading_comma) =>
+    (with_leading_comma ? ",\"" : "\"") + name + "\":[" + row + "]"
+
+if must_log
+    [eg1_0, eg1_1, eg1_2, eg1_3, eg1_4] = get_tol_grid(0)
+    [eg2_0, eg2_1, eg2_2, eg2_3, eg2_4] = get_tol_grid(1)
+    [eg3_0, eg3_1, eg3_2, eg3_3, eg3_4] = get_tol_grid(2)
+    [eg4_0, eg4_1, eg4_2, eg4_3, eg4_4] = get_tol_grid(3)
+    [eg5_0, eg5_1, eg5_2, eg5_3, eg5_4] = get_tol_grid(4)
+
+    string tol_grid_json = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + "}"
+
+    string slice_json = "[0,1]"
+    string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json + ",\"tol_idx_slots\":" + slice_json + ",\"schema\":\"v13\",\"data\":{"
+
+    log.info("--- OM SNAPSHOT BEGIN ---")
+    log.info(head)
+    log.info(fmt_row(n01, aa01, false))
+    log.info(fmt_row(n02, aa02, true))
+    log.info(fmt_row(n03, aa03, true))
+    log.info(fmt_row(n04, aa04, true))
+    log.info(fmt_row(n05, aa05, true))
+    log.info(fmt_row(n06, aa06, true))
+    log.info(fmt_row(n07, aa07, true))
+    log.info(fmt_row(n08, aa08, true))
+    log.info(fmt_row(n09, aa09, true))
+    log.info(fmt_row(n10, aa10, true))
+    log.info(fmt_row(n11, aa11, true))
+    log.info(fmt_row(n12, aa12, true))
+    log.info(fmt_row(n13, aa13, true))
+    log.info(fmt_row(n14, aa14, true))
+    log.info(fmt_row(n15, aa15, true))
+    log.info(fmt_row(n16, aa16, true))
+    log.info(fmt_row(n17, aa17, true))
+    log.info(fmt_row(n18, aa18, true))
+    log.info(fmt_row(n19, aa19, true))
+    log.info(fmt_row(n20, aa20, true))
+    log.info(fmt_row(n21, aa21, true))
+    log.info(fmt_row(n22, aa22, true))
+    log.info(fmt_row(n23, aa23, true))
+    log.info(fmt_row(n24, aa24, true))
+    log.info(fmt_row(n25, aa25, true))
+    log.info(fmt_row(n26, aa26, true))
+    log.info(fmt_row(n27, aa27, true))
+    log.info(fmt_row(n28, aa28, true))
+    log.info(fmt_row(n29, aa29, true))
+    log.info("}}")
+    log.info("--- OM SNAPSHOT END ---")
+
+if must_alert
+    // Auto Friday-close alert path: webhook receivers must concatenate the
+    // sequence of alert() calls between BEGIN and END markers.
+    [eg1_0, eg1_1, eg1_2, eg1_3, eg1_4] = get_tol_grid(0)
+    [eg2_0, eg2_1, eg2_2, eg2_3, eg2_4] = get_tol_grid(1)
+    [eg3_0, eg3_1, eg3_2, eg3_3, eg3_4] = get_tol_grid(2)
+    [eg4_0, eg4_1, eg4_2, eg4_3, eg4_4] = get_tol_grid(3)
+    [eg5_0, eg5_1, eg5_2, eg5_3, eg5_4] = get_tol_grid(4)
+    string tol_grid_json_a = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + "}"
+    string slice_json_a = "[0,1]"
+    string head_a = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json_a + ",\"tol_idx_slots\":" + slice_json_a + ",\"schema\":\"v13\",\"data\":{"
+    alert("--- OM SNAPSHOT BEGIN ---", alert.freq_once_per_bar_close)
+    alert(head_a, alert.freq_once_per_bar_close)
+    alert(fmt_row(n01, aa01, false), alert.freq_once_per_bar_close)
+    alert(fmt_row(n02, aa02, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n03, aa03, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n04, aa04, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n05, aa05, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n06, aa06, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n07, aa07, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n08, aa08, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n09, aa09, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n10, aa10, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n11, aa11, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n12, aa12, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n13, aa13, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n14, aa14, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n15, aa15, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n16, aa16, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n17, aa17, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n18, aa18, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n19, aa19, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n20, aa20, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n21, aa21, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n22, aa22, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n23, aa23, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n24, aa24, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n25, aa25, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n26, aa26, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n27, aa27, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n28, aa28, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n29, aa29, true),  alert.freq_once_per_bar_close)
+    alert("}}", alert.freq_once_per_bar_close)
+    alert("--- OM SNAPSHOT END ---", alert.freq_once_per_bar_close)
+
+// ==========================================
+// 8. DIRECT-CHART PARITY TEST (bypasses request.security)
+// ==========================================
+// Runs the SAME state machine directly on the chart's symbol using (dbgMA, dbgTolIdx)
+// to isolate whether discrepancy vs OS [ST] comes from the request.security wrapper.
+if dbgEnable
+    int dbg_ma_idx = dbgMA == "EMA9" ? 0 : dbgMA == "EMA20" ? 1 : dbgMA == "SMA50" ? 2 : dbgMA == "SMA200" ? 3 : 4
+    [_dg0, _dg1, _dg2, _dg3, _dg4] = get_tol_grid(dbg_ma_idx)
+    float dbg_tol = dbgTolIdx == 0 ? _dg0 : dbgTolIdx == 1 ? _dg1 : dbgTolIdx == 2 ? _dg2 : dbgTolIdx == 3 ? _dg3 : _dg4
+
+    float dbg_ma = dbgMA == "EMA9"   ? ta.ema(close, ema_fast_p) :
+                   dbgMA == "EMA20"  ? ta.ema(close, ema_slow_p) :
+                   dbgMA == "SMA50"  ? ta.sma(close, sma_mid_p)  :
+                   dbgMA == "SMA200" ? ta.sma(close, sma_long_p) :
+                                       ta.vwap
+
+    [_dm, _dub, _dlb] = ta.bb(close, 20, 2.0)
+    _dbk  = ta.sma(close, 20)
+    _drk  = ta.tr(true)
+    _dark = ta.sma(_drk, 20)
+    _dukc = _dbk + _dark * 1.5
+    _dlkc = _dbk - _dark * 1.5
+    bool dbg_sqz = (_dub < _dukc) and (_dlb > _dlkc)
+
+    [d_t, d_b, d_k, d_f] = run_sm(dbg_ma, dbg_sqz, dbg_tol > 0 ? dbg_tol : 0.0001, true, "DIRECT-" + dbgMA + "[" + str.tostring(dbgTolIdx) + "]")
+
+    if barstate.islast
+        log.info("=== DIRECT-CHART | " + syminfo.ticker + " " + timeframe.period + " " + dbgMA + " tol_idx=" + str.tostring(dbgTolIdx) + " tol=" + str.tostring(dbg_tol) + "% | Total=" + str.tostring(d_t) + " Bounce=" + str.tostring(d_b) + " Break=" + str.tostring(d_k) + " False=" + str.tostring(d_f) + " ===")
