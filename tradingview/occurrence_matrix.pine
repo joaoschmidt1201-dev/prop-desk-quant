@@ -653,7 +653,15 @@ must_alert      = enableAlert  and is_friday_close
 fmt_grid(float v0, float v1, float v2, float v3, float v4) =>
     "[" + str.tostring(v0) + "," + str.tostring(v1) + "," + str.tostring(v2) + "," + str.tostring(v3) + "," + str.tostring(v4) + "]"
 
-if must_log or must_alert
+// Per-ticker JSON fragment ("TICKER":[100 ints]) is ~400 chars and stays well
+// under Pine v5's 4096-char-per-string limit. The full payload (~12KB) does
+// NOT fit in a single Pine string, so we emit it line-by-line in Pine Logs
+// (head + 29 ticker rows + footer, with BEGIN/END markers). Use
+// `python scripts/om_paste_snapshot.py <DATE> <TF>` to assemble + validate.
+fmt_row(string name, string row, bool with_leading_comma) =>
+    (with_leading_comma ? ",\"" : "\"") + name + "\":[" + row + "]"
+
+if must_log
     [eg1_0, eg1_1, eg1_2, eg1_3, eg1_4] = get_tol_grid(0)
     [eg2_0, eg2_1, eg2_2, eg2_3, eg2_4] = get_tol_grid(1)
     [eg3_0, eg3_1, eg3_2, eg3_3, eg3_4] = get_tol_grid(2)
@@ -664,42 +672,83 @@ if must_log or must_alert
 
     string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json + ",\"schema\":\"v13\",\"data\":{"
 
-    string body = ""
-    body := body + "\""+n01+"\":["+aa01+"]"
-    body := body + ",\""+n02+"\":["+aa02+"]"
-    body := body + ",\""+n03+"\":["+aa03+"]"
-    body := body + ",\""+n04+"\":["+aa04+"]"
-    body := body + ",\""+n05+"\":["+aa05+"]"
-    body := body + ",\""+n06+"\":["+aa06+"]"
-    body := body + ",\""+n07+"\":["+aa07+"]"
-    body := body + ",\""+n08+"\":["+aa08+"]"
-    body := body + ",\""+n09+"\":["+aa09+"]"
-    body := body + ",\""+n10+"\":["+aa10+"]"
-    body := body + ",\""+n11+"\":["+aa11+"]"
-    body := body + ",\""+n12+"\":["+aa12+"]"
-    body := body + ",\""+n13+"\":["+aa13+"]"
-    body := body + ",\""+n14+"\":["+aa14+"]"
-    body := body + ",\""+n15+"\":["+aa15+"]"
-    body := body + ",\""+n16+"\":["+aa16+"]"
-    body := body + ",\""+n17+"\":["+aa17+"]"
-    body := body + ",\""+n18+"\":["+aa18+"]"
-    body := body + ",\""+n19+"\":["+aa19+"]"
-    body := body + ",\""+n20+"\":["+aa20+"]"
-    body := body + ",\""+n21+"\":["+aa21+"]"
-    body := body + ",\""+n22+"\":["+aa22+"]"
-    body := body + ",\""+n23+"\":["+aa23+"]"
-    body := body + ",\""+n24+"\":["+aa24+"]"
-    body := body + ",\""+n25+"\":["+aa25+"]"
-    body := body + ",\""+n26+"\":["+aa26+"]"
-    body := body + ",\""+n27+"\":["+aa27+"]"
-    body := body + ",\""+n28+"\":["+aa28+"]"
-    body := body + ",\""+n29+"\":["+aa29+"]"
+    log.info("--- OM SNAPSHOT BEGIN ---")
+    log.info(head)
+    log.info(fmt_row(n01, aa01, false))
+    log.info(fmt_row(n02, aa02, true))
+    log.info(fmt_row(n03, aa03, true))
+    log.info(fmt_row(n04, aa04, true))
+    log.info(fmt_row(n05, aa05, true))
+    log.info(fmt_row(n06, aa06, true))
+    log.info(fmt_row(n07, aa07, true))
+    log.info(fmt_row(n08, aa08, true))
+    log.info(fmt_row(n09, aa09, true))
+    log.info(fmt_row(n10, aa10, true))
+    log.info(fmt_row(n11, aa11, true))
+    log.info(fmt_row(n12, aa12, true))
+    log.info(fmt_row(n13, aa13, true))
+    log.info(fmt_row(n14, aa14, true))
+    log.info(fmt_row(n15, aa15, true))
+    log.info(fmt_row(n16, aa16, true))
+    log.info(fmt_row(n17, aa17, true))
+    log.info(fmt_row(n18, aa18, true))
+    log.info(fmt_row(n19, aa19, true))
+    log.info(fmt_row(n20, aa20, true))
+    log.info(fmt_row(n21, aa21, true))
+    log.info(fmt_row(n22, aa22, true))
+    log.info(fmt_row(n23, aa23, true))
+    log.info(fmt_row(n24, aa24, true))
+    log.info(fmt_row(n25, aa25, true))
+    log.info(fmt_row(n26, aa26, true))
+    log.info(fmt_row(n27, aa27, true))
+    log.info(fmt_row(n28, aa28, true))
+    log.info(fmt_row(n29, aa29, true))
+    log.info("}}")
+    log.info("--- OM SNAPSHOT END ---")
 
-    string payload = head + body + "}}"
-    if must_log
-        log.info(payload)
-    if must_alert
-        alert(payload, alert.freq_once_per_bar_close)
+if must_alert
+    // Auto Friday-close alert path: webhook receivers must concatenate the
+    // sequence of alert() calls between BEGIN and END markers.
+    [eg1_0, eg1_1, eg1_2, eg1_3, eg1_4] = get_tol_grid(0)
+    [eg2_0, eg2_1, eg2_2, eg2_3, eg2_4] = get_tol_grid(1)
+    [eg3_0, eg3_1, eg3_2, eg3_3, eg3_4] = get_tol_grid(2)
+    [eg4_0, eg4_1, eg4_2, eg4_3, eg4_4] = get_tol_grid(3)
+    [eg5_0, eg5_1, eg5_2, eg5_3, eg5_4] = get_tol_grid(4)
+    string tol_grid_json_a = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + "}"
+    string head_a = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\"],\"tol_grid\":" + tol_grid_json_a + ",\"schema\":\"v13\",\"data\":{"
+    alert("--- OM SNAPSHOT BEGIN ---", alert.freq_once_per_bar_close)
+    alert(head_a, alert.freq_once_per_bar_close)
+    alert(fmt_row(n01, aa01, false), alert.freq_once_per_bar_close)
+    alert(fmt_row(n02, aa02, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n03, aa03, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n04, aa04, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n05, aa05, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n06, aa06, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n07, aa07, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n08, aa08, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n09, aa09, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n10, aa10, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n11, aa11, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n12, aa12, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n13, aa13, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n14, aa14, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n15, aa15, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n16, aa16, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n17, aa17, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n18, aa18, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n19, aa19, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n20, aa20, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n21, aa21, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n22, aa22, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n23, aa23, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n24, aa24, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n25, aa25, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n26, aa26, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n27, aa27, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n28, aa28, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n29, aa29, true),  alert.freq_once_per_bar_close)
+    alert("}}", alert.freq_once_per_bar_close)
+    alert("--- OM SNAPSHOT END ---", alert.freq_once_per_bar_close)
 
 // ==========================================
 // 8. DIRECT-CHART PARITY TEST (bypasses request.security)
