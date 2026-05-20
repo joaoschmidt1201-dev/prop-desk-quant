@@ -44,10 +44,10 @@ export function pnlClass(v: number | null | undefined): string {
   return v > 0 ? "text-[var(--gain)]" : "text-[var(--loss)]";
 }
 
-/** Format an already-percentage value (e.g. -1.8 → "-1.80%"), with a +/- sign. */
+/** Format an already-percentage value (e.g. -1.8 → "-1.8%"), with a +/- sign. */
 export function fmtSignedPct(v: number | null | undefined): string {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
-  return `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
+  return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
 }
 
 /** Color BE→Spot distance by proximity: breached/within 2% = loss, within 5% = amber. */
