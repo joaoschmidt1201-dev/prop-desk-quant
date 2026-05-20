@@ -4,8 +4,10 @@ Procedures recorrentes do desk. Cada uma foi validada em produção.
 
 ## Rotinas Diárias
 
-### Morning Briefing (8:00 BRT)
-**Automático.** GitHub Actions roda `scripts/morning_briefing.py` em `cron: 0 11 * * 1-5`.
+### Morning Briefing (6:15 BRT)
+**Automático.** GitHub Actions roda `scripts/morning_briefing.py` em `cron: 15 9 * * 1-5`
+(09:15 UTC). Horário cedo + off-peak de propósito: o scheduler do GitHub atrasa crons no pico
+(11–12 UTC), então o buffer de ~4h15 vs. abertura (10:30 BRT) garante o disparo antes do mercado.
 
 Publica no Discord: VIX, futures ES/NQ/RTY, SPX + moving averages,
 GEX levels da semana, earnings intelligence (Finnhub EPS actuals),

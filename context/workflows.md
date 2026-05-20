@@ -19,7 +19,7 @@ Prop Desk Quant — Workflows Document
   ---
   Workflow 1 — Daily Morning Briefing (Automated)
 
-  Trigger: GitHub Actions cron, 11:00 UTC / 08:00 BRT, weekdays only
+  Trigger: GitHub Actions cron, 09:15 UTC / 06:15 BRT, weekdays only
   No manual action required on normal days.
 
   Execution sequence:

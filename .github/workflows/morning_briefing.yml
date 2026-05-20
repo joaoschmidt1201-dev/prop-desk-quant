@@ -4,10 +4,12 @@ on:
   workflow_dispatch:
     # Permite disparo manual pela aba GitHub Actions (útil para testes)
   schedule:
-    # 11:07 UTC = 8:07 BRT — 2.5h antes da abertura do mercado (10:30 BRT)
-    # Minuto :07 (não :00) para evitar a janela de pico do scheduler do GitHub,
-    # que frequentemente atrasa em horas ou dropa runs agendados no topo da hora.
-    - cron: '7 11 * * 1-5'
+    # 09:15 UTC = 6:15 BRT — ~4h15 antes da abertura do mercado US (13:30 UTC / 10:30 BRT, EDT).
+    # O scheduler do GitHub Actions NÃO garante o horário: enfileira e atrasa crons
+    # em janelas de pico, sendo a faixa 11:00–12:00 UTC e o topo da hora as piores.
+    # A defesa não é o minuto exato, é o BUFFER: às 09:15 UTC + minuto ímpar off-peak,
+    # mesmo um atraso de 2h ainda dispara bem antes da abertura.
+    - cron: '15 9 * * 1-5'
 
 jobs:
   morning-briefing:
