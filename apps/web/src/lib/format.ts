@@ -44,6 +44,21 @@ export function pnlClass(v: number | null | undefined): string {
   return v > 0 ? "text-[var(--gain)]" : "text-[var(--loss)]";
 }
 
+/** Format an already-percentage value (e.g. -1.8 → "-1.80%"), with a +/- sign. */
+export function fmtSignedPct(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
+}
+
+/** Color BE→Spot distance by proximity: breached/within 2% = loss, within 5% = amber. */
+export function beDistClass(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "text-muted-foreground";
+  const a = Math.abs(v);
+  if (v <= 0 || a < 2) return "text-[var(--loss)]";
+  if (a < 5) return "text-amber-400";
+  return "text-muted-foreground";
+}
+
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {

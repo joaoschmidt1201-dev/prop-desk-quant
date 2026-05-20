@@ -12,6 +12,7 @@ const API_BASE =
 export type Filter = {
   months: string[];
   env: string | null;
+  live?: boolean;
 };
 
 export type MonthInfo = {
@@ -38,6 +39,15 @@ export type Trade = {
   delta: number | null;
   pnl?: number;
   open_pnl?: number;
+  // Live BE→Spot distance (attached by /api/trades for active trades).
+  lw_be?: number | null;
+  up_be?: number | null;
+  spot?: number | null;
+  spot_source?: "live" | "open" | null;
+  spot_asof?: string | null;
+  dist_to_lw_be_pct?: number | null;
+  dist_to_up_be_pct?: number | null;
+  dist_to_be_pct?: number | null;
   [k: string]: unknown;
 };
 
@@ -467,7 +477,12 @@ export type OccurrenceMatrixPayload = {
 
 function qs(filter: Partial<Filter>): string {
   const params = new URLSearchParams();
-  if (filter.months?.length) params.set("month", filter.months.join(","));
+  if (filter.live) {
+    // Live ignores month selection on the backend; keep the URL clean.
+    params.set("live", "1");
+  } else if (filter.months?.length) {
+    params.set("month", filter.months.join(","));
+  }
   if (filter.env) params.set("env", filter.env);
   const s = params.toString();
   return s ? `?${s}` : "";

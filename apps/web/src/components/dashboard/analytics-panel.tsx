@@ -25,7 +25,7 @@ const WEEKDAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Unknown"];
 
 export function AnalyticsPanel({ filter }: Props) {
   const { data, isLoading } = useQuery({
-    queryKey: ["analytics", filter.months, filter.env],
+    queryKey: ["analytics", filter.months, filter.env, filter.live],
     queryFn: () => api.analytics(filter),
     placeholderData: (previousData) => previousData,
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,

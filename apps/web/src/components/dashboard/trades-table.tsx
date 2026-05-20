@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Filter, type Trade } from "@/lib/api";
-import { fmtDate, fmtMoney, pnlClass } from "@/lib/format";
+import { beDistClass, fmtDate, fmtMoney, fmtNum, fmtSignedPct, pnlClass } from "@/lib/format";
 import { DASHBOARD_REFETCH_INTERVAL_MS } from "@/lib/refresh";
 
 type Props = { filter: Filter };
@@ -14,6 +14,7 @@ const SORT_OPTIONS = [
   { value: "open_date", label: "Opening date" },
   { value: "ticker", label: "Ticker" },
   { value: "pnl", label: "P&L" },
+  { value: "be_distance", label: "BE distance" },
   { value: "expiration", label: "Expiration" },
 ] as const;
 
@@ -64,6 +65,15 @@ function compareTradesAsc(sortMode: SortMode, a: Trade, b: Trade): number {
       return compareText(a.underlying, b.underlying) || compareText(a.name, b.name);
     case "pnl":
       return compareNullableNumber(tradePnl(a), tradePnl(b), "asc") || compareText(a.name, b.name);
+    case "be_distance": {
+      // Closest-to-BE first: sort by |distance| ascending; trades without a BE go last.
+      const da = numericValue(a.dist_to_be_pct);
+      const db = numericValue(b.dist_to_be_pct);
+      return (
+        compareNullableNumber(da == null ? null : Math.abs(da), db == null ? null : Math.abs(db), "asc") ||
+        compareText(a.name, b.name)
+      );
+    }
     case "expiration":
       return compareNullableNumber(dateValue(a.exp_date), dateValue(b.exp_date), "asc") || compareText(a.name, b.name);
     case "status_dte":
@@ -84,7 +94,7 @@ export function TradesTable({ filter }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("status_dte");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { data, isLoading } = useQuery({
-    queryKey: ["trades", filter.months, filter.env],
+    queryKey: ["trades", filter.months, filter.env, filter.live],
     queryFn: () => api.trades(filter),
     placeholderData: (previousData) => previousData,
     refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS,
@@ -155,6 +165,8 @@ export function TradesTable({ filter }: Props) {
               <th className="px-3 py-3 text-right font-medium">NC</th>
               <th className="px-3 py-3 text-right font-medium">Max Loss</th>
               <th className="px-3 py-3 text-right font-medium">Delta</th>
+              <th className="px-3 py-3 text-right font-medium">Spot</th>
+              <th className="px-3 py-3 text-right font-medium">BE Δ%</th>
               <th className="px-3 py-3 text-right font-medium">P&L</th>
               <th className="px-6 py-3 text-right font-medium">Exp</th>
             </tr>
@@ -162,6 +174,15 @@ export function TradesTable({ filter }: Props) {
           <tbody>
             {trades.map((t: Trade) => {
               const pnl = tradePnl(t);
+              const beDist = numericValue(t.dist_to_be_pct);
+              const stale = t.spot_source === "open";
+              const beTitle = [
+                t.dist_to_lw_be_pct != null ? `Lower BE: ${fmtSignedPct(t.dist_to_lw_be_pct)}` : null,
+                t.dist_to_up_be_pct != null ? `Upper BE: ${fmtSignedPct(t.dist_to_up_be_pct)}` : null,
+                stale ? "spot = open price (live quote unavailable)" : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <tr key={t.name} className="border-t border-border/20 transition hover:bg-card/40">
                   <td className="px-6 py-3 font-medium tracking-tight">{t.name}</td>
@@ -182,6 +203,19 @@ export function TradesTable({ filter }: Props) {
                   <td className="px-3 py-3 text-right tabular text-muted-foreground">
                     {t.delta != null ? Number(t.delta).toFixed(1) : "--"}
                   </td>
+                  <td className="px-3 py-3 text-right tabular text-muted-foreground" title={t.spot_asof ? `as of ${fmtDate(t.spot_asof)}` : undefined}>
+                    {t.spot != null ? (
+                      <span className={stale ? "opacity-60" : ""}>
+                        {fmtNum(t.spot)}
+                        {stale && <span className="ml-0.5 text-muted-foreground/60">*</span>}
+                      </span>
+                    ) : (
+                      "--"
+                    )}
+                  </td>
+                  <td className={`px-3 py-3 text-right tabular ${beDistClass(beDist)}`} title={beTitle || undefined}>
+                    {fmtSignedPct(beDist)}
+                  </td>
                   <td className={`px-3 py-3 text-right tabular font-semibold ${pnlClass(pnl)}`}>{fmtMoney(pnl)}</td>
                   <td className="px-6 py-3 text-right tabular text-[11px] text-muted-foreground">{fmtDate(t.exp_date)}</td>
                 </tr>
@@ -189,7 +223,7 @@ export function TradesTable({ filter }: Props) {
             })}
             {trades.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={11} className="px-6 py-12 text-center text-sm text-muted-foreground">
                   No trades match the current filter.
                 </td>
               </tr>

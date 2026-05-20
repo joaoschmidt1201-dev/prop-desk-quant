@@ -49,6 +49,11 @@ except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/
         snapshot_mtimes as occurrence_snapshot_mtimes,
     )
 
+try:
+    from .live_spot import get_live_spots
+except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/api
+    from live_spot import get_live_spots
+
 # ─── Paths & env ──────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -317,12 +322,15 @@ def parse_months(months: str | None) -> list[str]:
     return sorted(parsed, key=_month_sort_tuple)
 
 
-def trade_in_filter(trade: dict[str, Any], months: list[str], env: str | None) -> bool:
+def trade_in_filter(trade: dict[str, Any], months: list[str], env: str | None, live: bool = False) -> bool:
+    if env and trade.get("environment") != env:
+        return False
+    # Live filter: only currently-open trades, regardless of month.
+    if live:
+        return bool(trade.get("is_active"))
     sheet = (trade.get("sheet") or "").strip()
     valid_sheet = bool(sheet and MONTH_SHEET_REGEX.match(sheet))
     if months and (not valid_sheet or sheet not in months):
-        return False
-    if env and trade.get("environment") != env:
         return False
     return True
 
@@ -336,6 +344,76 @@ def trade_pnl(trade: dict[str, Any], individual: dict[str, float]) -> float:
         if v is not None:
             return float(v)
     return 0.0
+
+
+def _as_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        f = float(value)
+        return f if f == f else None  # drop NaN
+    except (TypeError, ValueError):
+        return None
+
+
+def attach_live_be_distance(trades: list[dict[str, Any]]) -> None:
+    """Attach current spot + BE distance % to active trades. Mutates in place.
+
+    Spot comes from the batched/cached live_spot fetch. When live spot is missing
+    for an underlying (yfinance rate-limited/offline), falls back to the trade's
+    open price and marks spot_source='open'. Closed or BE-less trades get None so
+    the field shape stays stable for the frontend.
+
+    dist_to_lw_be_pct = (spot - lw_be) / spot * 100   (spot above the lower BE)
+    dist_to_up_be_pct = (up_be - spot) / spot * 100   (spot below the upper BE)
+    dist_to_be_pct    = whichever of the existing BEs is nearest (smallest |.|).
+    """
+    active = [t for t in trades if t.get("is_active")]
+    underlyings = {
+        str(t.get("underlying"))
+        for t in active
+        if t.get("underlying") and str(t.get("underlying")) not in {"?", "Unknown"}
+    }
+    spots = get_live_spots(underlyings) if underlyings else {}
+
+    for t in trades:
+        t["spot"] = None
+        t["spot_source"] = None
+        t["spot_asof"] = None
+        t["dist_to_lw_be_pct"] = None
+        t["dist_to_up_be_pct"] = None
+        t["dist_to_be_pct"] = None
+
+        if not t.get("is_active"):
+            continue
+        lw_be = _as_float(t.get("lw_be"))
+        up_be = _as_float(t.get("up_be"))
+        if lw_be is None and up_be is None:
+            continue
+
+        live = spots.get(str(t.get("underlying")))
+        if live:
+            spot = float(live["price"])
+            t["spot_source"] = "live"
+            t["spot_asof"] = live["asof"]
+        else:
+            spot = _as_float(t.get("underlying_price_at_open"))
+            if spot is None or spot <= 0:
+                continue
+            t["spot_source"] = "open"
+        t["spot"] = round(spot, 4)
+
+        candidates: list[float] = []
+        if lw_be is not None:
+            d = (spot - lw_be) / spot * 100
+            t["dist_to_lw_be_pct"] = round(d, 2)
+            candidates.append(d)
+        if up_be is not None:
+            d = (up_be - spot) / spot * 100
+            t["dist_to_up_be_pct"] = round(d, 2)
+            candidates.append(d)
+        if candidates:
+            t["dist_to_be_pct"] = round(min(candidates, key=abs), 2)
 
 
 def trade_delta(trade: dict[str, Any]) -> float:
@@ -601,6 +679,7 @@ class MonthsResponse(BaseModel):
 class FilterEcho(BaseModel):
     months: list[str]
     env: str | None
+    live: bool = False
 
 
 class TradesResponse(BaseModel):
@@ -830,10 +909,11 @@ def get_months() -> MonthsResponse:
 def get_trades(
     month: str | None = Query(None, description="Comma-separated month codes (e.g. APR26,MAR26)"),
     env: str | None = Query(None, description="Environment filter (CZ_Live, JS_Forward, CZ_Forward)"),
+    live: bool = Query(False, description="Only currently-open trades, regardless of month"),
 ) -> TradesResponse:
     snap = load_snapshot()
     months = parse_months(month)
-    trades = [t for t in snap.get("trades", []) if trade_in_filter(t, months, env)]
+    trades = [t for t in snap.get("trades", []) if trade_in_filter(t, months, env, live)]
 
     # Normalize PnL/delta and backfill display fields for visual-only orphan trades
     # (source=visual_sheet) that don't have a current db_robots row.
@@ -853,17 +933,21 @@ def get_trades(
             if exp:
                 t["dte_remaining"] = (exp.date() - today).days
 
-    return TradesResponse(filter=FilterEcho(months=months, env=env), trades=trades)
+    # Live spot + BE distance % for active positions (batched + cached fetch).
+    attach_live_be_distance(trades)
+
+    return TradesResponse(filter=FilterEcho(months=months, env=env, live=live), trades=trades)
 
 
 @app.get("/api/kpis", response_model=KpisResponse)
 def get_kpis(
     month: str | None = Query(None),
     env: str | None = Query(None),
+    live: bool = Query(False),
 ) -> KpisResponse:
     snap = load_snapshot()
     months = parse_months(month)
-    trades = [t for t in snap.get("trades", []) if trade_in_filter(t, months, env)]
+    trades = [t for t in snap.get("trades", []) if trade_in_filter(t, months, env, live)]
     individual_pnls = snap.get("individual_trade_pnls") or {}
 
     open_pnl = 0.0
@@ -901,7 +985,9 @@ def get_kpis(
     expectancy = (sum(closed_pnls) / len(closed_pnls)) if closed_pnls else None
 
     sheet_summaries = sheet_summary_lookup(snap)
-    selected_summaries = [
+    # Live view aggregates the open book trade-level; the sheet TOTAL rows are a
+    # month concept and don't apply, so skip them entirely when live.
+    selected_summaries = [] if live else [
         sheet_summaries[m]
         for m in months
         if m in sheet_summaries and (env is None or sheet_summaries[m].get("env") == env)
@@ -918,7 +1004,7 @@ def get_kpis(
             max_profit_total = sheet_max_profit
 
     return KpisResponse(
-        filter=FilterEcho(months=months, env=env),
+        filter=FilterEcho(months=months, env=env, live=live),
         pnl={
             "open": round(open_pnl, 2),
             "rlzd": round(rlzd, 2),
@@ -948,6 +1034,7 @@ def get_kpis(
 def get_analytics(
     month: str | None = Query(None),
     env: str | None = Query(None),
+    live: bool = Query(False),
 ) -> JSONResponse:
     snap = load_snapshot()
     months = parse_months(month)
@@ -956,12 +1043,15 @@ def get_analytics(
     sheet_daily_pnls = snap.get("sheet_daily_pnls") or {}
 
     def valid_month_trade(t: dict[str, Any]) -> bool:
+        if env and t.get("environment") != env:
+            return False
+        # Live view: only currently-open trades, regardless of month sheet.
+        if live:
+            return bool(t.get("is_active"))
         sheet = (t.get("sheet") or "").strip()
         if not sheet or not MONTH_SHEET_REGEX.match(sheet):
             return False
         if months and sheet not in months:
-            return False
-        if env and t.get("environment") != env:
             return False
         return True
 
@@ -1080,7 +1170,7 @@ def get_analytics(
         insights.append({"label": "Loss concentration", "value": f"{abs(min(losses)) / abs(sum(losses)):.0%}", "detail": "largest loss / total gross losses"})
 
     return JSONResponse({
-        "filter": {"months": months, "env": env},
+        "filter": {"months": months, "env": env, "live": live},
         "summary": {
             "total_pnl": round(total_pnl, 2),
             "n_trades": len(trades),
@@ -2324,7 +2414,8 @@ async def chat(req: ChatRequest, request: Request) -> StreamingResponse:
     snap = load_snapshot()
     months = req.filter.months
     env = req.filter.env
-    trades = [t for t in snap.get("trades", []) if trade_in_filter(t, months, env)]
+    live = req.filter.live
+    trades = [t for t in snap.get("trades", []) if trade_in_filter(t, months, env, live)]
 
     system_prompt = _build_system_prompt(trades, snap, months, env)
     messages = [{"role": m.role, "content": m.content} for m in req.messages if m.role != "system"]

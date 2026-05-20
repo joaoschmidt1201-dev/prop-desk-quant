@@ -14,13 +14,15 @@ import { TradesDownload } from "./trades-download";
 export function Dashboard() {
   const [selectedUser, setSelectedUser] = useState<"CZ" | "JS">("CZ");
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [live, setLive] = useState(false);
   const queryClient = useQueryClient();
   const filter = useMemo<Filter>(
     () => ({
       months: selectedMonths,
       env: selectedUser === "JS" ? "JS_Forward" : "CZ_Live",
+      live,
     }),
-    [selectedMonths, selectedUser],
+    [selectedMonths, selectedUser, live],
   );
 
   useEffect(() => {
@@ -39,8 +41,10 @@ export function Dashboard() {
           <MonthFilter
             selectedUser={selectedUser}
             selectedMonths={selectedMonths}
+            live={live}
             onUserChange={setSelectedUser}
             onChange={setSelectedMonths}
+            onLiveChange={setLive}
           />
         </div>
 

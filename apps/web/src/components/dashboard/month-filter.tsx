@@ -11,15 +11,24 @@ type DeskUser = "CZ" | "JS";
 type Props = {
   selectedUser: DeskUser;
   selectedMonths: string[];
+  live: boolean;
   onUserChange: (user: DeskUser) => void;
   onChange: (months: string[]) => void;
+  onLiveChange: (live: boolean) => void;
 };
 
 function isJsMonth(sheet: string): boolean {
   return sheet.trim().toUpperCase().startsWith("JS ");
 }
 
-export function MonthFilter({ selectedUser, selectedMonths, onUserChange, onChange }: Props) {
+export function MonthFilter({
+  selectedUser,
+  selectedMonths,
+  live,
+  onUserChange,
+  onChange,
+  onLiveChange,
+}: Props) {
   const { data } = useQuery({
     queryKey: ["months"],
     queryFn: () => api.months(),
@@ -55,6 +64,7 @@ export function MonthFilter({ selectedUser, selectedMonths, onUserChange, onChan
   }, [months.length, onChange, selectedInScope.length, selectedMonths, visibleSheetSet, visibleSheets]);
 
   function toggle(sheet: string) {
+    onLiveChange(false); // choosing a period exits the live view
     if (selectedMonths.includes(sheet)) {
       const next = selectedMonths.filter((month) => month !== sheet);
       onChange(next.length ? next : visibleSheets);
@@ -68,9 +78,25 @@ export function MonthFilter({ selectedUser, selectedMonths, onUserChange, onChan
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground/70">Period</span>
         <button
-          onClick={() => onChange(visibleSheets)}
+          onClick={() => onLiveChange(true)}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-semibold transition ${
+            live
+              ? "bg-[var(--gain)]/15 text-[var(--gain)] ring-1 ring-[var(--gain)]/40"
+              : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
+          }`}
+          title="Open positions only, across all months"
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-[var(--gain)] animate-pulse" : "bg-muted-foreground/60"}`} />
+          Live
+        </button>
+        <span className="mx-0.5 h-4 w-px bg-border/50" aria-hidden />
+        <button
+          onClick={() => {
+            onLiveChange(false);
+            onChange(visibleSheets);
+          }}
           className={`rounded-md px-3 py-1 text-[11px] font-medium transition ${
-            allVisibleSelected
+            !live && allVisibleSelected
               ? "bg-primary/15 text-primary ring-1 ring-primary/40"
               : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
           }`}
@@ -78,12 +104,14 @@ export function MonthFilter({ selectedUser, selectedMonths, onUserChange, onChan
           All
         </button>
         {visibleMonths.map((month) => {
-          const active = selectedMonths.includes(month.sheet);
+          const active = !live && selectedMonths.includes(month.sheet);
           return (
             <button
               key={month.sheet}
               onClick={() => toggle(month.sheet)}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-[11px] font-medium transition ${
+                live ? "opacity-50" : ""
+              } ${
                 active
                   ? "bg-primary/15 text-primary ring-1 ring-primary/40"
                   : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
