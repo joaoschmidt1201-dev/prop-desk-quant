@@ -1,18 +1,21 @@
 # PROJETO — Backtest das Estratégias de Butterfly do Ernie (QuantConnect)
 *Charter vivo · multi-dia · será refinado ao longo do processo · criado 2026-05-20*
 
-## ▶ RETOMAR AQUI (ponto de parada — 2026-05-20)
-**Onde paramos:** Fase 0 ✅ (dados SPXW grátis no QC validados) e Fase 1 ✅ (algo escrito e validado em janela curta 2024-11: 4 trades, 1 W zone2, net +$185, aritmética conferida trade a trade).
+## ▶ RETOMAR AQUI (ponto de parada — 2026-05-21)
+**Onde paramos:** Fase 0 ✅ e Fase 1 ✅ (algo). **Bloco 2024 RODADO + BUG DE SETTLEMENT ENCONTRADO E CORRIGIDO.** O run deu net **analítico +$10,237** (72 trades, WR 25%, PF 1.71, zonas z0 75%/z2 14%/z3 11%/z1 0%), MAS a **equity OFICIAL do QC deu –$2,405 (End Equity 98.624 / –1,376% / Sharpe –0.937)**. Reconciliação (`reconcile_fase1_2024.py`): divergência de **$12,642**, concentrada em poucos trades (18/dez –5,940 vs –300; 10/jul winner cortado 840 vs 2,402; 07/ago –1,645 vs –295).
 
-**Próxima ação (começar por aqui amanhã):** rodar o **primeiro estudo de ano inteiro** no QC.
-1. Abrir o algo (`backtests/quantconnect/fase1_classic_otm_fly.py`) e trocar as 2 datas no topo do `initialize`:
-   `self.set_start_date(2024, 1, 1)` / `self.set_end_date(2024, 12, 31)`.
-2. Rodar; pegar o resumo + o bloco `>>>CSV_START … >>>CSV_END` do log (download do ObjectStore é gated → usar o log).
-3. Repetir em blocos: 2022(jun→dez), 2023, 2025, 2026 — o Claude costura os CSVs.
-4. Comparar a distribuição (win rate, múltiplo do winner, PF, Sharpe) com o subset SPX do log do Ernie.
+**CAUSA-RAIZ:** o algo fechava as 4 pernas com **market order (`self.liquidate()`) às 16:01** no expiry. SPXW é europeu **PM cash-settled** → liquida em CAIXA no preço oficial (= intrínseco, SEM spread). Market order no minuto do expiry **cruza o spread gigante das pernas deep-ITM** → perdas/cortes fantasmas que violam a convexidade do fly. ∴ **+$10,237 analítico = correto; –$2,405 do QC = artefato.** **FIX:** removido o `self.liquidate()` do `_settle_open_trade`; deixar o LEAN cash-settle nativo. *(Aprendizado p/ todas as fases: cash-settled index options NUNCA fecham por market order no expiry.)*
+
+**FIX CONFIRMADO END-TO-END (2026-05-21):** validado na janela curta (nov/2024: +$175 ≈ +$185) e depois **no ANO INTEIRO** → **End Equity $110.253 = Net +$10,253 / +10,253%**, Sharpe 0.305, **PF 1.80** (= Ernie SPX), WR 42%, DD 3% — bate com o analítico +$10,237 (resíduo só **$16**). Pior **P&L realizado** de qualquer perna no ano: **–$960** (regra dos 10% intacta).
+
+**⚠️ Leitura da aba Trades (não confundir):** os –$23k/–$12k/–$5k são a **coluna MAE** (Maximum Adverse Excursion = pior swing INTRADAY de UMA perna isolada), NÃO P&L realizado — a short deep-ITM infla no intraday mas é compensada pelas longs; o fly inteiro fica limitado. A **coluna P&L do blotter também não mostra o resultado dos winners** (intrínseco da long ITM é creditado em caixa SEPARADO). **Fonte da verdade = a EQUITY, não o blotter.** Provas: `verify_fase1_2024_postfix.py`, `reconcile_fase1_2024.py`.
+
+**Próxima ação (começar por aqui):**
+1. **→ AQUI — EMPILHAR OS PRÓXIMOS BLOCOS:** rodar **2022(jun→dez) → 2023 → 2025 → 2026** (mesmo baseline; semestres se estourar o compute do tier free). João roda cada um e traz End Equity + CSV de orders; Claude costura os anos.
+2. Comparar a distribuição agregada com o subset SPX-only do log do Ernie (Sharpe 4.02 / PF 1.80). *2024: PF já bate (1.80), Sharpe baixo (0.31 vs 4.02) — o gap é o trail/timing discricionário do Ernie (Fase 2).*
 *(Manter o baseline: `placement_mode="debit"`, asa 30, EMA9, 10:00. Varreduras de asa/horário/EMA-vs-Hull vêm depois.)*
 
-**Pendências anotadas:** IV às vezes vem 0 na cadeia (ok no modo debit; resolver no modo sigma da F3); reconciliar 1× o net analítico vs equity oficial do QC (fills+fees). **Git: ainda NÃO commitado** (arquivos salvos em disco/OneDrive).
+**Pendências anotadas:** IV às vezes vem 0 na cadeia (ok no modo debit; resolver no modo sigma da F3). **Git: marco Fase 1 em `7e0d763`**; fix de settlement (validado end-to-end no ano) + datas + charter + CSVs + scripts **ainda NÃO commitados** — 2024 fechado, prontos p/ versionar quando o João pedir.
 
 ## Context
 Pedido do CZ (sessão 2026-05-20): entender a estratégia 0DTE que ele opera (framework do

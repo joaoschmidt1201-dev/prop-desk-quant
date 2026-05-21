@@ -19,14 +19,17 @@ class Fase1ClassicOtmFly(QCAlgorithm):
     Emite log por-trade no ObjectStore (`fase1_trades.csv`) para ingestão no app do desk
     (CZ Dashboard / Trade Auditor) — colunas alinhadas ao log do Ernie + extras.
 
-    >>> RODAR PRIMEIRO a janela curta de validação. Só depois expandir p/ 2022-06 -> presente. <<<
+    >>> Validação curta (nov/2024) JÁ PASSOU. Agora rodamos o estudo por BLOCOS DE ANO:
+        2024 -> 2022(jun→dez) -> 2023 -> 2025 -> 2026 (o Claude costura os CSVs). <<<
     """
 
     # ===================== CONFIG (parâmetros varríveis) =====================
     def initialize(self):
-        # ---- Janela CURTA de validação (sobrepõe trades reais de nov/2024 do log do Ernie) ----
-        self.set_start_date(2024, 11, 4)
-        self.set_end_date(2024, 11, 15)
+        # ---- Estudo de ANO INTEIRO — bloco 2024 (fix de settlement VALIDADO na janela curta:
+        # nov/2024 deu End Equity +$175 ≈ analítico +$185, winner 06/nov pagou +$985 cheio,
+        # zero perna fantasma). Depois de 2024: 2022(jun→dez)/2023/2025/2026. ----
+        self.set_start_date(2024, 1, 1)
+        self.set_end_date(2024, 12, 31)
         self.set_cash(100_000)
         self.set_time_zone(TimeZones.NEW_YORK)
 
@@ -240,7 +243,12 @@ class Fase1ClassicOtmFly(QCAlgorithm):
             "zone": self._zone(ret), "result": "W" if net > 0 else "L",
         }
         self.trades.append(rec)
-        self.liquidate()                              # garante flat (se o LEAN já não liquidou)
+        # ⚠️ NÃO liquidar via market order. SPXW é europeu, PM cash-settled: a posição liquida
+        # em CAIXA no preço oficial de settlement (= intrínseco, SEM spread). Mandar market order
+        # no minuto do expiry cruzava o spread enorme das pernas deep-ITM e gerava perdas/cortes
+        # FANTASMAS que violam a convexidade do fly (ex.: 18/dez/2024 perna -$26k; winners cortados
+        # pela metade). Deixar o LEAN cash-settle as SPXW no expiry -> equity oficial = intrínseco.
+        # (Recordamos o intrínseco analítico acima; a equity do QC deve bater após o fix.)
         self.open_trade = None
         self.debug(f"{self.time} SETTLE {rec['side']} S_T={S_T:.0f} payoff={payoff:.2f} net={net:.0f} zone={rec['zone']}")
 
