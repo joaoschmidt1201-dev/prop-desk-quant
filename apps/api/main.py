@@ -1280,13 +1280,13 @@ for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:
 import os as _os_batman
 _BATMAN_DIR = BACKTESTS_ROOT / "batman_backtest_app"
 _BATMAN_LABELS = {
-    "1DTE_debit": "Batman 1DTE · débito 5% · width VIX (CZ)",
-    "1DTE_debit_search": "Batman 1DTE · débito · width-search (baseline)",
-    "1DTE_delta": "Batman 1DTE · Δ-placement · width VIX",
-    "0DTE_debit": "Batman 0DTE · débito 5% · width VIX",
-    "0DTE_delta": "Batman 0DTE · Δ-placement · width VIX",
-    "wMonFri_debit": "Batman seg→sex (4-5DTE) · débito · width VIX",
-    "wFriFri_debit": "Batman sex→sex (7DTE) · débito · width VIX",
+    "1DTE_debit": "Batman 1DTE · 5% debit · VIX-width (CZ)",
+    "1DTE_debit_search": "Batman 1DTE · debit · width-search (baseline)",
+    "1DTE_delta": "Batman 1DTE · delta-placement · VIX-width",
+    "0DTE_debit": "Batman 0DTE · 5% debit · VIX-width",
+    "0DTE_delta": "Batman 0DTE · delta-placement · VIX-width",
+    "wMonFri_debit": "Batman Mon→Fri (4-5DTE) · debit · VIX-width",
+    "wFriFri_debit": "Batman Fri→Fri (7DTE) · debit · VIX-width",
 }
 if _BATMAN_DIR.exists():
     for _tag in sorted(_os_batman.listdir(_BATMAN_DIR)):
@@ -1299,8 +1299,9 @@ if _BATMAN_DIR.exists():
             "strategy": "Batman (dual OTM butterfly)",
             "horizon": _tag.split("_")[0],
             "description": (
-                f"Batman {_tag} · SPXW · entrada 15:45 ET · hold-to-expiry · width pela tabela "
-                "VIX do CZ/Ernie · P&L reconstruído (settlement payoff) calibrado à equity QC · $100k cap"
+                f"Batman {_tag} · SPXW · 15:45 ET entry · hold-to-expiry · width from the CZ/Ernie "
+                "VIX table · per-trade P&L reconstructed from settlement payoff and scaled to match the "
+                "official QC equity (aggregate & per-VIX figures authoritative) · $100k capital"
             ),
             "trades_csv": f"batman_backtest_app/{_tag}/trades.csv",
             "daily_csv": f"batman_backtest_app/{_tag}/daily.csv",
