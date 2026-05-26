@@ -1273,6 +1273,41 @@ for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:
         "multiplier": 1,  # premium already in USD in trades.csv
     })
 
+# Batman (dual OTM butterfly, 0-7DTE) — reconstruído de closedTrades (QC API) via
+# settlement payoff (SPX close) calibrado à equity autoritativa do QC. Ver
+# scripts/batman_export_app.py. Registro DINÂMICO: cada cenário com CSV em
+# reports/batman_backtest_app/<tag>/ vira uma entrada (novos aparecem ao reiniciar).
+import os as _os_batman
+_BATMAN_DIR = BACKTESTS_ROOT / "batman_backtest_app"
+_BATMAN_LABELS = {
+    "1DTE_debit": "Batman 1DTE · débito 5% · width VIX (CZ)",
+    "1DTE_debit_search": "Batman 1DTE · débito · width-search (baseline)",
+    "1DTE_delta": "Batman 1DTE · Δ-placement · width VIX",
+    "0DTE_debit": "Batman 0DTE · débito 5% · width VIX",
+    "0DTE_delta": "Batman 0DTE · Δ-placement · width VIX",
+    "wMonFri_debit": "Batman seg→sex (4-5DTE) · débito · width VIX",
+    "wFriFri_debit": "Batman sex→sex (7DTE) · débito · width VIX",
+}
+if _BATMAN_DIR.exists():
+    for _tag in sorted(_os_batman.listdir(_BATMAN_DIR)):
+        if not (_BATMAN_DIR / _tag / "trades.csv").exists():
+            continue
+        BACKTESTS_REGISTRY.append({
+            "id": f"batman-{_tag.replace('_', '-').lower()}",
+            "name": _BATMAN_LABELS.get(_tag, f"Batman {_tag}"),
+            "underlying": "SPX",
+            "strategy": "Batman (dual OTM butterfly)",
+            "horizon": _tag.split("_")[0],
+            "description": (
+                f"Batman {_tag} · SPXW · entrada 15:45 ET · hold-to-expiry · width pela tabela "
+                "VIX do CZ/Ernie · P&L reconstruído (settlement payoff) calibrado à equity QC · $100k cap"
+            ),
+            "trades_csv": f"batman_backtest_app/{_tag}/trades.csv",
+            "daily_csv": f"batman_backtest_app/{_tag}/daily.csv",
+            "kind": "batman",
+            "multiplier": 1,
+        })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
