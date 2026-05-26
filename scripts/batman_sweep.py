@@ -41,6 +41,10 @@ BASE = {"symmetry": "sym", "width_mode": "vix_table", **SPAN}
 
 # (tag, overrides) — só eixos ESTRUTURAIS. VIX/close-rule/TP saem das runtime stats de cada run.
 GRID = [
+    # close-rule %-over-debit EXECUTADA no faithful 1DTE (prioridade — pedido do CZ)
+    ("1DTE_debit_tp50",  {"structure": "1DTE", "placement_mode": "debit", "tp_close_frac": "0.5"}),
+    ("1DTE_debit_tp100", {"structure": "1DTE", "placement_mode": "debit", "tp_close_frac": "1.0"}),
+    ("1DTE_debit_tp200", {"structure": "1DTE", "placement_mode": "debit", "tp_close_frac": "2.0"}),
     ("1DTE_debit",    {"structure": "1DTE",           "placement_mode": "debit"}),
     ("1DTE_delta",    {"structure": "1DTE",           "placement_mode": "delta"}),
     ("0DTE_debit",    {"structure": "0DTE",           "placement_mode": "debit"}),

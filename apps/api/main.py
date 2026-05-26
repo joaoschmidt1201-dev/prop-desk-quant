@@ -1280,7 +1280,10 @@ for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:
 import os as _os_batman
 _BATMAN_DIR = BACKTESTS_ROOT / "batman_backtest_app"
 _BATMAN_LABELS = {
-    "1DTE_debit": "Batman 1DTE · 5% debit · VIX-width (CZ)",
+    "1DTE_debit": "Batman 1DTE · 5% debit · VIX-width (CZ) · hold",
+    "1DTE_debit_tp50": "Batman 1DTE · 5% debit · close at +50% debit",
+    "1DTE_debit_tp100": "Batman 1DTE · 5% debit · close at +100% debit",
+    "1DTE_debit_tp200": "Batman 1DTE · 5% debit · close at +200% debit",
     "1DTE_debit_search": "Batman 1DTE · debit · width-search (baseline)",
     "1DTE_delta": "Batman 1DTE · delta-placement · VIX-width",
     "0DTE_debit": "Batman 0DTE · 5% debit · VIX-width",

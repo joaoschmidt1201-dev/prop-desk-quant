@@ -90,6 +90,8 @@ class Batman1DteV1(QCAlgorithm):
         # Inclui 0.10 e 0.20 p/ casar 1:1 com os profit-targets do app (_scan_close_rule). ----
         self.tp_levels = [0.10, 0.20, 0.25, 0.50, 0.75, 1.00, 1.50, 2.00]
         self.mark_every_min = 5            # cadência de marcação intraday no dia do expiry (compute)
+        _tpc = self.get_parameter("tp_close_frac", "none")   # none=hold; ex. 0.5 = fecha a fly a +50% do débito
+        self.tp_close_frac = None if _tpc in ("none", "None", "") else float(_tpc)
 
         # ---- Universo (SPX/SPXW; multi-ticker = futuro) ----
         index = self.add_index("SPX", Resolution.MINUTE)
@@ -306,12 +308,14 @@ class Batman1DteV1(QCAlgorithm):
             "entry_debit": debit, "debit_frac": (debit / actual_w) if actual_w else 0.0,
             "short_delta": short_delta,
             # gravação de gestão (preenchidos na marcação intraday):
-            "max_value": debit, "cross": {lvl: None for lvl in self.tp_levels},
+            "max_value": debit, "cross": {lvl: None for lvl in self.tp_levels}, "closed": False,
         }
 
     # ===================== MARCAÇÃO (grava cruzamentos de TP) =====================
     def _mark_batman(self, bm):
         for fly in bm["flies"]:
+            if fly.get("closed"):
+                continue
             lo, mid, up = fly["c_low"].symbol, fly["c_mid"].symbol, fly["c_up"].symbol
             # valor p/ FECHAR a fly (conservador): vende as longs no bid, recompra as shorts no ask
             lo_b = self.securities[lo].bid_price
@@ -326,6 +330,15 @@ class Batman1DteV1(QCAlgorithm):
             for lvl in self.tp_levels:
                 if fly["cross"][lvl] is None and value >= (1.0 + lvl) * d:
                     fly["cross"][lvl] = (self.time.strftime("%H:%M"), round(value, 2))
+            # CLOSE-RULE %-over-debit EXECUTADA: fecha a fly ao cruzar (1+tp_close_frac)*débito
+            if self.tp_close_frac is not None and value >= (1.0 + self.tp_close_frac) * d:
+                exp = fly["c_mid"].expiry
+                if fly["side"] == "Call":
+                    self.sell(OptionStrategies.butterfly_call(self.spxw, fly["upper"], fly["center"], fly["lower"], exp), 1)
+                else:
+                    self.sell(OptionStrategies.butterfly_put(self.spxw, fly["upper"], fly["center"], fly["lower"], exp), 1)
+                fly["closed"] = True
+                self._record(bm, fly, self.securities[self.spx].price, value)   # realiza no valor do TP
 
     # ===================== SETTLE =====================
     def _settle_due(self):
@@ -339,6 +352,8 @@ class Batman1DteV1(QCAlgorithm):
             if bm["expiry"] != self.time.date():
                 still_open.append(bm); continue
             for fly in bm["flies"]:
+                if fly.get("closed"):
+                    continue                      # já fechado pela close-rule (TP) — não settla de novo
                 lo, mid, up = fly["lower"], fly["center"], fly["upper"]
                 if fly["side"] == "Call":
                     payoff = max(0, S_T - lo) - 2 * max(0, S_T - mid) + max(0, S_T - up)

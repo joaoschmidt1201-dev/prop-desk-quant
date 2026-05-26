@@ -127,13 +127,17 @@ def export(bid, tag, underlying="SPX", qc_net=None):
         if S_exp is None:
             skipped += 1; continue
         # P&L pelo PAYOFF real (closedTrades.profitLoss ignora o cash-settle ITM -> errado).
-        debit = 0.0; settle = 0.0
+        debit = 0.0; pnl = 0.0
         for l in legs:
             _, right, K = parse_symbol(l["symbols"][0]["value"])
             n = (1 if l["direction"] == 0 else -1) * abs(l["quantity"]) * 100
             debit += n * l["entryPrice"]
-            settle += n * (max(0.0, S_exp - K) if right == "C" else max(0.0, K - S_exp))
-        pnl = round(settle - debit, 2); debit = round(debit, 2)
+            if (l.get("exitPrice") or 0) > 0:     # fechada CEDO (TP real) -> P&L do round-trip (correto)
+                pnl += l.get("profitLoss") or 0
+            else:                                  # held-to-expiry -> payoff (closedTrades ignora cash-settle)
+                intr = max(0.0, S_exp - K) if right == "C" else max(0.0, K - S_exp)
+                pnl += n * (intr - l["entryPrice"])
+        pnl = round(pnl, 2); debit = round(debit, 2)
         vix = vix_at(tdate, vdf)
         dte = max((exp - tdate).days, 1)
         trades.append({
