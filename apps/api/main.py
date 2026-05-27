@@ -1679,6 +1679,48 @@ def _backtest_kpis(
             "total_pnl_pct": round(row["total_pnl"] / BACKTEST_STARTING_CAPITAL, 4),
         })
 
+    # ── VIX regime breakdown — CZ/Ernie width-table regimes (<17 / 17-25 / 25-32 / 32+).
+    # Answers "which VIX regime actually pays". Only populated when trades carry vix_entry.
+    def _vix_bucket(v: float) -> str:
+        if v < 17:
+            return "VIX < 17"
+        if v < 25:
+            return "VIX 17-25"
+        if v < 32:
+            return "VIX 25-32"
+        return "VIX 32+"
+
+    vix_acc: dict[str, dict[str, Any]] = {}
+    for t in closed:
+        v = t.get("vix_entry")
+        if v is None:
+            continue
+        try:
+            vf = float(v)
+        except (TypeError, ValueError):
+            continue
+        pnl = float(t.get("pnl_usd") or 0)
+        b = _vix_bucket(vf)
+        row = vix_acc.setdefault(b, {"n_trades": 0, "wins": 0, "total_pnl": 0.0})
+        row["n_trades"] += 1
+        if pnl > 0:
+            row["wins"] += 1
+        row["total_pnl"] += pnl
+    vix_breakdown = []
+    for b in ("VIX < 17", "VIX 17-25", "VIX 25-32", "VIX 32+"):
+        if b not in vix_acc:
+            continue
+        row = vix_acc[b]
+        wr = row["wins"] / row["n_trades"] if row["n_trades"] else None
+        vix_breakdown.append({
+            "bucket": b,
+            "n_trades": row["n_trades"],
+            "wins": row["wins"],
+            "win_rate": round(wr, 4) if wr is not None else None,
+            "total_pnl": round(row["total_pnl"], 2),
+            "total_pnl_pct": round(row["total_pnl"] / BACKTEST_STARTING_CAPITAL, 4),
+        })
+
     return {
         "n_trades": n,
         "n_open": len(trades) - n,
@@ -1706,6 +1748,7 @@ def _backtest_kpis(
         "return_on_peak_capital_pct": round(return_on_peak_cap_pct, 4) if return_on_peak_cap_pct is not None else None,
         "capital_utilization_pct": round(capital_utilization_pct, 4) if capital_utilization_pct is not None else None,
         "yearly_breakdown": yearly_breakdown,
+        "vix_breakdown": vix_breakdown,
     }
 
 
@@ -1762,13 +1805,18 @@ def get_backtest(
         available_rules = SS42_RULES
     elif meta["kind"] == "triplecal":
         available_rules = TRIPLECAL_RULES
+    elif meta["kind"] == "batman":
+        # Batman profit-targets are %-of-net-debit and executed in-engine, so each
+        # target is its own backtest (tp50/tp100/tp200). The generic tastytrade close
+        # rules don't apply here (1DTE has no usable intraday MTM in the daily marks),
+        # so we only expose Hold and let CZ compare the executed-TP backtests side by side.
+        available_rules = ["Hold to Expiration"]
     else:
         available_rules = IC7_RULES
     rule_to_use = rule if rule in available_rules else "Hold to Expiration"
     vix_filter_to_use = vix_filter if vix_filter in VIX_FILTERS else "All"
-    # Triple calendar is the only family currently carrying VIX entry; for others
-    # VIX filter is a no-op (trades lacking vix_entry would all be dropped).
-    available_vix_filters = VIX_FILTERS if meta["kind"] in ("triplecal", "ss42") else ["All"]
+    # These families carry vix_entry, so the VIX entry filter is meaningful.
+    available_vix_filters = VIX_FILTERS if meta["kind"] in ("triplecal", "ss42", "batman") else ["All"]
 
     filtered_trades = _filter_by_vix(raw_trades, vix_filter_to_use)
     trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"])

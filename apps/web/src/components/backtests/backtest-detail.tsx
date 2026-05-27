@@ -160,6 +160,7 @@ export function BacktestDetail({ id }: { id: string }) {
         </div>
       </div>
       <YearlyBreakdownCard detail={safeData} />
+      <VixBreakdownCard detail={safeData} />
       <div className="mt-6">
         <TradesTable detail={safeData} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
         <TradeInspector detail={safeData} index={selectedIdx} onChange={setSelectedIdx} />
@@ -407,6 +408,68 @@ export function YearlyBreakdownCard({ detail }: { detail: BacktestDetailType }) 
               {rows.map((r) => (
                 <tr key={r.year} className="border-b border-border/30 last:border-0">
                   <td className="px-3 py-2 text-left font-medium">{r.year}</td>
+                  <td className="px-3 py-2 text-right">{r.n_trades}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{r.wins}</td>
+                  <td className="px-3 py-2 text-right">{fmtPct(r.win_rate)}</td>
+                  <td className={`px-3 py-2 text-right font-medium ${pnlClass(r.total_pnl)}`}>{fmtMoney(r.total_pnl)}</td>
+                  <td className={`px-3 py-2 text-right ${pnlClass(r.total_pnl_pct)}`}>{fmtPct(r.total_pnl_pct)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border/80 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <td className="px-3 py-2 text-left font-semibold">Total</td>
+                <td className="px-3 py-2 text-right font-semibold">{totals.n_trades}</td>
+                <td className="px-3 py-2 text-right font-semibold">{totals.wins}</td>
+                <td className="px-3 py-2 text-right font-semibold">{fmtPct(totalWr)}</td>
+                <td className={`px-3 py-2 text-right font-semibold ${pnlClass(totals.total_pnl)}`}>{fmtMoney(totals.total_pnl)}</td>
+                <td className={`px-3 py-2 text-right font-semibold ${pnlClass(totals.total_pnl_pct)}`}>{fmtPct(totals.total_pnl_pct)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </ChartCard>
+    </div>
+  );
+}
+
+export function VixBreakdownCard({ detail }: { detail: BacktestDetailType }) {
+  const rows = detail.kpis.vix_breakdown ?? [];
+  if (rows.length === 0) return null;
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.n_trades += r.n_trades;
+      acc.wins += r.wins;
+      acc.total_pnl += r.total_pnl;
+      acc.total_pnl_pct += r.total_pnl_pct;
+      return acc;
+    },
+    { n_trades: 0, wins: 0, total_pnl: 0, total_pnl_pct: 0 },
+  );
+  const totalWr = totals.n_trades ? totals.wins / totals.n_trades : null;
+  return (
+    <div className="mt-6">
+      <ChartCard
+        title="VIX regime breakdown"
+        icon={<Activity className="h-4 w-4" />}
+        sub={`${rows.length} regimes · entry-VIX grouping (CZ/Ernie width table)`}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm tabular">
+            <thead>
+              <tr className="border-b border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">VIX regime</th>
+                <th className="px-3 py-2 text-right font-medium">Trades</th>
+                <th className="px-3 py-2 text-right font-medium">Wins</th>
+                <th className="px-3 py-2 text-right font-medium">WR</th>
+                <th className="px-3 py-2 text-right font-medium">P&L</th>
+                <th className="px-3 py-2 text-right font-medium">P&L %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.bucket} className="border-b border-border/30 last:border-0">
+                  <td className="px-3 py-2 text-left font-medium">{r.bucket}</td>
                   <td className="px-3 py-2 text-right">{r.n_trades}</td>
                   <td className="px-3 py-2 text-right text-muted-foreground">{r.wins}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(r.win_rate)}</td>

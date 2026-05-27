@@ -163,6 +163,15 @@ export type BacktestYearRow = {
   total_pnl_pct: number;
 };
 
+export type BacktestVixRow = {
+  bucket: string;
+  n_trades: number;
+  wins: number;
+  win_rate: number | null;
+  total_pnl: number;
+  total_pnl_pct: number;
+};
+
 export type BacktestKpis = {
   n_trades: number;
   n_open: number;
@@ -190,6 +199,7 @@ export type BacktestKpis = {
   return_on_peak_capital_pct?: number | null;
   capital_utilization_pct?: number | null;
   yearly_breakdown?: BacktestYearRow[];
+  vix_breakdown?: BacktestVixRow[];
 };
 
 export type BacktestDetail = {
