@@ -56,8 +56,11 @@ All three are 1DTE, full span 2022-06-20 → 2026-05-13, hold-to-expiry, $100k b
    legs by `entryTime` = 1 Batman, reconstructs per-trade P&L, calibrates to QC equity, writes the app
    schema CSVs to `reports/batman_backtest_app/<tag>/{trades,daily}.csv`.
 4. **App API** `apps/api/main.py` — dynamic registry scans `reports/batman_backtest_app/`; `kind="batman"`,
-   `multiplier=1`. KPIs incl. `yearly_breakdown` + `vix_breakdown` (CZ regimes). Batman close-rule =
-   Hold only (TP targets are separate executed backtests). VIX entry filter enabled.
+   `multiplier=1`. KPIs incl. `yearly_breakdown` + `vix_breakdown` (CZ regimes). VIX entry filter enabled.
+   **Profit targets ride as per-trade columns** (`pnl_tp50/100/200`) merged into the host backtest and
+   exposed as **close-rule options** ("Close at +50%/100%/200% of net debit") — NOT separate backtests;
+   `_apply_rule(kind="batman")` swaps `pnl_usd` to the selected column. Per-tag strategy descriptions
+   (mechanics, incl. the 0.15 delta) live in `_BATMAN_META`.
 5. **App web** `apps/web/src/components/backtests/backtest-detail.tsx` — `YearlyBreakdownCard` +
    `VixBreakdownCard` (regime table) + trade inspector. Deploys via push→Vercel.
 
@@ -81,20 +84,29 @@ All three are 1DTE, full span 2022-06-20 → 2026-05-13, hold-to-expiry, $100k b
   `query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=5y&interval=1d` (stdlib, not bulk-rate-limited;
   same pattern as `apps/api/live_spot.py`). Cached to `data/cache/spx_daily.parquet`.
 
-## 6. The calibration (what "P&L reconstructed (settlement payoff) calibrated to QC equity" means)
-The per-trade $ is **reconstructed** (payoff from strikes + SPX close, since the blotter is blocked),
-then every trade's pnl is scaled by `factor = QC_net / reconstructed_net` so the app total **equals the
-authoritative QC equity exactly**. The factor is > 0, so it preserves each trade's **sign** (WR, win/loss
-labels, in-range) and the **distribution shape** — only the absolute magnitude is nudged (recon uses the
-daily SPX close as the settlement ref vs QC's intraday settle). **Verdict: trustworthy for aggregates,
-WR, per-VIX and per-year splits; treat a single trade's exact dollar as ±a few %.**
+## 6. The calibration (per-trade reconstruction → authoritative QC total)
+The per-trade $ is **reconstructed** (payoff from strikes + SPX close, since the blotter is blocked).
+The reconstruction misses a **~constant per-trade cost** (fees/slippage): the recon-vs-QC gap is
+≈ $3–6 per Batman across every scenario. So we calibrate **ADDITIVELY** — distribute `(QC_net − recon)/n`
+to every trade. This matches the authoritative QC total **exactly** while leaving the VIX/year **slices
+undistorted**.
+
+⚠️ **DO NOT calibrate multiplicatively** (`factor = QC_net/recon`). It blows up when the net is small:
+0DTE-delta had recon −$2.5k vs QC −$7.6k → factor **×3.07**, which inflated the VIX 15-25 slice from a
+true ~+$40k to a fake **+$133k** (and would flip every sign if recon and QC had opposite signs). This
+was a real bug caught in review — additive is both more accurate (the gap *is* a per-trade cost) and
+graceful near zero.
+
+**Verdict:** aggregates, WR, and per-VIX / per-year **splits are trustworthy** (sign + consistency).
+A single trade's exact dollar is ± a few $ (the per-trade cost is averaged, not itemized).
 
 ## 7. HOW TO ADD A SCENARIO (the repeatable loop)
 1. Add `(tag, overrides)` to `GRID` in `scripts/batman_sweep.py` (only **structural** axes — VIX/close-rule
    are slices of one run, not separate runs).
 2. `python scripts/batman_sweep.py` (idempotent — skips tags that already have `runtime`).
 3. `python scripts/batman_export_app.py` → writes the app CSVs.
-4. Add a label to `_BATMAN_LABELS` in `apps/api/main.py` (English, always).
+4. Add a `name`/`horizon`/`desc` entry to `_BATMAN_META` in `apps/api/main.py` (English, always; the
+   description must explain how the variant is built — width source, placement, DTE/entry).
 5. `git add reports/batman_backtest_app apps/... && git commit && git push` → Render+Vercel redeploy →
    appears in the app (registry is dynamic).
 

@@ -1279,33 +1279,76 @@ for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:
 # reports/batman_backtest_app/<tag>/ vira uma entrada (novos aparecem ao reiniciar).
 import os as _os_batman
 _BATMAN_DIR = BACKTESTS_ROOT / "batman_backtest_app"
-_BATMAN_LABELS = {
-    "1DTE_debit": "Batman 1DTE · 5% debit · VIX-width (CZ) · hold",
-    "1DTE_debit_tp50": "Batman 1DTE · 5% debit · close at +50% debit",
-    "1DTE_debit_tp100": "Batman 1DTE · 5% debit · close at +100% debit",
-    "1DTE_debit_tp200": "Batman 1DTE · 5% debit · close at +200% debit",
-    "1DTE_debit_search": "Batman 1DTE · debit · width-search (baseline)",
-    "1DTE_delta": "Batman 1DTE · delta-placement · VIX-width",
-    "0DTE_debit": "Batman 0DTE · 5% debit · VIX-width",
-    "0DTE_delta": "Batman 0DTE · delta-placement · VIX-width",
-    "wMonFri_debit": "Batman Mon→Fri (4-5DTE) · debit · VIX-width",
-    "wFriFri_debit": "Batman Fri→Fri (7DTE) · debit · VIX-width",
+# Strategy descriptions explain HOW each Batman variant is constructed and traded
+# (mechanics — not data plumbing). `desc` is what CZ reads to identify the trade.
+_BM_INTRO = (
+    "Batman = a call butterfly plus a put butterfly (each long 1 / short 2 / long 1), both placed "
+    "out-of-the-money on SPXW (cash-settled, European index options). No stop — the most you can lose "
+    "is the net debit paid; winners run into the expiry settlement."
+)
+_BATMAN_META = {
+    "1DTE_debit": {
+        "name": "Batman 1DTE · 5% debit · VIX-width",
+        "horizon": "1DTE",
+        "desc": _BM_INTRO + " Entered at 15:45 ET every session for the NEXT day's expiry (1DTE). "
+        "Wing width is read from the CZ/Ernie VIX table (VIX<17 → 20–30, 17–25 → 30–40, 25–32 → 40–50, "
+        ">32 → 50+ points). Each fly's body is centered at the OTM strike where the net debit is ≈ 5% of "
+        "the wing width. Use the close-rule selector above to hold to expiry or close at +50% / +100% / "
+        "+200% of the net debit.",
+    },
+    "1DTE_delta": {
+        "name": "Batman 1DTE · 0.15-delta placement · VIX-width",
+        "horizon": "1DTE",
+        "desc": _BM_INTRO + " Entered 15:45 ET for the next day's expiry (1DTE). Wing width from the "
+        "CZ/Ernie VIX table; but instead of placing by debit, each fly's short strikes are set at the "
+        "≈ 0.15-delta strike on its side (delta-placement, to lean into the put/call skew).",
+    },
+    "1DTE_debit_search": {
+        "name": "Batman 1DTE · 5% debit · widest-wing search (baseline)",
+        "horizon": "1DTE",
+        "desc": _BM_INTRO + " Entered 15:45 ET for the next day's expiry (1DTE). Diagnostic baseline: "
+        "wing width is NOT from the VIX table — it searches for the widest wings that still keep the fly "
+        "OTM under the debit cap (~5%). Body centered by debit.",
+    },
+    "0DTE_debit": {
+        "name": "Batman 0DTE · 5% debit · VIX-width",
+        "horizon": "0DTE",
+        "desc": _BM_INTRO + " Entered 15:45 ET for SAME-day expiry (0DTE) — a ~15-minute hold into the "
+        "cash settlement. Wing width from the CZ/Ernie VIX table; body at the OTM strike where the net "
+        "debit is ≈ 5% of the wing width.",
+    },
+    "0DTE_delta": {
+        "name": "Batman 0DTE · 0.15-delta placement · VIX-width",
+        "horizon": "0DTE",
+        "desc": _BM_INTRO + " Entered 15:45 ET for SAME-day expiry (0DTE). Wing width from the CZ/Ernie "
+        "VIX table; each fly's short strikes are placed at the ≈ 0.15-delta strike on its side "
+        "(delta-placement, to lean into the skew).",
+    },
+    "wMonFri_debit": {
+        "name": "Batman Mon→Fri (4–5DTE) · 5% debit · VIX-width",
+        "horizon": "Mon→Fri · 4–5DTE",
+        "desc": _BM_INTRO + " Entered Monday 15:45 ET for THAT week's Friday expiry (4–5 DTE). Wing width "
+        "from the CZ/Ernie VIX table; body centered at ≈ 5% debit of the wing width.",
+    },
+    "wFriFri_debit": {
+        "name": "Batman Fri→Fri (7DTE) · 5% debit · VIX-width",
+        "horizon": "Fri→Fri · 7DTE",
+        "desc": _BM_INTRO + " Entered Friday 15:45 ET for the NEXT Friday's expiry (7 DTE). Wing width "
+        "from the CZ/Ernie VIX table; body centered at ≈ 5% debit of the wing width.",
+    },
 }
 if _BATMAN_DIR.exists():
     for _tag in sorted(_os_batman.listdir(_BATMAN_DIR)):
         if not (_BATMAN_DIR / _tag / "trades.csv").exists():
             continue
+        _m = _BATMAN_META.get(_tag, {})
         BACKTESTS_REGISTRY.append({
             "id": f"batman-{_tag.replace('_', '-').lower()}",
-            "name": _BATMAN_LABELS.get(_tag, f"Batman {_tag}"),
+            "name": _m.get("name", f"Batman {_tag}"),
             "underlying": "SPX",
             "strategy": "Batman (dual OTM butterfly)",
-            "horizon": _tag.split("_")[0],
-            "description": (
-                f"Batman {_tag} · SPXW · 15:45 ET entry · hold-to-expiry · width from the CZ/Ernie "
-                "VIX table · per-trade P&L reconstructed from settlement payoff and scaled to match the "
-                "official QC equity (aggregate & per-VIX figures authoritative) · $100k capital"
-            ),
+            "horizon": _m.get("horizon", _tag.split("_")[0]),
+            "description": _m.get("desc", _BM_INTRO),
             "trades_csv": f"batman_backtest_app/{_tag}/trades.csv",
             "daily_csv": f"batman_backtest_app/{_tag}/daily.csv",
             "kind": "batman",
@@ -1413,6 +1456,14 @@ VIX_FILTERS = [
     "VIX >= 20",
     "VIX >= 25",
 ]
+# Batman profit-targets are %-of-net-debit, executed in-engine and exported as per-trade
+# columns. Selecting one swaps pnl_usd to that column (no daily MTM scan). Offered only
+# when the host backtest actually carries the column.
+_BATMAN_TP_COLS = {
+    "Close at +50% of net debit": "pnl_tp50",
+    "Close at +100% of net debit": "pnl_tp100",
+    "Close at +200% of net debit": "pnl_tp200",
+}
 
 
 def _filter_by_vix(trades: list[dict[str, Any]], vix_filter: str) -> list[dict[str, Any]]:
@@ -1524,8 +1575,31 @@ def _apply_rule(
     daily: list[dict[str, Any]],
     rule: str,
     multiplier: int,
+    kind: str | None = None,
 ) -> list[dict[str, Any]]:
     """Returns shallow copies of trades with effective_pnl_usd / effective_close_date set."""
+    if kind == "batman":
+        # Profit-targets are precomputed per-trade columns (pnl_tp50/100/200); Hold uses pnl_usd.
+        col = _BATMAN_TP_COLS.get(rule)
+        out: list[dict[str, Any]] = []
+        for t in trades:
+            nt = dict(t)
+            hold = float(t.get("pnl_usd") or 0)
+            nt["pnl_usd_at_exp"] = hold
+            if col is not None and t.get(col) is not None:
+                eff = float(t[col])
+                nt["pnl_usd"] = eff
+                nt["effective_pnl_usd"] = eff
+                nt["effective_close_date"] = None        # intraday TP exit; date not tracked
+                nt["effective_dit_at_close"] = None
+                nt["exit_method"] = "profit_target"
+            else:
+                nt["effective_pnl_usd"] = hold
+                nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
+                nt["effective_dit_at_close"] = None
+            out.append(nt)
+        return out
+
     out: list[dict[str, Any]] = []
     for t in trades:
         eff_pnl, close_date, dit = _scan_close_rule(t, daily, rule, multiplier)
@@ -1806,11 +1880,10 @@ def get_backtest(
     elif meta["kind"] == "triplecal":
         available_rules = TRIPLECAL_RULES
     elif meta["kind"] == "batman":
-        # Batman profit-targets are %-of-net-debit and executed in-engine, so each
-        # target is its own backtest (tp50/tp100/tp200). The generic tastytrade close
-        # rules don't apply here (1DTE has no usable intraday MTM in the daily marks),
-        # so we only expose Hold and let CZ compare the executed-TP backtests side by side.
-        available_rules = ["Hold to Expiration"]
+        # Profit-targets (% of net debit) ride as per-trade columns when present, exposed as
+        # close-rule options — no separate backtests. Hold is always available.
+        _tp = [r for r, c in _BATMAN_TP_COLS.items() if any(c in t for t in raw_trades)]
+        available_rules = ["Hold to Expiration"] + _tp
     else:
         available_rules = IC7_RULES
     rule_to_use = rule if rule in available_rules else "Hold to Expiration"
@@ -1819,7 +1892,7 @@ def get_backtest(
     available_vix_filters = VIX_FILTERS if meta["kind"] in ("triplecal", "ss42", "batman") else ["All"]
 
     filtered_trades = _filter_by_vix(raw_trades, vix_filter_to_use)
-    trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"])
+    trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"], kind=meta["kind"])
     kpis = _backtest_kpis(trades_with_rule, kind=meta["kind"], multiplier=meta["multiplier"])
 
     display_cols_ss42 = [
@@ -1839,10 +1912,16 @@ def get_backtest(
         "pnl_usd", "pnl_usd_at_exp", "effective_close_date", "effective_dit_at_close",
         "in_range", "result", "exit_method",
     ]
+    display_cols_batman = [
+        "trade_date", "exp_date", "underlying", "dte_entry", "total_credit", "vix_entry",
+        "pnl_usd", "pnl_usd_at_exp", "effective_close_date", "in_range", "result", "exit_method",
+    ]
     if meta["kind"] == "ss42":
         cols = display_cols_ss42
     elif meta["kind"] == "triplecal":
         cols = display_cols_triplecal
+    elif meta["kind"] == "batman":
+        cols = display_cols_batman
     else:
         cols = display_cols_ic7
     trades_view = [{c: t.get(c) for c in cols} for t in trades_with_rule]
