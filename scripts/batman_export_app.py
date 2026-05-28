@@ -1,20 +1,26 @@
 """
 ===============================================================================
- BATMAN EXPORT APP — closedTrades (QC API) -> trades.csv + daily.csv (schema do app)
+ BATMAN EXPORT APP — orders/closedTrades (QC API) -> trades.csv + daily.csv
 ===============================================================================
- Para cada cenário com backtestId em ~/qc_batman/sweep_results.json:
-   - puxa totalPerformance.closedTrades via /backtests/read (NÃO bloqueado),
-   - agrupa as 6 pernas por entryTime = 1 Batman,
-   - P&L por Batman = payoff de settlement (closedTrades.profitLoss ignora o cash-settle ITM),
-   - CALIBRAÇÃO ADITIVA: o gap recon-vs-QC é ~constante por trade (fees/slippage que o
-     payoff ignora), então distribui (qc_net - recon)/n por trade. Bate o total do QC
-     EXATO sem distorcer as fatias (VIX/ano). [multiplicativo explodia em net pequeno.]
+ FONTE DE VERDADE = payoff de BORBOLETA LIMPO (intrínseco num ÚNICO preço de
+ settle), reconstruído dos fills reais de entrada. NÃO calibra pra equity do QC.
 
- PROFIT TARGETS: NÃO viram backtests separados. Os runs tp50/tp100/tp200 são lidos e
- mesclados no 1DTE_debit como COLUNAS (pnl_tp50/100/200), pra o app oferecer
- "Close at +50%/+100%/+200% of net debit" no seletor de close-rule (igual o filtro de VIX).
+ POR QUÊ (achado 2026-05-27): a equity/Net Profit do QC INFLA borboletas que
+ expiram deep-ITM-atravessadas (ex.: crash abr/2025). O QC liquida as pernas
+ curtas e longas em timestamps/preços DIFERENTES (orders type 6) e fabrica P&L
+ fantasma. Uma borboleta simétrica atravessada vale $0 EXATO (pernas se
+ cancelam). Logo a equity do QC está ERRADA nesses casos; o payoff limpo é o
+ número CORRETO — e é imune ao artefato por construção (um único preço de settle).
 
- Uso:  python scripts/batman_export_app.py            # exporta tudo do sweep_results.json
+ Cada Batman = 6 pernas (call fly +1/-2/+1 acima, put fly +1/-2/+1 abaixo),
+ agrupadas por entryTime. P&L = Σ_legs n*(intrínseco(S_exp) - entryPrice), onde
+ entryPrice = fill REAL do QC (exato) e S_exp = close do SPX no expiry.
+
+ VALIDAÇÃO: Σ pnl_usd reconcilia com o `NET M0 hold` do motor (runtime stat,
+ também limpo). Diferença esperada = só o spread de entrada (o motor estima asas
+ no ask / corpo no bid; aqui usamos o fill real, mais barato) → poucos $/trade.
+
+ Uso:  python scripts/batman_export_app.py            # exporta tudo do sweep
        python scripts/batman_export_app.py <bid> <tag>
 ===============================================================================
 """
@@ -31,18 +37,6 @@ OUT = REPO / "reports" / "batman_backtest_app"
 SWEEP = HOME / "qc_batman" / "sweep_results.json"
 VIX_CACHE = REPO / "data" / "cache" / "vix_daily.parquet"
 SPX_CACHE = REPO / "data" / "cache" / "spx_daily.parquet"
-
-# Profit targets são COLUNAS no host, não backtests autônomos.
-# host tag -> {coluna: tag do run de TP}
-TP_MERGE = {
-    "1DTE_debit": {
-        "pnl_tp50": "1DTE_debit_tp50",
-        "pnl_tp100": "1DTE_debit_tp100",
-        "pnl_tp200": "1DTE_debit_tp200",
-    },
-}
-# tags de TP NÃO são exportadas como backtests separados (viram colunas acima).
-SKIP_STANDALONE = {"1DTE_debit_tp50", "1DTE_debit_tp100", "1DTE_debit_tp200"}
 
 _cred = json.load(open(HOME / ".lean" / "credentials"))
 _UID = str(_cred.get("user-id") or _cred.get("user_id") or _cred.get("userId"))
@@ -133,9 +127,34 @@ def _money(s):
         return None
 
 
-def recon(bid, qc_net):
-    """Per-trade reconstructed P&L (1 Batman por entryTime), com calibração ADITIVA
-    pro total bater no QC sem distorcer as fatias. Devolve lista de dicts."""
+def _m0_hold(tag):
+    """NET M0 hold do motor (runtime stat) — referência LIMPA p/ validar. '$X / WR Y%'."""
+    rt = (SWEEP_RES.get(tag, {}).get("runtime") or {})
+    return _money((rt.get("NET M0 hold") or "").split("/")[0])
+
+
+def _fly_strikes(legs, right):
+    """(lower, center, upper, side_debit) de um lado. center = short (qty 2)."""
+    side = [l for l in legs if parse_symbol(l["symbols"][0]["value"])[1] == right]
+    ks = {}
+    for l in side:
+        _, _, K = parse_symbol(l["symbols"][0]["value"])
+        ks[K] = l
+    if not ks:                                  # lado ausente (ex.: run de TP fechou só um lado)
+        return None, None, None, 0.0
+    lo, up = min(ks), max(ks)
+    center = [K for K in ks if K not in (lo, up)]
+    center = center[0] if center else round((lo + up) / 2, 0)
+    debit = 0.0
+    for K, l in ks.items():
+        n = (1 if l["direction"] == 0 else -1) * abs(l["quantity"])
+        debit += n * l["entryPrice"]
+    return lo, center, up, round(debit, 2)
+
+
+def recon(bid):
+    """Per-trade LIMPO (1 Batman por entryTime). Payoff de borboleta num único preço
+    de settle, dos fills reais. SEM calibração. Devolve lista de dicts (com detalhe p/ auditoria)."""
     bt = api("/backtests/read", {"projectId": PID, "backtestId": bid})["backtest"]
     ct = (bt.get("totalPerformance") or {}).get("closedTrades") or []
     if not ct:
@@ -157,44 +176,57 @@ def recon(bid, qc_net):
             _, right, K = parse_symbol(l["symbols"][0]["value"])
             n = (1 if l["direction"] == 0 else -1) * abs(l["quantity"]) * 100
             debit += n * l["entryPrice"]
-            if (l.get("exitPrice") or 0) > 0:           # fechada cedo (TP real) -> round-trip exato
-                pnl += l.get("profitLoss") or 0
-            else:                                        # held-to-expiry -> payoff de settlement
+            if (l.get("exitPrice") or 0) > 0:           # fechada CEDO (TP executado) -> round-trip
+                pnl += l.get("profitLoss") or 0          # exato (sem artefato: 2 lados fecham juntos no mid)
+            else:                                        # held-to-expiry -> PAYOFF LIMPO num único preço
                 intr = max(0.0, S_exp - K) if right == "C" else max(0.0, K - S_exp)
                 pnl += n * (intr - l["entryPrice"])
-        trades.append({"trade_date": tdate, "exp_date": exp, "dte": max((exp - tdate).days, 1),
-                       "debit": round(debit, 2), "pnl": pnl, "vix": vix_at(tdate, vdf)})
-    rec = sum(t["pnl"] for t in trades)
-    if qc_net is not None and trades:
-        adj = (qc_net - rec) / len(trades)              # gap ~constante por trade -> aditivo
-        for t in trades:
-            t["pnl"] = round(t["pnl"] + adj, 2)
+        clo, ccen, cup, cdeb = _fly_strikes(legs, "C")
+        plo, pcen, pup, pdeb = _fly_strikes(legs, "P")
+        trades.append({
+            "trade_date": tdate, "exp_date": exp, "dte": max((exp - tdate).days, 1),
+            "debit": round(debit, 2), "pnl": round(pnl, 2), "vix": vix_at(tdate, vdf),
+            "spot_settle": round(S_exp, 2),
+            "call_lower": clo, "call_center": ccen, "call_upper": cup, "call_debit": cdeb,
+            "put_lower": plo, "put_center": pcen, "put_upper": pup, "put_debit": pdeb,
+        })
     return trades
 
 
-def export(tag, bid, qc_net, underlying="SPX"):
-    trades = recon(bid, qc_net)
+TP_LEVELS = [50, 100, 150, 200]   # % sobre o débito (close-rule); colunas pnl_tpNN
+
+
+def export(tag, bid, tp_bids=None, underlying="SPX"):
+    """Exporta a variante base. tp_bids = {nivel(int): backtestId} dos runs tp_close;
+    o recon de cada um vira a coluna pnl_tpNN (P&L por-trade SOB aquela regra de TP)."""
+    trades = recon(bid)
     if not trades:
         print(f"[{tag}] sem closedTrades"); return 0
-    # mescla profit-targets como colunas (só nos host tags)
+
+    # colunas de TP: recon de cada run tp_close, casado por trade_date (mesmo dia de abertura).
     tp_maps = {}
-    for col, tp_tag in TP_MERGE.get(tag, {}).items():
-        tr = SWEEP_RES.get(tp_tag, {})
-        tbid = tr.get("backtestId"); tqc = _money((tr.get("runtime") or {}).get("Net Profit"))
-        if tbid:
-            tp_maps[col] = {t["trade_date"]: t["pnl"] for t in recon(tbid, tqc)}
+    for lvl, tbid in (tp_bids or {}).items():
+        try:
+            tp_maps[lvl] = {t["trade_date"]: t["pnl"] for t in recon(tbid)}
+        except Exception as e:
+            print(f"  [{tag}] tp{lvl} recon falhou: {e}")
 
     rows = []
     for t in trades:
         row = {
             "trade_date": t["trade_date"].isoformat(), "exp_date": t["exp_date"].isoformat(),
             "underlying": underlying, "dte_entry": t["dte"], "total_credit": t["debit"],
-            "pnl_usd": t["pnl"], "vix_entry": t["vix"],
+            "pnl_usd": t["pnl"], "vix_entry": t["vix"], "spot_exit": t["spot_settle"],
             "result": "WIN" if t["pnl"] > 0 else "LOSS", "exit_method": "expiration",
             "in_range": t["pnl"] > 0,
+            "call_lower": t["call_lower"], "call_center": t["call_center"], "call_upper": t["call_upper"],
+            "call_debit": t["call_debit"],
+            "put_lower": t["put_lower"], "put_center": t["put_center"], "put_upper": t["put_upper"],
+            "put_debit": t["put_debit"],
         }
-        for col, m in tp_maps.items():
-            row[col] = m.get(t["trade_date"], t["pnl"])   # dia sem par no run de TP -> hold
+        for lvl in TP_LEVELS:
+            if lvl in tp_maps:                       # sem fechamento naquele dia -> segura (hold)
+                row[f"pnl_tp{lvl}"] = round(tp_maps[lvl].get(t["trade_date"], t["pnl"]), 2)
         rows.append(row)
 
     daily = []
@@ -209,11 +241,20 @@ def export(tag, bid, qc_net, underlying="SPX"):
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys())); w.writeheader(); w.writerows(rows)
     with open(d / "daily.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(daily[0].keys())); w.writeheader(); w.writerows(daily)
+
     net = sum(r["pnl_usd"] for r in rows)
     wr = 100.0 * sum(1 for r in rows if r["pnl_usd"] > 0) / len(rows)
-    extra = (" | TP cols: " + ",".join(tp_maps)) if tp_maps else ""
-    print(f"[{tag}] {len(rows)} batmans | net ${net:,.0f} | WR {wr:.0f}%{extra} -> {d}")
+    # VALIDAÇÃO: reconcilia com o M0 limpo do motor (diferença = spread de entrada)
+    m0 = _m0_hold(tag)
+    chk = ""
+    if m0 is not None:
+        chk = f" | M0 motor ${m0:,.0f} | dif ${net - m0:+,.0f} ({(net-m0)/len(rows):+.1f}/trade)"
+    print(f"[{tag}] {len(rows)} batmans | net LIMPO ${net:,.0f} | WR {wr:.0f}%{chk} -> {d}")
     return len(rows)
+
+
+import re as _re
+_TP_RE = _re.compile(r"^(.*)_tp(\d+)$")
 
 
 def main():
@@ -221,17 +262,25 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     SWEEP_RES = json.loads(SWEEP.read_text(encoding="utf-8")) if SWEEP.exists() else {}
     if len(sys.argv) >= 3:
-        bid, tag = sys.argv[1], sys.argv[2]
-        export(tag, bid, _money((SWEEP_RES.get(tag, {}).get("runtime") or {}).get("Net Profit")))
+        export(sys.argv[2], sys.argv[1])
         return
+    # Mapeia tags tp_close -> base: {base_tag: {nivel: bid}}. As tags _tpNN NÃO viram pasta;
+    # entram como colunas pnl_tpNN na pasta da variante base.
+    tp_by_base: dict[str, dict[int, str]] = {}
+    base_tags: list[str] = []
     for tag, r in SWEEP_RES.items():
-        if tag in SKIP_STANDALONE:
-            continue
         bid = r.get("backtestId")
         if not bid:
             continue
+        m = _TP_RE.match(tag)
+        if m:
+            tp_by_base.setdefault(m.group(1), {})[int(m.group(2))] = bid
+        else:
+            base_tags.append(tag)
+    for tag in base_tags:
+        bid = SWEEP_RES[tag]["backtestId"]
         try:
-            export(tag, bid, _money((r.get("runtime") or {}).get("Net Profit")))
+            export(tag, bid, tp_bids=tp_by_base.get(tag))
         except Exception as e:
             print(f"[{tag}] FALHOU: {e}")
 

@@ -1204,6 +1204,7 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
         "name": "Short Strangle 42 DTE",
         "underlying": "SPX",
         "strategy": "Short Strangle",
+        "family": "Short Strangle",
         "horizon": "42 DTE",
         "description": "Short Strangle 16Δ · SPX · 42 DTE · 1st Friday entry",
         "trades_csv": "ss42_backtest/SS42_SPX_2025-05-02_2026-04-02.csv",
@@ -1216,6 +1217,7 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
         "name": "Short Strangle 42 DTE",
         "underlying": "RUT",
         "strategy": "Short Strangle",
+        "family": "Short Strangle",
         "horizon": "42 DTE",
         "description": "Short Strangle 16Δ · RUT · 42 DTE · 1st Friday entry",
         "trades_csv": "ss42_backtest/SS42_RUT_2025-05-02_2026-04-02.csv",
@@ -1228,6 +1230,7 @@ BACKTESTS_REGISTRY: list[dict[str, Any]] = [
         "name": "Iron Condor 7 DTE",
         "underlying": "NDX",
         "strategy": "Iron Condor",
+        "family": "Iron Condor",
         "horizon": "7 DTE",
         "description": "Iron Condor 7 DTE · NDX · 50pt put wing / 100pt call wing · weekly expected move",
         "trades_csv": "ic7_backtest/IC7_7DTE_NDX_2025-05-02_2026-03-27.csv",
@@ -1261,6 +1264,7 @@ for _dte, _horizon, _delta, _limit in _TRIPLECAL_CONFIGS:
         "name": f"Triple Calendar {_horizon}",
         "underlying": "SPX",
         "strategy": "Triple Calendar",
+        "family": "Triple Calendar",
         "horizon": _horizon,
         "description": (
             f"Triple Calendar · SPX · {_horizon} · {_legs_desc} · "
@@ -1337,22 +1341,67 @@ _BATMAN_META = {
         "from the CZ/Ernie VIX table; body centered at ≈ 5% debit of the wing width.",
     },
 }
+# UM ÍCONE por estrutura (5 grupos). Dentro de cada um, o seletor de width-rule troca a
+# variante (label -> tag/pasta). A variante "Ernie VIX table" das 4 estruturas antigas
+# reaproveita as pastas *_debit; as fixas/delta vêm das pastas novas (sweep). Registro
+# DINÂMICO: variante só aparece se a pasta tiver trades.csv (novas surgem ao reiniciar).
+def _bm_variants(prefix: str, ernie_tag: str) -> dict[str, str]:
+    return {
+        "Ernie VIX table": ernie_tag,
+        "Fixed 25": f"{prefix}_w25", "Fixed 30": f"{prefix}_w30",
+        "Fixed 40": f"{prefix}_w40", "Fixed 50": f"{prefix}_w50",
+        "Delta 0.16": f"{prefix}_delta16",
+    }
+
+_BATMAN_DEFAULT_WIDTH = "Ernie VIX table"
+_BATMAN_GROUPS = [
+    {"id": "batman-0dte", "name": "Batman 0DTE", "horizon": "0DTE",
+     "entry": "Opened 10:00 ET every session for SAME-day (0DTE) expiry.",
+     "variants": _bm_variants("0DTE", "0DTE_debit")},
+    {"id": "batman-1dte", "name": "Batman 1DTE", "horizon": "1DTE",
+     "entry": "Opened 15:45 ET every session for the NEXT day's expiry (1DTE).",
+     "variants": _bm_variants("1DTE", "1DTE_debit")},
+    {"id": "batman-4dte", "name": "Batman 4DTE (Mon→Fri)", "horizon": "Mon→Fri · 4–5DTE",
+     "entry": "Opened Monday 15:45 ET for THAT week's Friday expiry (4–5DTE).",
+     "variants": _bm_variants("wMonFri", "wMonFri_debit")},
+    {"id": "batman-7dte", "name": "Batman 7DTE (Fri→Fri)", "horizon": "Fri→Fri · 7DTE",
+     "entry": "Opened Friday 15:45 ET for the NEXT Friday's expiry (7DTE).",
+     "variants": _bm_variants("wFriFri", "wFriFri_debit")},
+    {"id": "batman-21dte", "name": "Batman 21DTE (Fri→Fri)", "horizon": "Fri→Fri · ~21DTE",
+     "entry": "Opened Friday 15:45 ET for the Friday ~3 weeks out (~21DTE).",
+     "variants": _bm_variants("w21", "w21_ernie")},
+]
+# Descrição da MECÂNICA (como a width/short são escolhidos) — comum a todas as variantes.
+_BM_MECH = (
+    " Wing width comes from the selected rule (Ernie VIX table: VIX<17→20–30, 17–25→30–40, "
+    "25–32→40–50, >32→50+; or a fixed 25/30/40/50). For each width the short strike is slid out "
+    "from the money until the net debit hits the rule (~5% of width per fly ≈ 10% of width for the "
+    "whole Batman: width 30→~$300, width 50→~$500). Delta 0.16 places the short at the ≈0.16-delta "
+    "strike instead. Width = distance from the short strike to a wing."
+)
+
+def _bm_group_for(bt_id: str) -> dict[str, Any] | None:
+    return next((g for g in _BATMAN_GROUPS if g["id"] == bt_id), None)
+
+def _bm_variants_on_disk(group: dict[str, Any]) -> list[str]:
+    return [lbl for lbl, tag in group["variants"].items()
+            if (_BATMAN_DIR / tag / "trades.csv").exists()]
+
 if _BATMAN_DIR.exists():
-    for _tag in sorted(_os_batman.listdir(_BATMAN_DIR)):
-        if not (_BATMAN_DIR / _tag / "trades.csv").exists():
+    for _g in _BATMAN_GROUPS:
+        _avail = _bm_variants_on_disk(_g)
+        if not _avail:
             continue
-        _m = _BATMAN_META.get(_tag, {})
+        _wr = _BATMAN_DEFAULT_WIDTH if _BATMAN_DEFAULT_WIDTH in _avail else _avail[0]
+        _tag = _g["variants"][_wr]
         BACKTESTS_REGISTRY.append({
-            "id": f"batman-{_tag.replace('_', '-').lower()}",
-            "name": _m.get("name", f"Batman {_tag}"),
-            "underlying": "SPX",
-            "strategy": "Batman (dual OTM butterfly)",
-            "horizon": _m.get("horizon", _tag.split("_")[0]),
-            "description": _m.get("desc", _BM_INTRO),
+            "id": _g["id"], "name": _g["name"], "underlying": "SPX",
+            "strategy": "Batman (dual OTM butterfly)", "family": "Batman",
+            "horizon": _g["horizon"], "description": _BM_INTRO + _g["entry"] + _BM_MECH,
             "trades_csv": f"batman_backtest_app/{_tag}/trades.csv",
             "daily_csv": f"batman_backtest_app/{_tag}/daily.csv",
-            "kind": "batman",
-            "multiplier": 1,
+            "kind": "batman", "multiplier": 1,
+            "variants": _g["variants"],
         })
 
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
@@ -1462,6 +1511,7 @@ VIX_FILTERS = [
 _BATMAN_TP_COLS = {
     "Close at +50% of net debit": "pnl_tp50",
     "Close at +100% of net debit": "pnl_tp100",
+    "Close at +150% of net debit": "pnl_tp150",
     "Close at +200% of net debit": "pnl_tp200",
 }
 
@@ -1795,6 +1845,39 @@ def _backtest_kpis(
             "total_pnl_pct": round(row["total_pnl"] / BACKTEST_STARTING_CAPITAL, 4),
         })
 
+    # ── Day-of-week breakdown (entry weekday). Answers "which open days pay" — pedido do CZ
+    # p/ 0DTE/1DTE (o frontend só mostra nessas, que abrem em vários dias).
+    import datetime as _dt
+    _dow_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    dow_acc: dict[int, dict[str, Any]] = {}
+    for t in closed:
+        td = t.get("trade_date")
+        if not td:
+            continue
+        try:
+            wd = _dt.date.fromisoformat(str(td)[:10]).weekday()
+        except ValueError:
+            continue
+        pnl = float(t.get("pnl_usd") or 0)
+        row = dow_acc.setdefault(wd, {"n_trades": 0, "wins": 0, "total_pnl": 0.0})
+        row["n_trades"] += 1
+        if pnl > 0:
+            row["wins"] += 1
+        row["total_pnl"] += pnl
+    dow_breakdown = []
+    for wd in range(7):
+        if wd not in dow_acc:
+            continue
+        row = dow_acc[wd]
+        wr = row["wins"] / row["n_trades"] if row["n_trades"] else None
+        dow_breakdown.append({
+            "dow": _dow_names[wd],
+            "n_trades": row["n_trades"], "wins": row["wins"],
+            "win_rate": round(wr, 4) if wr is not None else None,
+            "total_pnl": round(row["total_pnl"], 2),
+            "total_pnl_pct": round(row["total_pnl"] / BACKTEST_STARTING_CAPITAL, 4),
+        })
+
     return {
         "n_trades": n,
         "n_open": len(trades) - n,
@@ -1823,6 +1906,7 @@ def _backtest_kpis(
         "capital_utilization_pct": round(capital_utilization_pct, 4) if capital_utilization_pct is not None else None,
         "yearly_breakdown": yearly_breakdown,
         "vix_breakdown": vix_breakdown,
+        "dow_breakdown": dow_breakdown,
     }
 
 
@@ -1847,6 +1931,7 @@ def list_backtests() -> JSONResponse:
             "name": bt["name"],
             "underlying": bt["underlying"],
             "strategy": bt["strategy"],
+            "family": bt.get("family", bt["strategy"]),
             "horizon": bt["horizon"],
             "period": _period_label(trades),
             "kpis": {
@@ -1870,8 +1955,23 @@ def get_backtest(
     bt_id: str,
     rule: str = Query("Hold to Expiration", description="Close management rule"),
     vix_filter: str = Query("All", description="VIX entry filter bucket"),
+    width_rule: str = Query(_BATMAN_DEFAULT_WIDTH, description="Batman width/placement rule"),
 ) -> JSONResponse:
     meta = _backtest_meta(bt_id)
+    # Batman groups carry a `variants` map (width-rule label -> folder tag). Resolve which
+    # variant to read from the width_rule query; only variants present on disk are offered.
+    available_width_rules: list[str] = []
+    width_rule_to_use: str | None = None
+    if meta.get("variants"):
+        available_width_rules = [lbl for lbl, tag in meta["variants"].items()
+                                 if (_BATMAN_DIR / tag / "trades.csv").exists()]
+        if available_width_rules:
+            width_rule_to_use = (width_rule if width_rule in available_width_rules
+                                 else (_BATMAN_DEFAULT_WIDTH if _BATMAN_DEFAULT_WIDTH in available_width_rules
+                                       else available_width_rules[0]))
+            _tag = meta["variants"][width_rule_to_use]
+            meta = {**meta, "trades_csv": f"batman_backtest_app/{_tag}/trades.csv",
+                    "daily_csv": f"batman_backtest_app/{_tag}/daily.csv"}
     raw_trades = _read_backtest_trades(meta)
     daily = _read_backtest_daily(meta)
 
@@ -1914,6 +2014,8 @@ def get_backtest(
     ]
     display_cols_batman = [
         "trade_date", "exp_date", "underlying", "dte_entry", "total_credit", "vix_entry",
+        "spot_exit", "call_lower", "call_center", "call_upper", "call_debit",
+        "put_lower", "put_center", "put_upper", "put_debit",
         "pnl_usd", "pnl_usd_at_exp", "effective_close_date", "in_range", "result", "exit_method",
     ]
     if meta["kind"] == "ss42":
@@ -1940,6 +2042,8 @@ def get_backtest(
             "available_rules": available_rules,
             "vix_filter": vix_filter_to_use,
             "available_vix_filters": available_vix_filters,
+            "width_rule": width_rule_to_use,
+            "available_width_rules": available_width_rules,
         },
         "kpis": kpis,
         "trades": trades_view,

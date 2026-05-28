@@ -130,6 +130,7 @@ export type BacktestSummary = {
   name: string;
   underlying: string;
   strategy: string;
+  family?: string;
   horizon: string;
   period: string | null;
   kpis: {
@@ -172,6 +173,15 @@ export type BacktestVixRow = {
   total_pnl_pct: number;
 };
 
+export type BacktestDowRow = {
+  dow: string;
+  n_trades: number;
+  wins: number;
+  win_rate: number | null;
+  total_pnl: number;
+  total_pnl_pct: number;
+};
+
 export type BacktestKpis = {
   n_trades: number;
   n_open: number;
@@ -200,6 +210,7 @@ export type BacktestKpis = {
   capital_utilization_pct?: number | null;
   yearly_breakdown?: BacktestYearRow[];
   vix_breakdown?: BacktestVixRow[];
+  dow_breakdown?: BacktestDowRow[];
 };
 
 export type BacktestDetail = {
@@ -208,15 +219,18 @@ export type BacktestDetail = {
     name: string;
     underlying: string;
     strategy: string;
+    family?: string;
     horizon: string;
     description?: string | null;
-    kind: "ss42" | "ic7" | "triplecal";
+    kind: "ss42" | "ic7" | "triplecal" | "batman";
     period: string | null;
     multiplier: number;
     rule: string;
     available_rules: string[];
     vix_filter?: string;
     available_vix_filters?: string[];
+    width_rule?: string | null;
+    available_width_rules?: string[];
   };
   kpis: BacktestKpis;
   trades: Record<string, unknown>[];
@@ -527,10 +541,11 @@ export const api = {
     const q = params.toString();
     return get<OccurrenceMatrixPayload>(`/api/occurrence-matrix${q ? `?${q}` : ""}`);
   },
-  backtest: (id: string, rule?: string, vixFilter?: string) => {
+  backtest: (id: string, rule?: string, vixFilter?: string, widthRule?: string) => {
     const params: string[] = [];
     if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);
     if (vixFilter && vixFilter !== "All") params.push(`vix_filter=${encodeURIComponent(vixFilter)}`);
+    if (widthRule) params.push(`width_rule=${encodeURIComponent(widthRule)}`);
     const q = params.length ? `?${params.join("&")}` : "";
     return get<BacktestDetail>(`/api/backtests/${id}${q}`);
   },

@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, FlaskConical, TrendingDown, TrendingUp } from "lucide-react";
 import { api, type BacktestSummary } from "@/lib/api";
 import { fmtMoney, fmtPct, fmtNum, pnlClass } from "@/lib/format";
 
+const familyOf = (bt: BacktestSummary) => bt.family ?? bt.strategy;
+
 export function BacktestsOverview() {
   const { data, isLoading } = useQuery({ queryKey: ["backtests"], queryFn: () => api.backtests() });
-  const items = data?.backtests ?? [];
+  const allItems = data?.backtests ?? [];
+  const [family, setFamily] = useState<string>("All");
+
+  // Stable family order, deduped, derived from the registry.
+  const families = Array.from(new Set(allItems.map(familyOf)));
+  const items = family === "All" ? allItems : allItems.filter((bt) => familyOf(bt) === family);
 
   return (
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-8 py-8">
@@ -28,6 +36,29 @@ export function BacktestsOverview() {
           <span>Sourced from <code className="rounded bg-card/60 px-1.5 py-0.5 text-[10px]">reports/*_backtest/</code></span>
         </div>
       </div>
+
+      {families.length > 1 && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Strategy</span>
+          {["All", ...families].map((f) => {
+            const active = family === f;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFamily(f)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                  active
+                    ? "border-primary/50 bg-primary/15 text-primary"
+                    : "border-border/60 bg-card/40 text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                }`}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">

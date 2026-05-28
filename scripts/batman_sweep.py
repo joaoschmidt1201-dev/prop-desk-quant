@@ -29,30 +29,64 @@ ORG = "1f97d316a4d53242e929726971860505"
 RESULTS_JSON = WORKSPACE / "sweep_results.json"
 RESULTS_MD = WORKSPACE / "sweep_results.md"
 
-# Run de diagnóstico já em curso (debit_search) — esperar terminar e usar como data-point.
-WAIT_FIRST_BID = "1a10e12b12f3aef5d89d738338d85415"
-WAIT_FIRST_TAG = "1DTE_debit_search"
-WAIT_FIRST_PARAMS = {"structure": "1DTE", "placement_mode": "debit", "width_mode": "debit_search",
-                     "symmetry": "sym", "start_date": "2022-06-20", "end_date": "2026-05-13",
-                     "run_tag": "1DTE_debit_sym"}
-
 SPAN = {"start_date": "2022-06-20", "end_date": "2026-05-13"}
 BASE = {"symmetry": "sym", "width_mode": "vix_table", **SPAN}
 
-# (tag, overrides) — só eixos ESTRUTURAIS. VIX/close-rule/TP saem das runtime stats de cada run.
-GRID = [
-    # close-rule %-over-debit EXECUTADA no faithful 1DTE (prioridade — pedido do CZ)
-    ("1DTE_debit_tp50",  {"structure": "1DTE", "placement_mode": "debit", "tp_close_frac": "0.5"}),
-    ("1DTE_debit_tp100", {"structure": "1DTE", "placement_mode": "debit", "tp_close_frac": "1.0"}),
-    ("1DTE_debit_tp200", {"structure": "1DTE", "placement_mode": "debit", "tp_close_frac": "2.0"}),
-    ("1DTE_debit",    {"structure": "1DTE",           "placement_mode": "debit"}),
-    ("1DTE_delta",    {"structure": "1DTE",           "placement_mode": "delta"}),
-    ("0DTE_debit",    {"structure": "0DTE",           "placement_mode": "debit"}),
-    ("0DTE_delta",    {"structure": "0DTE",           "placement_mode": "delta"}),
-    ("wMonFri_debit", {"structure": "weekly_mon_fri", "placement_mode": "debit"}),
-    ("wFriFri_debit", {"structure": "weekly_fri_fri", "placement_mode": "debit"}),
-    ("1DTE_debit_search", {"structure": "1DTE", "placement_mode": "debit", "width_mode": "debit_search"}),
+# 5 estruturas (ícones) × 6 variantes de placement/width. Tag = <icon>_<variant>.
+# Eixos VIX / close-rule(TP) / dia-de-abertura saem das runtime stats + recon (não viram run).
+STRUCTURES = [
+    ("0DTE",    "0DTE"),
+    ("1DTE",    "1DTE"),
+    ("wMonFri", "weekly_mon_fri"),
+    ("wFriFri", "weekly_fri_fri"),
+    ("w21",     "weekly_fri_fri_21d"),
 ]
+# variante -> overrides (além de structure). ernie = vix_table+debit; wNN = fixed; delta16 = delta 0.16
+VARIANTS = [
+    ("ernie",   {"placement_mode": "debit", "width_mode": "vix_table"}),
+    ("w25",     {"placement_mode": "debit", "width_mode": "fixed", "fixed_width": "25"}),
+    ("w30",     {"placement_mode": "debit", "width_mode": "fixed", "fixed_width": "30"}),
+    ("w40",     {"placement_mode": "debit", "width_mode": "fixed", "fixed_width": "40"}),
+    ("w50",     {"placement_mode": "debit", "width_mode": "fixed", "fixed_width": "50"}),
+    ("delta16", {"placement_mode": "delta", "width_mode": "vix_table", "target_delta": "0.16"}),
+]
+
+# As 4 ernie das estruturas EXISTENTES já têm dado limpo (tags *_debit) -> NÃO re-roda.
+# O grupo da API mapeia o label "Ernie VIX table" -> esses tags *_debit (ver _BATMAN_GROUPS).
+EXISTING_ERNIE_TAG = {"0DTE": "0DTE_debit", "1DTE": "1DTE_debit",
+                      "wMonFri": "wMonFri_debit", "wFriFri": "wFriFri_debit"}
+
+# TP por-trade (req #4): close-rule %-over-débito EXECUTADA no motor. Cada (variante × nível)
+# é um run próprio; o recon pega o fill exato do fechamento. Reaproveita runs antigos já no
+# results (1DTE_debit_tp50/100/200). Falta o +150% e todos os outros.
+TP_FRACS = [("tp50", "0.5"), ("tp100", "1.0"), ("tp150", "1.5"), ("tp200", "2.0")]
+
+def _canon_tag(icon: str, vname: str) -> str:
+    """Tag/pasta canônica da variante base (a que a API mapeia)."""
+    if vname == "ernie":
+        return EXISTING_ERNIE_TAG.get(icon, f"{icon}_ernie")   # w21 -> w21_ernie
+    return f"{icon}_{vname}"
+
+def _build_grid():
+    """BASE (26 a rodar) + TP (30 variantes × 4 níveis = 120). Ordem: BASE primeiro
+    (21DTE-ernie na frente), depois TP. Idempotente: o main() pula tags já com runtime."""
+    first, w21_rest, others, tp = [], [], [], []
+    for icon, struct in STRUCTURES:
+        for vname, ov in VARIANTS:
+            canon = _canon_tag(icon, vname)
+            params = {"structure": struct, **ov}
+            # ---- BASE (ernie das 4 existentes é pulada; reaproveita *_debit) ----
+            if icon == "w21":
+                (first if vname == "ernie" else w21_rest).append((canon, params))
+            elif vname != "ernie":
+                others.append((canon, params))
+            # ---- TP: DESATIVADO (decisão João 2026-05-27). O agregado hold-vs-TP já vem das
+            #      runtime stats de cada base; TP por-trade só nas vencedoras depois (poucos runs). ----
+            for suf, frac in TP_FRACS:
+                tp.append((f"{canon}_{suf}", {**params, "tp_close_frac": frac}))
+    return first + w21_rest + others          # só os 26 BASE (tp fica fora da fila)
+
+GRID = _build_grid()
 
 # ---------- QC API (HMAC) ----------
 _cred = json.load(open(HOME / ".lean" / "credentials"))
@@ -85,6 +119,20 @@ def wait_for(bid, timeout=9000, interval=30):
             pass
         time.sleep(interval)
     return None
+
+def node_busy():
+    """True se há algum backtest 'In Progress' no projeto (tier free = 1 nó)."""
+    try:
+        r = api("/backtests/list", {"projectId": CLOUD_ID})
+        return any("Progress" in (b.get("status") or "") for b in r.get("backtests", []))
+    except Exception:
+        return False
+
+def wait_node_free(timeout=10800):
+    t0 = time.time()
+    while node_busy() and (time.time() - t0) < timeout:
+        print("  nó ocupado — espera 60s...", flush=True)
+        time.sleep(60)
 
 def parse_bid(out):
     m = re.search(r"/project/\d+/([0-9a-fA-F]{16,})", out) or re.search(r"[Bb]acktest id:\s*([0-9a-fA-F]{16,})", out)
@@ -123,10 +171,18 @@ def do_scenario(tag, params, res):
     p = run(["lean", "cloud", "push", "--project", PROJECT])
     if p.returncode != 0:
         res[tag] = {"params": params, "error": "push:" + p.stderr[-300:]}; save_results(res); return
-    b = run(["lean", "cloud", "backtest", PROJECT, "--name", tag])
-    bid = parse_bid((b.stdout or "") + (b.stderr or ""))
+    wait_node_free()                              # tier free = 1 nó; espera run anterior/órfão terminar
+    bid, out = None, ""
+    for attempt in range(5):                      # retry: "Invalid credentials"/throttle é transitório
+        b = run(["lean", "cloud", "backtest", PROJECT, "--name", tag])
+        out = (b.stdout or "") + (b.stderr or "")
+        bid = parse_bid(out)
+        if bid:
+            break
+        print(f"  [{tag}] sem bid (tentativa {attempt+1}) — espera 90s", flush=True)
+        time.sleep(90)
     if not bid:
-        res[tag] = {"params": params, "error": "no-bid:" + ((b.stdout or "") + (b.stderr or ""))[-400:]}; save_results(res); return
+        res[tag] = {"params": params, "error": "no-bid:" + out[-400:]}; save_results(res); return
     rs = wait_for(bid)
     res[tag] = {"params": params, "backtestId": bid, "runtime": rs}
     save_results(res)
@@ -134,17 +190,16 @@ def do_scenario(tag, params, res):
 
 def main():
     res = load_results()
-    # 1) aproveita o run de diagnóstico já em curso como o data-point debit_search
-    if WAIT_FIRST_TAG not in res or not res[WAIT_FIRST_TAG].get("runtime"):
-        print(f"esperando diag {WAIT_FIRST_BID} terminar...", flush=True)
-        rs = wait_for(WAIT_FIRST_BID)
-        res[WAIT_FIRST_TAG] = {"params": WAIT_FIRST_PARAMS, "backtestId": WAIT_FIRST_BID, "runtime": rs}
-        save_results(res)
-        print(f"[ok] {WAIT_FIRST_TAG} -> Net {(rs or {}).get('Net Profit','?')}", flush=True)
-    # 2) grid faithful (nó já livre)
     for tag, ov in GRID:
-        if tag in res and res[tag].get("runtime"):
+        cur = res.get(tag, {})
+        if cur.get("runtime") and not (cur["runtime"] or {}).get("_error"):
             print(f"[skip] {tag}", flush=True); continue
+        if cur.get("backtestId"):                 # run já submetido (interrompido/órfão) -> ADOTA
+            print(f"[adopt] {tag} {cur['backtestId']}", flush=True)
+            rs = wait_for(cur["backtestId"])
+            res[tag] = {**cur, "runtime": rs}; save_results(res)
+            print(f"[ok] {tag} -> Net {(rs or {}).get('Net Profit','?')}", flush=True)
+            continue
         do_scenario(tag, {**BASE, **ov, "run_tag": tag}, res)
     print("\n===== SWEEP COMPLETO =====", flush=True)
 

@@ -62,6 +62,16 @@ type BacktestTrade = {
   in_range?: boolean | string | null;
   result?: string | null;
   exit_method?: string | null;
+  // Batman (dual OTM butterfly) per-trade fields
+  vix_entry?: number | string | null;
+  call_lower?: number | string | null;
+  call_center?: number | string | null;
+  call_upper?: number | string | null;
+  call_debit?: number | string | null;
+  put_lower?: number | string | null;
+  put_center?: number | string | null;
+  put_upper?: number | string | null;
+  put_debit?: number | string | null;
 };
 
 type BacktestDailyRow = {
@@ -111,10 +121,11 @@ const DASH = "\u2014";
 export function BacktestDetail({ id }: { id: string }) {
   const [rule, setRule] = useState<string>("Hold to Expiration");
   const [vixFilter, setVixFilter] = useState<string>("All");
+  const [widthRule, setWidthRule] = useState<string | undefined>(undefined);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(0);
   const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["backtest", id, rule, vixFilter],
-    queryFn: () => api.backtest(id, rule, vixFilter),
+    queryKey: ["backtest", id, rule, vixFilter, widthRule ?? ""],
+    queryFn: () => api.backtest(id, rule, vixFilter, widthRule),
     placeholderData: (prev) => prev,
   });
 
@@ -131,6 +142,8 @@ export function BacktestDetail({ id }: { id: string }) {
       available_rules: data.meta.available_rules ?? ["Hold to Expiration"],
       vix_filter: data.meta.vix_filter ?? "All",
       available_vix_filters: data.meta.available_vix_filters ?? ["All"],
+      width_rule: data.meta.width_rule ?? null,
+      available_width_rules: data.meta.available_width_rules ?? [],
     },
     kpis: { ...data.kpis, equity: data.kpis.equity ?? [] },
     trades: data.trades ?? [],
@@ -145,6 +158,8 @@ export function BacktestDetail({ id }: { id: string }) {
         onRuleChange={setRule}
         vixFilter={vixFilter}
         onVixFilterChange={setVixFilter}
+        widthRule={widthRule ?? safeData.meta.width_rule ?? undefined}
+        onWidthRuleChange={setWidthRule}
         loading={isFetching}
       />
       <KpiBand detail={safeData} />
@@ -161,9 +176,11 @@ export function BacktestDetail({ id }: { id: string }) {
       </div>
       <YearlyBreakdownCard detail={safeData} />
       <VixBreakdownCard detail={safeData} />
-      <div className="mt-6">
-        <TradesTable detail={safeData} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
+      <DowBreakdownCard detail={safeData} />
+      {/* Trade auditor ON TOP of the all-trades table (CZ: audit trade-by-trade) */}
+      <div className="mt-6 space-y-4">
         <TradeInspector detail={safeData} index={selectedIdx} onChange={setSelectedIdx} />
+        <TradesTable detail={safeData} selectedIdx={selectedIdx} onSelect={setSelectedIdx} />
       </div>
     </main>
   );
@@ -175,6 +192,8 @@ function Header({
   onRuleChange,
   vixFilter,
   onVixFilterChange,
+  widthRule,
+  onWidthRuleChange,
   loading,
 }: {
   detail: BacktestDetailType;
@@ -182,6 +201,8 @@ function Header({
   onRuleChange: (r: string) => void;
   vixFilter: string;
   onVixFilterChange: (v: string) => void;
+  widthRule?: string;
+  onWidthRuleChange: (v: string) => void;
   loading: boolean;
 }) {
   const isOverridden = rule !== "Hold to Expiration";
@@ -189,6 +210,9 @@ function Header({
   const availableVixFilters = detail.meta.available_vix_filters ?? ["All"];
   const hasVixOptions = availableVixFilters.length > 1;
   const vixApplied = vixFilter !== "All";
+  const availableWidthRules = detail.meta.available_width_rules ?? [];
+  const hasWidthOptions = availableWidthRules.length > 1;
+  const widthValue = widthRule ?? detail.meta.width_rule ?? availableWidthRules[0];
   return (
     <div className="mb-6 flex flex-col gap-3">
       <Link
@@ -217,6 +241,25 @@ function Header({
           )}
         </div>
         <div className="flex flex-wrap items-end gap-4">
+          {hasWidthOptions && (
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Width / placement</span>
+              </div>
+              <Select value={widthValue} onValueChange={(v) => v && onWidthRuleChange(v)}>
+                <SelectTrigger className="h-9 min-w-[170px] border-border/60 bg-card/50 text-sm focus:border-primary/60">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableWidthRules.map((w) => (
+                    <SelectItem key={w} value={w} className="text-sm">{w}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-[11px] text-muted-foreground">short strike set by the debit rule</span>
+            </div>
+          )}
           {hasVixOptions && (
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex items-center gap-2">
@@ -495,6 +538,71 @@ export function VixBreakdownCard({ detail }: { detail: BacktestDetailType }) {
   );
 }
 
+export function DowBreakdownCard({ detail }: { detail: BacktestDetailType }) {
+  // Only meaningful for the daily-entry structures (0DTE/1DTE open every weekday).
+  const h = detail.meta.horizon ?? "";
+  const dailyEntry = detail.meta.kind === "batman" && (h.includes("0DTE") || h.includes("1DTE"));
+  const rows = detail.kpis.dow_breakdown ?? [];
+  if (!dailyEntry || rows.length === 0) return null;
+  const totals = rows.reduce(
+    (acc, r) => {
+      acc.n_trades += r.n_trades;
+      acc.wins += r.wins;
+      acc.total_pnl += r.total_pnl;
+      acc.total_pnl_pct += r.total_pnl_pct;
+      return acc;
+    },
+    { n_trades: 0, wins: 0, total_pnl: 0, total_pnl_pct: 0 },
+  );
+  const totalWr = totals.n_trades ? totals.wins / totals.n_trades : null;
+  return (
+    <div className="mt-6">
+      <ChartCard
+        title="Open-day breakdown (day of week)"
+        icon={<Activity className="h-4 w-4" />}
+        sub="Which entry weekday pays — entry-date grouping"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm tabular">
+            <thead>
+              <tr className="border-b border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">Open day</th>
+                <th className="px-3 py-2 text-right font-medium">Trades</th>
+                <th className="px-3 py-2 text-right font-medium">Wins</th>
+                <th className="px-3 py-2 text-right font-medium">WR</th>
+                <th className="px-3 py-2 text-right font-medium">P&L</th>
+                <th className="px-3 py-2 text-right font-medium">P&L %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.dow} className="border-b border-border/30 last:border-0">
+                  <td className="px-3 py-2 text-left font-medium">{r.dow}</td>
+                  <td className="px-3 py-2 text-right">{r.n_trades}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{r.wins}</td>
+                  <td className="px-3 py-2 text-right">{fmtPct(r.win_rate)}</td>
+                  <td className={`px-3 py-2 text-right font-medium ${pnlClass(r.total_pnl)}`}>{fmtMoney(r.total_pnl)}</td>
+                  <td className={`px-3 py-2 text-right ${pnlClass(r.total_pnl_pct)}`}>{fmtPct(r.total_pnl_pct)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border/80 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <td className="px-3 py-2 text-left font-semibold">Total</td>
+                <td className="px-3 py-2 text-right font-semibold">{totals.n_trades}</td>
+                <td className="px-3 py-2 text-right font-semibold">{totals.wins}</td>
+                <td className="px-3 py-2 text-right font-semibold">{fmtPct(totalWr)}</td>
+                <td className={`px-3 py-2 text-right font-semibold ${pnlClass(totals.total_pnl)}`}>{fmtMoney(totals.total_pnl)}</td>
+                <td className={`px-3 py-2 text-right font-semibold ${pnlClass(totals.total_pnl_pct)}`}>{fmtPct(totals.total_pnl_pct)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </ChartCard>
+    </div>
+  );
+}
+
 export function EquityCurveCard({ detail }: { detail: BacktestDetailType }) {
   const data = detail.kpis.equity.map((p) => ({ date: p.trade_date, cum: p.cumulative_pnl, pnl: p.pnl_usd }));
   const final = data.length ? data[data.length - 1].cum : 0;
@@ -731,6 +839,10 @@ function TradeInspector({
   const credit = asNum(trade.total_credit);
   const spotEntry = asNum(trade.spot_entry);
   const spotExit = asNum(trade.spot_exit);
+  const isBatman = detail.meta.kind === "batman";
+  const vixEntry = asNum(trade.vix_entry);
+  const putCenter = asNum(trade.put_center);
+  const callCenter = asNum(trade.call_center);
 
   return (
     <div className="mt-4 space-y-4">
@@ -777,29 +889,45 @@ function TradeInspector({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <KpiBlock label="Entry Spot" value={fmtNum(spotEntry)} />
-        <KpiBlock label="IV ATM" value={iv != null ? fmtPct(iv / 100) : DASH} />
-        <KpiBlock label="DTE Entry" value={`${fmtNum(dteEntry)} days`} />
-        <KpiBlock
-          label="Credit"
-          value={credit != null ? `${fmtNum(credit)} pts` : DASH}
-          sub={credit != null ? fmtMoney(credit * detail.meta.multiplier) : undefined}
-        />
-        <KpiBlock
-          label="Exit Spot"
-          value={open ? DASH : fmtNum(spotExit)}
-          sub={!open && spotEntry != null && spotExit != null ? `${fmtSigned(spotExit - spotEntry, 0)} pts` : undefined}
-          tone={!open && spotEntry != null && spotExit != null ? spotExit - spotEntry : null}
-        />
-        <KpiBlock
-          label="P&L (USD)"
-          value={open ? "In Progress" : fmtMoney(pnl)}
-          tone={open ? null : pnl}
-          sub={open ? "Open trade" : undefined}
-          small={open}
-        />
-      </div>
+      {isBatman ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <KpiBlock label="VIX Entry" value={fmtNum(vixEntry)} />
+          <KpiBlock label="DTE Entry" value={`${fmtNum(dteEntry)} days`} />
+          <KpiBlock label="Net Debit" value={credit != null ? fmtMoney(credit) : DASH} sub="paid (max loss)" />
+          <KpiBlock label="Put tent" value={fmtNum(putCenter)} sub="body strike" />
+          <KpiBlock label="Call tent" value={fmtNum(callCenter)} sub="body strike" />
+          <KpiBlock
+            label="Settle / P&L"
+            value={fmtMoney(pnl)}
+            tone={pnl}
+            sub={spotExit != null ? `spot ${fmtNum(spotExit)}` : undefined}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <KpiBlock label="Entry Spot" value={fmtNum(spotEntry)} />
+          <KpiBlock label="IV ATM" value={iv != null ? fmtPct(iv / 100) : DASH} />
+          <KpiBlock label="DTE Entry" value={`${fmtNum(dteEntry)} days`} />
+          <KpiBlock
+            label="Credit"
+            value={credit != null ? `${fmtNum(credit)} pts` : DASH}
+            sub={credit != null ? fmtMoney(credit * detail.meta.multiplier) : undefined}
+          />
+          <KpiBlock
+            label="Exit Spot"
+            value={open ? DASH : fmtNum(spotExit)}
+            sub={!open && spotEntry != null && spotExit != null ? `${fmtSigned(spotExit - spotEntry, 0)} pts` : undefined}
+            tone={!open && spotEntry != null && spotExit != null ? spotExit - spotEntry : null}
+          />
+          <KpiBlock
+            label="P&L (USD)"
+            value={open ? "In Progress" : fmtMoney(pnl)}
+            tone={open ? null : pnl}
+            sub={open ? "Open trade" : undefined}
+            small={open}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-7">
@@ -987,6 +1115,8 @@ function BacktestStrikeStructure({
   const credit = asNum(trade.total_credit);
   const rows = kind === "ss42"
     ? buildSs42LegRows(trade, entryDaily)
+    : kind === "batman"
+    ? buildBatmanLegRows(trade)
     : buildIc7LegRows(trade);
 
   return (
@@ -997,6 +1127,22 @@ function BacktestStrikeStructure({
       rightLabel={kind === "ss42" ? "Delta" : "Width"}
     />
   );
+}
+
+function buildBatmanLegRows(trade: BacktestTrade): LegRow[] {
+  const cl = asNum(trade.call_lower), cc = asNum(trade.call_center), cu = asNum(trade.call_upper);
+  const pl = asNum(trade.put_lower), pc = asNum(trade.put_center), pu = asNum(trade.put_upper);
+  const cWidth = cc != null && cl != null ? `${Math.round(cc - cl)} pt wing` : DASH;
+  const pWidth = pc != null && pl != null ? `${Math.round(pc - pl)} pt wing` : DASH;
+  // Two long OTM butterflies: each long 1 wing / short 2 body / long 1 wing.
+  return [
+    { leg: "Call +1 (low)", side: "Buy", strike: cl, detail: cWidth, mid: null },
+    { leg: "Call −2 (body)", side: "Sell", strike: cc, detail: cWidth, mid: asNum(trade.call_debit) },
+    { leg: "Call +1 (high)", side: "Buy", strike: cu, detail: cWidth, mid: null },
+    { leg: "Put +1 (high)", side: "Buy", strike: pu, detail: pWidth, mid: null },
+    { leg: "Put −2 (body)", side: "Sell", strike: pc, detail: pWidth, mid: asNum(trade.put_debit) },
+    { leg: "Put +1 (low)", side: "Buy", strike: pl, detail: pWidth, mid: null },
+  ];
 }
 
 export function EmptyChartState({ label }: { label: string }) {
@@ -1161,6 +1307,40 @@ function buildPayoffSeries(
   markerSpot: number | null,
   markerLabel: string,
 ): PayoffSeries | null {
+  if (kind === "batman") {
+    const cl = asNum(trade.call_lower), cc = asNum(trade.call_center), cu = asNum(trade.call_upper);
+    const pl = asNum(trade.put_lower), pc = asNum(trade.put_center), pu = asNum(trade.put_upper);
+    if (cl == null || cc == null || cu == null || pl == null || pc == null || pu == null) return null;
+    const settle = asNum(trade.spot_exit);
+    const anchor = (pc + cc) / 2;                       // entre as duas tendas (proxy de "entry")
+    const refs = [pl, pu, cl, cu];
+    if (settle != null) refs.push(settle);
+    let xMin = Math.min(...refs);
+    let xMax = Math.max(...refs);
+    const pad = Math.max((xMax - xMin) * 0.08, anchor * 0.012);
+    xMin = Math.max(0, xMin - pad);
+    xMax += pad;
+    const steps = 240;
+    const points = Array.from({ length: steps + 1 }, (_, idx) => {
+      const spot = xMin + ((xMax - xMin) * idx) / steps;
+      const pnl = payoffAtSpot(spot, trade, kind, multiplier);
+      return { spot, pnl, profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0, pctFromEntry: ((spot - anchor) / anchor) * 100 };
+    });
+    const references: PayoffReference[] = [
+      { key: "put-tent", label: "Put tent", value: pc, color: "var(--gain)", dash: "4 4" },
+      { key: "call-tent", label: "Call tent", value: cc, color: "var(--gain)", dash: "4 4" },
+      { key: "put-wing", label: "Put wing", value: pl, color: "var(--border)", dash: "2 4" },
+      { key: "call-wing", label: "Call wing", value: cu, color: "var(--border)", dash: "2 4" },
+    ];
+    return {
+      points,
+      references,
+      domain: [xMin, xMax],
+      marker: settle == null || settle < xMin || settle > xMax
+        ? null
+        : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+    };
+  }
   const spotEntry = asNum(trade.spot_entry);
   const credit = asNum(trade.total_credit);
   const shortPut = asNum(trade.short_put);
@@ -1224,12 +1404,23 @@ function buildPayoffSeries(
   };
 }
 
+// SPX index options settle at $100/point; Batman P&L is in USD already (total_credit in USD).
+const SPX_PT = 100;
+
 function payoffAtSpot(
   spot: number,
   trade: BacktestTrade,
   kind: BacktestDetailType["meta"]["kind"],
   multiplier: number,
 ): number {
+  if (kind === "batman") {
+    // Two long OTM butterflies (call fly above, put fly below): +1/-2/+1 each.
+    const cl = asNum(trade.call_lower) ?? 0, cc = asNum(trade.call_center) ?? 0, cu = asNum(trade.call_upper) ?? 0;
+    const pl = asNum(trade.put_lower) ?? 0, pc = asNum(trade.put_center) ?? 0, pu = asNum(trade.put_upper) ?? 0;
+    const callFly = Math.max(0, spot - cl) - 2 * Math.max(0, spot - cc) + Math.max(0, spot - cu);
+    const putFly = Math.max(0, pl - spot) - 2 * Math.max(0, pc - spot) + Math.max(0, pu - spot);
+    return (callFly + putFly) * SPX_PT - (asNum(trade.total_credit) ?? 0);
+  }
   const credit = asNum(trade.total_credit) ?? 0;
   const shortPut = asNum(trade.short_put) ?? 0;
   const shortCall = asNum(trade.short_call) ?? 0;

@@ -47,9 +47,10 @@ class Batman1DteV1(QCAlgorithm):
         self.placement_mode    = self.get_parameter("placement_mode", "debit")     # debit (P1) | delta (P2)
         self.symmetry          = self.get_parameter("symmetry", "sym")             # sym | asym
         self.ticker            = self.get_parameter("ticker", "SPX")               # SPX (multi-ticker = futuro)
-        self.target_delta      = float(self.get_parameter("target_delta", "0.15"))
+        self.target_delta      = float(self.get_parameter("target_delta", "0.16"))  # 0.16 (CZ); delta-0.15 aposentado
         self.target_debit_frac = float(self.get_parameter("target_debit_frac", "0.05"))
-        self.width_mode        = self.get_parameter("width_mode", "vix_table")     # vix_table (CZ/Ernie) | debit_search
+        self.width_mode        = self.get_parameter("width_mode", "vix_table")     # vix_table (CZ/Ernie) | fixed | debit_search
+        self.fixed_width       = float(self.get_parameter("fixed_width", "30"))    # usado só c/ width_mode=fixed (25/30/40/50)
         sd = self.get_parameter("start_date", "2022-06-20").split("-")
         ed = self.get_parameter("end_date",   "2026-05-13").split("-")
         # tag única por cenário: key do ObjectStore + nome no relatório. O sweep passa o run_tag.
@@ -70,6 +71,9 @@ class Batman1DteV1(QCAlgorithm):
         elif self.structure == "weekly_fri_fri":
             self.entry_hour, self.entry_minute = 15, 45
             self.trade_weekdays = {4};              self._exp_lo, self._exp_hi = 5, 9    # sex -> sex (~7DTE)
+        elif self.structure == "weekly_fri_fri_21d":
+            self.entry_hour, self.entry_minute = 15, 45
+            self.trade_weekdays = {4};              self._exp_lo, self._exp_hi = 18, 24   # sex -> sex +3sem (~21DTE)
         else:  # "1DTE" (default)
             self.structure = "1DTE"
             self.entry_hour, self.entry_minute = 15, 45
@@ -122,10 +126,12 @@ class Batman1DteV1(QCAlgorithm):
             self.current_day = self.time.date()
             self.entered_today = False
 
-        # --- marcação intraday dos batmans que expiram HOJE (grava cruzamentos de TP) ---
+        # --- marcação intraday p/ gravar cruzamentos de TP. Nos SEMANAIS marca em TODOS os
+        #     dias da vida do trade (não só no expiry), p/ as colunas de TP valerem no 4/7/21DTE. ---
         if self.time.minute % self.mark_every_min == 0:
+            _weekly = self.structure in ("weekly_mon_fri", "weekly_fri_fri", "weekly_fri_fri_21d")
             for bm in self.open_batmans:
-                if bm["expiry"] == self.time.date():
+                if bm["expiry"] == self.time.date() or (_weekly and bm["expiry"] >= self.time.date()):
                     self._mark_batman(bm)
 
         # --- entrada (uma vez/dia, a partir de 15:45) ---
@@ -169,6 +175,9 @@ class Batman1DteV1(QCAlgorithm):
             return fr[0] if fr else None
         if self.structure == "weekly_fri_fri":               # entra sex -> PRÓXIMA sexta (~7d)
             fr = [e for e in fut if e.weekday() == 4 and (e - today).days >= 5]
+            return fr[0] if fr else None
+        if self.structure == "weekly_fri_fri_21d":           # entra sex -> sexta +3 semanas (~21d)
+            fr = [e for e in fut if e.weekday() == 4 and 19 <= (e - today).days <= 24]
             return fr[0] if fr else None
         return fut[0]                                         # 1DTE: próximo expiry > hoje
 
@@ -256,11 +265,13 @@ class Batman1DteV1(QCAlgorithm):
         # ditado pelo outro lado no Batman simétrico). ----
         if force_wing is not None:
             wings = [force_wing]                                   # put herda o width do call (sym)
+        elif self.width_mode == "fixed":
+            wings = [self.fixed_width]                             # width TRAVADA (25/30/40/50); o débito move o short
         elif width_band is not None:
             wings = [w for w in self.width_candidates if width_band[0] <= w <= width_band[1]]
         else:
             wings = self.width_candidates
-        relax = (force_wing is not None) or (width_band is not None)   # width ditado por fora -> relaxa banda de débito
+        relax = (force_wing is not None) or (self.width_mode == "fixed") or (width_band is not None)   # width ditado por fora -> relaxa banda de débito
         chosen, chosen_wing = None, None
         for wing in wings:                           # mais largo primeiro
             best = None                              # (gap, tupla_make)
