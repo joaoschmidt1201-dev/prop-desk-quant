@@ -541,7 +541,8 @@ export function VixBreakdownCard({ detail }: { detail: BacktestDetailType }) {
 export function DowBreakdownCard({ detail }: { detail: BacktestDetailType }) {
   // Only meaningful for the daily-entry structures (0DTE/1DTE open every weekday).
   const h = detail.meta.horizon ?? "";
-  const dailyEntry = detail.meta.kind === "batman" && (h.includes("0DTE") || h.includes("1DTE"));
+  // DoW faz sentido em QUALQUER estratégia que entra todo dia útil (0DTE/1DTE Batman, IC 0DTE, etc.)
+  const dailyEntry = h.includes("0DTE") || h.includes("1DTE");
   const rows = detail.kpis.dow_breakdown ?? [];
   if (!dailyEntry || rows.length === 0) return null;
   const totals = rows.reduce(
