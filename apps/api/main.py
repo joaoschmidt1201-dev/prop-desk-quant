@@ -1426,7 +1426,7 @@ if (_IC0DTE_DIR / "IC0DTE" / "trades.csv").exists():
         "(custo de recompra = 2× crédito → perda travada em ~1× crédito).",
         "trades_csv": "ic0dte_backtest/IC0DTE/trades.csv",
         "daily_csv": "ic0dte_backtest/IC0DTE/daily.csv",
-        "kind": "ic7", "multiplier": 1,
+        "kind": "ic0dte", "multiplier": 1,
         "close_rules": _IC0DTE_RULES,
     })
 
@@ -1453,7 +1453,7 @@ if (_IF0DTE_DIR / "IF0DTE" / "trades.csv").exists():
         "Close-rules: Hold ou TP a 10/20/30% do crédito coletado.",
         "trades_csv": "ironfly_backtest/IF0DTE/trades.csv",
         "daily_csv": "ironfly_backtest/IF0DTE/daily.csv",
-        "kind": "ic7", "multiplier": 1,
+        "kind": "ironfly", "multiplier": 1,
         "close_rules": _IF0DTE_RULES,
     })
 

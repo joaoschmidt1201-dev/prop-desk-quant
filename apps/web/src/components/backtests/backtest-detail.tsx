@@ -904,6 +904,28 @@ function TradeInspector({
             sub={spotExit != null ? `spot ${fmtNum(spotExit)}` : undefined}
           />
         </div>
+      ) : (detail.meta.kind === "ic0dte" || detail.meta.kind === "ironfly") ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <KpiBlock label="VIX Entry" value={fmtNum(vixEntry)} />
+          <KpiBlock label="DTE Entry" value={`${fmtNum(dteEntry)} days`} />
+          <KpiBlock label="Net Credit" value={credit != null ? fmtMoney(credit) : DASH} sub="received" />
+          <KpiBlock
+            label="Short Put"
+            value={fmtNum(asNum(trade.short_put))}
+            sub={detail.meta.kind === "ironfly" ? "ATM body" : undefined}
+          />
+          <KpiBlock
+            label="Short Call"
+            value={fmtNum(asNum(trade.short_call))}
+            sub={detail.meta.kind === "ironfly" ? "ATM body" : undefined}
+          />
+          <KpiBlock
+            label="Settle / P&L"
+            value={fmtMoney(pnl)}
+            tone={pnl}
+            sub={spotExit != null ? `spot ${fmtNum(spotExit)}` : undefined}
+          />
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <KpiBlock label="Entry Spot" value={fmtNum(spotEntry)} />
@@ -1118,6 +1140,10 @@ function BacktestStrikeStructure({
     ? buildSs42LegRows(trade, entryDaily)
     : kind === "batman"
     ? buildBatmanLegRows(trade)
+    : kind === "ic0dte"
+    ? buildIC0DTELegRows(trade)
+    : kind === "ironfly"
+    ? buildIronFlyLegRows(trade)
     : buildIc7LegRows(trade);
 
   return (
@@ -1128,6 +1154,33 @@ function BacktestStrikeStructure({
       rightLabel={kind === "ss42" ? "Delta" : "Width"}
     />
   );
+}
+
+function buildIC0DTELegRows(trade: BacktestTrade): LegRow[] {
+  // IC 0DTE: 4 strikes distintos. Asa = sp-lp (put) e lc-sc (call).
+  const lp = asNum(trade.long_put), sp = asNum(trade.short_put);
+  const sc = asNum(trade.short_call), lc = asNum(trade.long_call);
+  const putWidth = sp != null && lp != null ? `${Math.round(sp - lp)} pt wing` : DASH;
+  const callWidth = sc != null && lc != null ? `${Math.round(lc - sc)} pt wing` : DASH;
+  return [
+    { leg: "Long Put",   side: "Buy",  strike: lp, detail: putWidth, mid: null },
+    { leg: "Short Put",  side: "Sell", strike: sp, detail: putWidth, mid: null },
+    { leg: "Short Call", side: "Sell", strike: sc, detail: callWidth, mid: null },
+    { leg: "Long Call",  side: "Buy",  strike: lc, detail: callWidth, mid: null },
+  ];
+}
+
+function buildIronFlyLegRows(trade: BacktestTrade): LegRow[] {
+  // Iron Fly: shorts no MESMO strike (body ATM); longs ±wing.
+  const lp = asNum(trade.long_put), sp = asNum(trade.short_put);
+  const sc = asNum(trade.short_call), lc = asNum(trade.long_call);
+  const wing = sp != null && lp != null ? `${Math.round(sp - lp)} pt wing (= EM)` : DASH;
+  return [
+    { leg: "Long Put (low)",   side: "Buy",  strike: lp, detail: wing,     mid: null },
+    { leg: "Short Put (ATM)",  side: "Sell", strike: sp, detail: "body",   mid: null },
+    { leg: "Short Call (ATM)", side: "Sell", strike: sc, detail: "body",   mid: null },
+    { leg: "Long Call (high)", side: "Buy",  strike: lc, detail: wing,     mid: null },
+  ];
 }
 
 function buildBatmanLegRows(trade: BacktestTrade): LegRow[] {
@@ -1308,6 +1361,47 @@ function buildPayoffSeries(
   markerSpot: number | null,
   markerLabel: string,
 ): PayoffSeries | null {
+  if (kind === "ic0dte" || kind === "ironfly") {
+    const lp = asNum(trade.long_put);
+    const sp = asNum(trade.short_put);
+    const sc = asNum(trade.short_call);
+    const lc = asNum(trade.long_call);
+    const credit = asNum(trade.total_credit);
+    if (lp == null || sp == null || sc == null || lc == null || credit == null) return null;
+    const settle = asNum(trade.spot_exit);
+    const creditPts = credit / SPX_PT;                       // crédito USD -> pontos pra BEPs
+    const lowerBep = sp - creditPts;
+    const upperBep = sc + creditPts;
+    const anchor = (sp + sc) / 2;                            // meio da zona de lucro (= ATM no IronFly)
+    const refs = [lp, sp, sc, lc, lowerBep, upperBep];
+    if (settle != null) refs.push(settle);
+    let xMin = Math.min(...refs), xMax = Math.max(...refs);
+    const pad = Math.max((xMax - xMin) * 0.08, anchor * 0.005);
+    xMin = Math.max(0, xMin - pad);
+    xMax += pad;
+    const steps = 240;
+    const points = Array.from({ length: steps + 1 }, (_, idx) => {
+      const spot = xMin + ((xMax - xMin) * idx) / steps;
+      const pnl = payoffAtSpot(spot, trade, kind, multiplier);
+      return { spot, pnl, profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0, pctFromEntry: ((spot - anchor) / anchor) * 100 };
+    });
+    const references: PayoffReference[] = [
+      { key: "short-put", label: "Short Put", value: sp, color: "var(--loss)", dash: "3 3" },
+      { key: "short-call", label: "Short Call", value: sc, color: "var(--loss)", dash: "3 3" },
+      { key: "long-put", label: "Long Put", value: lp, color: "var(--border)", dash: "2 4" },
+      { key: "long-call", label: "Long Call", value: lc, color: "var(--border)", dash: "2 4" },
+      { key: "bep-lower", label: "Lower BEP", value: lowerBep, color: "var(--warning)", dash: "5 5" },
+      { key: "bep-upper", label: "Upper BEP", value: upperBep, color: "var(--warning)", dash: "5 5" },
+    ];
+    return {
+      points,
+      references,
+      domain: [xMin, xMax],
+      marker: settle == null || settle < xMin || settle > xMax
+        ? null
+        : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+    };
+  }
   if (kind === "batman") {
     const cl = asNum(trade.call_lower), cc = asNum(trade.call_center), cu = asNum(trade.call_upper);
     const pl = asNum(trade.put_lower), pc = asNum(trade.put_center), pu = asNum(trade.put_upper);
@@ -1421,6 +1515,20 @@ function payoffAtSpot(
     const callFly = Math.max(0, spot - cl) - 2 * Math.max(0, spot - cc) + Math.max(0, spot - cu);
     const putFly = Math.max(0, pl - spot) - 2 * Math.max(0, pc - spot) + Math.max(0, pu - spot);
     return (callFly + putFly) * SPX_PT - (asNum(trade.total_credit) ?? 0);
+  }
+  if (kind === "ic0dte" || kind === "ironfly") {
+    // Iron Condor / Iron Fly: long put + short put (credit spread) + short call + long call (credit spread).
+    // Iron Fly = IC with short_put === short_call (ATM body). Mesma fórmula.
+    // Perdas dos spreads capadas na asa; total_credit já em USD (multiplier=1).
+    const lp = asNum(trade.long_put) ?? 0;
+    const sp = asNum(trade.short_put) ?? 0;
+    const sc = asNum(trade.short_call) ?? 0;
+    const lc = asNum(trade.long_call) ?? 0;
+    const putWing = sp - lp;
+    const callWing = lc - sc;
+    const putLoss = Math.max(0, Math.min(sp - spot, putWing));
+    const callLoss = Math.max(0, Math.min(spot - sc, callWing));
+    return (asNum(trade.total_credit) ?? 0) - (putLoss + callLoss) * SPX_PT;
   }
   const credit = asNum(trade.total_credit) ?? 0;
   const shortPut = asNum(trade.short_put) ?? 0;

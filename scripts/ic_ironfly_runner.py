@@ -33,10 +33,11 @@ SPAN = {"start_date": "2022-06-20", "end_date": "2026-05-13"}
 SCENARIOS = [
     ("IC0DTE",       IC_ENGINE, {**SPAN, "stop_close": "none"}),
     ("IC0DTE_stop",  IC_ENGINE, {**SPAN, "stop_close": "on"}),
-    ("IF0DTE",       IF_ENGINE, {**SPAN}),
-    ("IF0DTE_tp10",  IF_ENGINE, {**SPAN, "tp_close_frac": "0.10"}),
-    ("IF0DTE_tp20",  IF_ENGINE, {**SPAN, "tp_close_frac": "0.20"}),
-    ("IF0DTE_tp30",  IF_ENGINE, {**SPAN, "tp_close_frac": "0.30"}),
+    ("IF0DTE",       IF_ENGINE, {**SPAN}),                                                      # hold
+    ("IF0DTE_stop",  IF_ENGINE, {**SPAN, "stop_close": "on"}),                                  # só stop @ centro±EM
+    ("IF0DTE_tp10",  IF_ENGINE, {**SPAN, "tp_close_frac": "0.10", "stop_close": "on"}),         # Doc rule: TP 10% + stop
+    ("IF0DTE_tp20",  IF_ENGINE, {**SPAN, "tp_close_frac": "0.20", "stop_close": "on"}),
+    ("IF0DTE_tp30",  IF_ENGINE, {**SPAN, "tp_close_frac": "0.30", "stop_close": "on"}),
 ]
 
 current_engine = {"path": None}
