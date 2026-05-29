@@ -1404,6 +1404,59 @@ if _BATMAN_DIR.exists():
             "variants": _g["variants"],
         })
 
+# ───────── IC SPX 0DTE (CZ estratégia #4) ─────────
+# Close-rule: Hold / Stop a 2x crédito (max loss = 1x crédito = net credit).
+# Run base = IC0DTE (hold); a coluna pnl_stop_2x vem da run IC0DTE_stop merged.
+_IC0DTE_DIR = BACKTESTS_ROOT / "ic0dte_backtest"
+_IC0DTE_RULES = {
+    "Hold to Expiration": None,                                # usa pnl_usd
+    "Stop at 2× credit (max loss = 1× credit)": "pnl_stop_2x", # usa coluna mesclada
+}
+if (_IC0DTE_DIR / "IC0DTE" / "trades.csv").exists():
+    BACKTESTS_REGISTRY.append({
+        "id": "ic-spx-0dte",
+        "name": "Iron Condor SPX 0DTE",
+        "underlying": "SPX",
+        "strategy": "Iron Condor 0DTE · 12:30 ET · 16Δ shorts · 5pt wings",
+        "family": "Iron Condor",
+        "horizon": "0DTE",
+        "description": "SPXW 0DTE Iron Condor (CZ estratégia #4). Entrada 12:30 ET todo dia útil; "
+        "shorts no delta mais próximo de 0.16 em cada lado; longs 5 pts fora (asa 5). Crédito recebido. "
+        "Close-rules: Hold to expiration (cash-settle no SPX close) ou Stop a 2× crédito "
+        "(custo de recompra = 2× crédito → perda travada em ~1× crédito).",
+        "trades_csv": "ic0dte_backtest/IC0DTE/trades.csv",
+        "daily_csv": "ic0dte_backtest/IC0DTE/daily.csv",
+        "kind": "ic7", "multiplier": 1,
+        "close_rules": _IC0DTE_RULES,
+    })
+
+# ───────── IRON FLY SPX 0DTE (CZ estratégia #2 · ThetaProfits/Doc) ─────────
+# Close-rule: Hold / TP a 10/20/30% do crédito.
+_IF0DTE_DIR = BACKTESTS_ROOT / "ironfly_backtest"
+_IF0DTE_RULES = {
+    "Hold to Expiration": None,
+    "Close at +10% of net credit": "pnl_tp10",
+    "Close at +20% of net credit": "pnl_tp20",
+    "Close at +30% of net credit": "pnl_tp30",
+}
+if (_IF0DTE_DIR / "IF0DTE" / "trades.csv").exists():
+    BACKTESTS_REGISTRY.append({
+        "id": "ironfly-spx-0dte",
+        "name": "Iron Fly SPX 0DTE",
+        "underlying": "SPX",
+        "strategy": "Iron Fly 0DTE · 10:00 ET após opening range · ATM · asas no EM",
+        "family": "Iron Fly",
+        "horizon": "0DTE",
+        "description": "SPXW 0DTE Iron Fly (Doc/ThetaProfits — CZ estratégia #2 Open Range Iron Fly). "
+        "Entra 10:00 ET após o opening range; shorts ATM no 1º strike acima do spot; asas no expected "
+        "move do dia (= straddle ATM). Stop por preço em centro±EM (= as asas). "
+        "Close-rules: Hold ou TP a 10/20/30% do crédito coletado.",
+        "trades_csv": "ironfly_backtest/IF0DTE/trades.csv",
+        "daily_csv": "ironfly_backtest/IF0DTE/daily.csv",
+        "kind": "ic7", "multiplier": 1,
+        "close_rules": _IF0DTE_RULES,
+    })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
@@ -1626,8 +1679,31 @@ def _apply_rule(
     rule: str,
     multiplier: int,
     kind: str | None = None,
+    close_rules: dict[str, str | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Returns shallow copies of trades with effective_pnl_usd / effective_close_date set."""
+    # Generic close-rule handler — usado por IC 0DTE e Iron Fly 0DTE (variantes mescladas como
+    # colunas pnl_*). Mesma lógica do Batman mas configurada pelo registry entry.
+    if close_rules is not None:
+        col = close_rules.get(rule)
+        out: list[dict[str, Any]] = []
+        for t in trades:
+            nt = dict(t)
+            hold = float(t.get("pnl_usd") or 0)
+            nt["pnl_usd_at_exp"] = hold
+            if col is not None and t.get(col) is not None:
+                eff = float(t[col])
+                nt["pnl_usd"] = eff
+                nt["effective_pnl_usd"] = eff
+                nt["effective_close_date"] = None
+                nt["effective_dit_at_close"] = None
+                nt["exit_method"] = "rule_triggered"
+            else:
+                nt["effective_pnl_usd"] = hold
+                nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
+                nt["effective_dit_at_close"] = None
+            out.append(nt)
+        return out
     if kind == "batman":
         # Profit-targets are precomputed per-trade columns (pnl_tp50/100/200); Hold uses pnl_usd.
         col = _BATMAN_TP_COLS.get(rule)
@@ -1975,7 +2051,12 @@ def get_backtest(
     raw_trades = _read_backtest_trades(meta)
     daily = _read_backtest_daily(meta)
 
-    if meta["kind"] == "ss42":
+    # Close-rules custom (IC 0DTE, Iron Fly 0DTE) — registry entry carrega o dict.
+    _cr = meta.get("close_rules")
+    if _cr is not None:
+        # Oferece a regra sempre que o crédito é Hold (col=None) OU a coluna existe nos trades
+        available_rules = [r for r, c in _cr.items() if c is None or any(c in t for t in raw_trades)]
+    elif meta["kind"] == "ss42":
         available_rules = SS42_RULES
     elif meta["kind"] == "triplecal":
         available_rules = TRIPLECAL_RULES
@@ -1989,10 +2070,10 @@ def get_backtest(
     rule_to_use = rule if rule in available_rules else "Hold to Expiration"
     vix_filter_to_use = vix_filter if vix_filter in VIX_FILTERS else "All"
     # These families carry vix_entry, so the VIX entry filter is meaningful.
-    available_vix_filters = VIX_FILTERS if meta["kind"] in ("triplecal", "ss42", "batman") else ["All"]
+    available_vix_filters = VIX_FILTERS if (meta["kind"] in ("triplecal", "ss42", "batman") or _cr is not None) else ["All"]
 
     filtered_trades = _filter_by_vix(raw_trades, vix_filter_to_use)
-    trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"], kind=meta["kind"])
+    trades_with_rule = _apply_rule(filtered_trades, daily, rule_to_use, meta["multiplier"], kind=meta["kind"], close_rules=_cr)
     kpis = _backtest_kpis(trades_with_rule, kind=meta["kind"], multiplier=meta["multiplier"])
 
     display_cols_ss42 = [
@@ -2004,8 +2085,10 @@ def get_backtest(
     display_cols_ic7 = [
         "trade_date", "exp_date", "spot_entry", "atm_strike", "iv_atm_pct", "expected_move",
         "em_pct", "short_put", "long_put", "short_call", "long_call", "total_credit",
-        "spot_exit", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
+        "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "max_risk_usd", "in_range", "result", "exit_method",
+        # colunas de close-rule mescladas (IC 0DTE / Iron Fly 0DTE)
+        "pnl_stop_2x", "pnl_tp10", "pnl_tp20", "pnl_tp30",
     ]
     display_cols_triplecal = [
         "trade_date", "exp_date", "underlying", "dte_entry", "total_credit", "vix_entry",
