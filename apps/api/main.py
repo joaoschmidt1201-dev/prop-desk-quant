@@ -1457,6 +1457,55 @@ if (_IF0DTE_DIR / "IF0DTE" / "trades.csv").exists():
         "close_rules": _IF0DTE_RULES,
     })
 
+# ───────── JADE LIZARD SPX (estudo confirmatório tasty · Fase B) ─────────
+# JL = call spread ESTREITO ~ATM (lado eliminado/alta) + put spread LARGO OTM (lado retido/baixa);
+# net credit ≥ largura estreita → sem risco de alta. Close-rules: Hold / TP a 10/25/50/75% do crédito.
+# P&L GROSS (sem comissão), igual IC/Iron Fly no app. 7DTE fora (overlap → margin call, ver diag).
+_JL_DIR = BACKTESTS_ROOT / "jadelizard_backtest"
+_JL_RULES = {
+    "Hold to Expiration": None,
+    "Close at +10% of net credit": "pnl_tp10",
+    "Close at +25% of net credit": "pnl_tp25",
+    "Close at +50% of net credit": "pnl_tp50",
+    "Close at +75% of net credit": "pnl_tp75",
+}
+# (tag, label da largura, horizonte, put_wide, call_narrow)
+_JL_CONFIGS = [
+    ("jl_w20_n5_0dte",  "20-wide put / 5-narrow call",  "0DTE", 20, 5),
+    ("jl_w20_n10_0dte", "20-wide put / 10-narrow call", "0DTE", 20, 10),
+    ("jl_w30_n5_0dte",  "30-wide put / 5-narrow call",  "0DTE", 30, 5),
+    ("jl_w30_n10_0dte", "30-wide put / 10-narrow call", "0DTE", 30, 10),
+    ("jl_w20_n5_1dte",  "20-wide put / 5-narrow call",  "1DTE", 20, 5),
+]
+for _jtag, _wlabel, _hz, _pw, _nw in _JL_CONFIGS:
+    if not (_JL_DIR / _jtag / "trades.csv").exists():
+        continue
+    _entry = "~09:31 ET (open)" if _hz == "0DTE" else "~15:45 ET (overnight, gap risk)"
+    BACKTESTS_REGISTRY.append({
+        "id": "jadelizard-spx-" + _jtag.replace("jl_", "").replace("_", "-"),
+        "name": f"Jade Lizard SPX {_hz} · {_wlabel}",
+        "underlying": "SPX",
+        "strategy": f"Jade Lizard · SPX · {_hz} · {_wlabel} · entra {_entry}",
+        "family": "Jade Lizard",
+        "horizon": _hz,
+        "description": (
+            f"SPXW {_hz} Jade Lizard (estudo confirmatório tasty · Fase B). Call spread ESTREITO "
+            f"({_nw} pts) logo acima do ATM = lado eliminado (sem risco de alta quando net credit ≥ "
+            f"largura estreita); put spread LARGO ({_pw} pts) o mais OTM possível = lado retido (risco "
+            f"de baixa). Entra {_entry}; fill mid. Close-rules: Hold até expiração ou TP a 10/25/50/75% "
+            f"do crédito coletado. P&L GROSS (sem comissão), apples-to-apples com IC/Iron Fly no app — "
+            f"o edge é fino e SENSÍVEL a comissão (fechamento: 1DTE hold sobrevive ao bootstrap a "
+            f"0.65/perna mas vira frágil a 1.50/perna; TP não é robusto). 7DTE excluído (overlap "
+            f"multi-dia → margin call)."
+        ),
+        "trades_csv": f"jadelizard_backtest/{_jtag}/trades.csv",
+        "daily_csv": f"jadelizard_backtest/{_jtag}/daily.csv",
+        # kind="ic0dte": JL é um iron condor assimétrico de 4 pernas (lp<sp<sc<lc) — o viewer
+        # ic0dte já desenha esse payoff/estrutura. Reusa p/ não tocar o frontend (só a API redeploya).
+        "kind": "ic0dte", "multiplier": 1,
+        "close_rules": _JL_RULES,
+    })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
@@ -2082,14 +2131,17 @@ def get_backtest(
         "spot_exit", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "in_range", "result", "exit_method",
     ]
+    # colunas de close-rule mescladas: só mostra as que existem nos trades (IC 0DTE: stop_2x;
+    # Iron Fly: tp10/20/30; Jade Lizard: tp10/25/50/75) — evita coluna vazia entre famílias.
+    _ic7_rule_cols = [c for c in ("pnl_stop_2x", "pnl_tp10", "pnl_tp20", "pnl_tp25",
+                                  "pnl_tp30", "pnl_tp50", "pnl_tp75")
+                      if any(c in t for t in trades_with_rule)]
     display_cols_ic7 = [
         "trade_date", "exp_date", "spot_entry", "atm_strike", "iv_atm_pct", "expected_move",
         "em_pct", "short_put", "long_put", "short_call", "long_call", "total_credit",
         "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "max_risk_usd", "in_range", "result", "exit_method",
-        # colunas de close-rule mescladas (IC 0DTE / Iron Fly 0DTE)
-        "pnl_stop_2x", "pnl_tp10", "pnl_tp20", "pnl_tp30",
-    ]
+    ] + _ic7_rule_cols
     display_cols_triplecal = [
         "trade_date", "exp_date", "underlying", "dte_entry", "total_credit", "vix_entry",
         "pnl_usd", "pnl_usd_at_exp", "effective_close_date", "effective_dit_at_close",
