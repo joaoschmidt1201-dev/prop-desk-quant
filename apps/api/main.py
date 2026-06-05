@@ -1489,19 +1489,50 @@ for _jtag, _wlabel, _hz, _pw, _nw in _JL_CONFIGS:
         "family": "Jade Lizard",
         "horizon": _hz,
         "description": (
-            f"SPXW {_hz} Jade Lizard (estudo confirmatório tasty · Fase B). Call spread ESTREITO "
-            f"({_nw} pts) logo acima do ATM = lado eliminado (sem risco de alta quando net credit ≥ "
-            f"largura estreita); put spread LARGO ({_pw} pts) o mais OTM possível = lado retido (risco "
-            f"de baixa). Entra {_entry}; fill mid. Close-rules: Hold até expiração ou TP a 10/25/50/75% "
-            f"do crédito coletado. P&L GROSS (sem comissão), apples-to-apples com IC/Iron Fly no app — "
-            f"o edge é fino e SENSÍVEL a comissão (fechamento: 1DTE hold sobrevive ao bootstrap a "
-            f"0.65/perna mas vira frágil a 1.50/perna; TP não é robusto). 7DTE excluído (overlap "
-            f"multi-dia → margin call)."
+            f"Jade Lizard de SPX ({_hz}). Estrutura de crédito de 4 pernas que junta um call spread "
+            f"estreito ({_nw} pts) logo acima do preço atual (ATM) com um put spread largo ({_pw} pts) "
+            f"bem mais abaixo, fora do dinheiro. O crédito recebido é maior ou igual à largura estreita, "
+            f"o que elimina o risco do lado da alta — o risco fica apenas do lado da baixa, no put largo."
         ),
         "trades_csv": f"jadelizard_backtest/{_jtag}/trades.csv",
         "daily_csv": f"jadelizard_backtest/{_jtag}/daily.csv",
         # kind="ic0dte": JL é um iron condor assimétrico de 4 pernas (lp<sp<sc<lc) — o viewer
         # ic0dte já desenha esse payoff/estrutura. Reusa p/ não tocar o frontend (só a API redeploya).
+        "kind": "ic0dte", "multiplier": 1,
+        "close_rules": _JL_RULES,
+    })
+
+# ───────── REVERSE JADE LIZARD SPX (espelho bearish do JL · comparação p/ CZ) ─────────
+# RJL = put spread ESTREITO ~ATM (lado eliminado/baixa) + call spread LARGO OTM (lado retido/alta).
+# Postado p/ o CZ ver POR QUE o JL é melhor: no estudo o RJL é negativo em todo o grid (IS+OOS).
+# (tag, label, horizonte, wide_call, narrow_put)
+_RJL_CONFIGS = [
+    ("rjl_w20_n5_0dte",  "5-narrow put / 20-wide call",  "0DTE", 20, 5),
+    ("rjl_w20_n10_0dte", "10-narrow put / 20-wide call", "0DTE", 20, 10),
+    ("rjl_w30_n5_0dte",  "5-narrow put / 30-wide call",  "0DTE", 30, 5),
+    ("rjl_w30_n10_0dte", "10-narrow put / 30-wide call", "0DTE", 30, 10),
+    ("rjl_w20_n5_1dte",  "5-narrow put / 20-wide call",  "1DTE", 20, 5),
+]
+for _rtag, _wlabel, _hz, _wide, _narrow in _RJL_CONFIGS:
+    if not (_JL_DIR / _rtag / "trades.csv").exists():
+        continue
+    _entry = "~09:31 ET (open)" if _hz == "0DTE" else "~15:45 ET (overnight, gap risk)"
+    BACKTESTS_REGISTRY.append({
+        "id": "reverse-jadelizard-spx-" + _rtag.replace("rjl_", "").replace("_", "-"),
+        "name": f"Reverse Jade Lizard SPX {_hz} · {_wlabel}",
+        "underlying": "SPX",
+        "strategy": f"Reverse Jade Lizard · SPX · {_hz} · {_wlabel} · entra {_entry}",
+        "family": "Reverse Jade Lizard",
+        "horizon": _hz,
+        "description": (
+            f"Reverse Jade Lizard de SPX ({_hz}), o espelho do Jade Lizard. Estrutura de crédito de 4 "
+            f"pernas que junta um put spread estreito ({_narrow} pts) logo abaixo do preço atual (ATM) "
+            f"com um call spread largo ({_wide} pts) bem mais acima, fora do dinheiro. O crédito recebido "
+            f"é maior ou igual à largura estreita, o que elimina o risco do lado da baixa — o risco fica "
+            f"apenas do lado da alta, no call largo."
+        ),
+        "trades_csv": f"jadelizard_backtest/{_rtag}/trades.csv",
+        "daily_csv": f"jadelizard_backtest/{_rtag}/daily.csv",
         "kind": "ic0dte", "multiplier": 1,
         "close_rules": _JL_RULES,
     })
