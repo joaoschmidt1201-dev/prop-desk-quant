@@ -1369,12 +1369,14 @@ function buildPayoffSeries(
     const credit = asNum(trade.total_credit);
     if (lp == null || sp == null || sc == null || lc == null || credit == null) return null;
     const settle = asNum(trade.spot_exit);
+    const entrySpot = asNum(trade.spot_entry);              // SPOT IN (spot no momento da entrada)
     const creditPts = credit / SPX_PT;                       // crédito USD -> pontos pra BEPs
     const lowerBep = sp - creditPts;
     const upperBep = sc + creditPts;
     const anchor = (sp + sc) / 2;                            // meio da zona de lucro (= ATM no IronFly)
     const refs = [lp, sp, sc, lc, lowerBep, upperBep];
     if (settle != null) refs.push(settle);
+    if (entrySpot != null) refs.push(entrySpot);
     let xMin = Math.min(...refs), xMax = Math.max(...refs);
     const pad = Math.max((xMax - xMin) * 0.08, anchor * 0.005);
     xMin = Math.max(0, xMin - pad);
@@ -1393,6 +1395,9 @@ function buildPayoffSeries(
       { key: "bep-lower", label: "Lower BEP", value: lowerBep, color: "var(--warning)", dash: "5 5" },
       { key: "bep-upper", label: "Upper BEP", value: upperBep, color: "var(--warning)", dash: "5 5" },
     ];
+    if (entrySpot != null) {
+      references.unshift({ key: "entry", label: "SPOT IN", value: entrySpot, color: "var(--primary)", dash: "4 4" });
+    }
     return {
       points,
       references,
@@ -1475,7 +1480,7 @@ function buildPayoffSeries(
   });
 
   const references: PayoffReference[] = [
-    { key: "entry", label: "Entry", value: spotEntry, color: "var(--primary)", dash: "4 4" },
+    { key: "entry", label: "SPOT IN", value: spotEntry, color: "var(--primary)", dash: "4 4" },
     { key: "bep-lower", label: "Lower B/E", value: lowerBep, color: "var(--warning)", dash: "5 5" },
     { key: "bep-upper", label: "Upper B/E", value: upperBep, color: "var(--warning)", dash: "5 5" },
     { key: "short-put", label: "Short Put", value: shortPut, color: "var(--loss)", dash: "3 3" },
