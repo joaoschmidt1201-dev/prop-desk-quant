@@ -121,7 +121,7 @@ def export_cell(tag, sw, local):
         exp_iso = st["exp_date"].isoformat() if st else tdate
         row = {
             "trade_date": tdate, "exp_date": exp_iso, "underlying": "SPX",
-            "dte_entry": rec["dte"], "structure": "JL",
+            "dte_entry": rec["dte"], "structure": ("RJL" if tag.startswith("rjl") else "JL"),
             "spot_entry": rec["s"], "expected_move": rec["em"],
             "short_put": sp, "long_put": lp, "short_call": sc, "long_call": lc,
             "put_width": put_w, "call_width": call_w, "retained_dist": rec["ret_dist"],
