@@ -844,6 +844,13 @@ function TradeInspector({
   const vixEntry = asNum(trade.vix_entry);
   const putCenter = asNum(trade.put_center);
   const callCenter = asNum(trade.call_center);
+  // Lower breakeven at entry: short put minus credit (in index points). The downside
+  // cushion before the trade starts losing. % is distance below entry spot.
+  const shortPut = asNum(trade.short_put);
+  const creditPts = credit != null && detail.meta.multiplier ? credit / detail.meta.multiplier : null;
+  const lowerBe = shortPut != null && creditPts != null ? shortPut - creditPts : null;
+  const lowerBeDistPct =
+    lowerBe != null && spotEntry != null && spotEntry > 0 ? ((spotEntry - lowerBe) / spotEntry) * 100 : null;
 
   return (
     <div className="mt-4 space-y-4">
@@ -905,7 +912,7 @@ function TradeInspector({
           />
         </div>
       ) : (detail.meta.kind === "ic0dte" || detail.meta.kind === "ironfly") ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
           <KpiBlock label="VIX Entry" value={fmtNum(vixEntry)} />
           <KpiBlock label="DTE Entry" value={`${fmtNum(dteEntry)} days`} />
           <KpiBlock label="Net Credit" value={credit != null ? fmtMoney(credit) : DASH} sub="received" />
@@ -918,6 +925,11 @@ function TradeInspector({
             label="Short Call"
             value={fmtNum(asNum(trade.short_call))}
             sub={detail.meta.kind === "ironfly" ? "ATM body" : undefined}
+          />
+          <KpiBlock
+            label="Lower BE dist"
+            value={lowerBeDistPct != null ? fmtPct(lowerBeDistPct / 100) : DASH}
+            sub={lowerBe != null ? `BE ${fmtNum(lowerBe)} · below spot` : undefined}
           />
           <KpiBlock
             label="Settle / P&L"
