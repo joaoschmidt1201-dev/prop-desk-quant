@@ -499,6 +499,61 @@ export type OccurrenceMatrixPayload = {
   top_setups: Record<string, OccurrenceTopSetupEntry[]>;
 };
 
+// ─── GEX (our own gamma-exposure engine) ───────────────────────────────────────
+
+export type GexExpiration = { date: string; unix: number; dte: number };
+
+export type GexExpirations = {
+  underlying: string;
+  yahoo_symbol: string;
+  proxy: boolean;
+  index_symbol: string | null;
+  spot: number | null;
+  expirations: GexExpiration[];
+  asof: string;
+};
+
+export type GexStrike = { strike: number; call_gex: number; put_gex: number; net_gex: number };
+
+export type GexProfile = {
+  underlying: string;
+  yahoo_symbol: string;
+  proxy: boolean;
+  index_symbol: string | null;
+  index_scale: number | null;
+  spot: number;
+  expirations_used: string[];
+  cumulative: boolean;
+  strikes: GexStrike[];
+  gamma_flip: number | null;
+  call_wall: number | null;
+  put_wall: number | null;
+  net_gex_total: number;
+  asof: string;
+};
+
+export type Gex0dte = {
+  underlying: string;
+  spot: number;
+  net_gex_all: number;
+  net_gex_0dte: number;
+  has_0dte: boolean;
+  asof: string;
+};
+
+export type GexHistoryPoint = {
+  ts: string;
+  underlying: string;
+  spot: number;
+  net_gex_total: number;
+  net_gex_0dte: number;
+  gamma_flip: number | null;
+  call_wall: number | null;
+  put_wall: number | null;
+};
+
+export type GexTimeseries = { underlying: string; points: GexHistoryPoint[] };
+
 function qs(filter: Partial<Filter>): string {
   const params = new URLSearchParams();
   if (filter.live) {
@@ -541,6 +596,18 @@ export const api = {
     const q = params.toString();
     return get<OccurrenceMatrixPayload>(`/api/occurrence-matrix${q ? `?${q}` : ""}`);
   },
+  gexExpirations: (underlying = "SPY") =>
+    get<GexExpirations>(`/api/gex/expirations?underlying=${encodeURIComponent(underlying)}`),
+  gexProfile: (underlying = "SPY", exp?: string, cumulative = false) => {
+    const params = new URLSearchParams({ underlying });
+    if (exp) params.set("exp", exp);
+    if (cumulative) params.set("cumulative", "true");
+    return get<GexProfile>(`/api/gex/profile?${params.toString()}`);
+  },
+  gex0dte: (underlying = "SPY") =>
+    get<Gex0dte>(`/api/gex/0dte?underlying=${encodeURIComponent(underlying)}`),
+  gexTimeseries: (underlying = "SPY") =>
+    get<GexTimeseries>(`/api/gex/timeseries?underlying=${encodeURIComponent(underlying)}`),
   backtest: (id: string, rule?: string, vixFilter?: string, widthRule?: string) => {
     const params: string[] = [];
     if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);

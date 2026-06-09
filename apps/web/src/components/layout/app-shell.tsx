@@ -40,6 +40,12 @@ const NAV: NavItem[] = [
     icon: <Grid3X3 className="h-4 w-4" />,
     match: (p) => p.startsWith("/occurrence-matrix"),
   },
+  {
+    href: "/gex",
+    label: "GEX",
+    icon: <BarChart3 className="h-4 w-4" />,
+    match: (p) => p.startsWith("/gex"),
+  },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -99,20 +105,6 @@ function Sidebar({ pathname, healthAge }: { pathname: string; healthAge: number 
               </li>
             );
           })}
-        </ul>
-
-        <div className="mt-8 mb-2 px-2 text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground/80">
-          Coming soon
-        </div>
-        <ul className="space-y-1">
-          {["GEX Levels"].map((label) => (
-            <li key={label}>
-              <div className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/40">
-                <BarChart3 className="h-4 w-4" />
-                {label}
-              </div>
-            </li>
-          ))}
         </ul>
       </nav>
 

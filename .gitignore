@@ -15,6 +15,8 @@ data/
 # ── State (histórico GEX é tracked; caches locais não) ──────────────────────
 state/**/*.cache.json
 state/**/*.tmp
+# Série temporal forward do GEX é dado de runtime (gerado onde a API roda), não commitado
+state/gex/netgex_history_*.json
 
 # ── Relatórios gerados (logs e imagens — CSVs são commitados p/ viewer) ─────
 reports/**/*.log

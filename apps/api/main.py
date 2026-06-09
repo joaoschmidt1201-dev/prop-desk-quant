@@ -54,6 +54,25 @@ try:
 except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/api
     from live_spot import get_live_spots
 
+try:
+    from .gex import (
+        GEX_CACHE_TTL,
+        GexError,
+        compute_profile as gex_compute_profile,
+        list_expirations as gex_list_expirations,
+        load_history as gex_load_history,
+        zero_dte_split as gex_zero_dte_split,
+    )
+except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/api
+    from gex import (
+        GEX_CACHE_TTL,
+        GexError,
+        compute_profile as gex_compute_profile,
+        list_expirations as gex_list_expirations,
+        load_history as gex_load_history,
+        zero_dte_split as gex_zero_dte_split,
+    )
+
 # ─── Paths & env ──────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -774,6 +793,51 @@ def get_occurrence_matrix(
     any_override = bool(tol_idx_by_tf)
     response.headers["Cache-Control"] = "no-store" if any_override else f"max-age={SNAPSHOT_CACHE_TTL}"
     return load_occurrence_matrix(tol_idx_by_tf=tol_idx_by_tf)
+
+
+# ─── GEX — the desk's own gamma-exposure engine (see gex.py) ───────────────────
+# Forward-looking, computed from the live Yahoo chain. Default underlying is the
+# SPY ETF (Yahoo lacks index chains); pass SPX/NDX/RUT to read their ETF proxy.
+
+@app.get("/api/gex/expirations")
+def get_gex_expirations(response: Response, underlying: str = "SPY") -> dict[str, Any]:
+    try:
+        data = gex_list_expirations(underlying)
+    except GexError as exc:
+        raise HTTPException(503, f"GEX chain unavailable: {exc}") from exc
+    response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
+
+
+@app.get("/api/gex/profile")
+def get_gex_profile(
+    response: Response,
+    underlying: str = "SPY",
+    exp: str | None = None,
+    cumulative: bool = False,
+) -> dict[str, Any]:
+    try:
+        data = gex_compute_profile(underlying, expiration=exp, cumulative=cumulative)
+    except GexError as exc:
+        raise HTTPException(503, f"GEX chain unavailable: {exc}") from exc
+    response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
+
+
+@app.get("/api/gex/0dte")
+def get_gex_0dte(response: Response, underlying: str = "SPY") -> dict[str, Any]:
+    try:
+        data = gex_zero_dte_split(underlying)
+    except GexError as exc:
+        raise HTTPException(503, f"GEX chain unavailable: {exc}") from exc
+    response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
+
+
+@app.get("/api/gex/timeseries")
+def get_gex_timeseries(underlying: str = "SPY") -> dict[str, Any]:
+    """Net GEX history we accumulate forward (empty until snapshots build up)."""
+    return {"underlying": underlying.upper(), "points": gex_load_history(underlying)}
 
 
 def _trigger_export_script(*, source: str = "manual") -> bool:
