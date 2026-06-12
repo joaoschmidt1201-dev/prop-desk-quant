@@ -192,6 +192,22 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     else:
         print("[scheduler] disabled (set SCHEDULER_ENABLED=1 to enable)")
 
+    # Gently pre-warm the GEX chain cache so the first page load reads warm cache
+    # instead of bursting Yahoo from the datacenter IP. Runs in a daemon thread so
+    # it never blocks startup; serialized internally by the engine's fetch gate.
+    if _env_flag("GEX_WARMUP", "1"):
+        def _warm_gex() -> None:
+            try:
+                try:
+                    from .gex import warm_cache
+                except ImportError:  # `uvicorn main:app` from apps/api
+                    from gex import warm_cache
+                n = warm_cache()
+                print(f"[gex] warm-up complete — {n} symbol(s) cached")
+            except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+                print(f"[gex] warm-up skipped: {exc}", file=sys.stderr)
+        threading.Thread(target=_warm_gex, name="gex-warmup", daemon=True).start()
+
     try:
         yield
     finally:

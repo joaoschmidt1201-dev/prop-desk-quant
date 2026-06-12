@@ -79,13 +79,26 @@ PROXY_ETF: dict[str, str] = {"SPX": "SPY", "NDX": "QQQ", "RUT": "IWM"}
 # ETF → the index it proxies, for relabeling strikes to index-equivalent in the UI.
 ETF_INDEX: dict[str, str] = {"SPY": "SPX", "QQQ": "NDX", "IWM": "RUT"}
 
-GEX_CACHE_TTL = int(os.getenv("GEX_CACHE_TTL", "600"))        # 10 min — OI is daily anyway
+GEX_CACHE_TTL = int(os.getenv("GEX_CACHE_TTL", "1800"))       # 30 min — OI is daily; spot is refreshed separately
 _RETRY_BACKOFF = min(GEX_CACHE_TTL, int(os.getenv("GEX_RETRY_BACKOFF", "120")))
-_HTTP_TIMEOUT = float(os.getenv("GEX_HTTP_TIMEOUT", "10"))
+_HTTP_TIMEOUT = float(os.getenv("GEX_HTTP_TIMEOUT", "6"))  # fail fast so a slow fetch holds the gate briefly
+# Serialize options fetches and keep a floor between them. Yahoo's v7 options
+# endpoint throttles request *bursts* from a shared datacenter IP (Render): one
+# GEX page fans out to ~15 chain fetches (per-expiration horizons + cumulative),
+# which trips the limit instantly. We make at most ONE options request at a time,
+# spaced by GEX_FETCH_MIN_INTERVAL s — a burst becomes a trickle Yahoo tolerates.
+# Combined with the long cache + startup warm-up, most requests never hit Yahoo.
+GEX_FETCH_MIN_INTERVAL = float(os.getenv("GEX_FETCH_MIN_INTERVAL", "0.4"))
+# Symbols to gently pre-warm on startup (nearest chain each) so the first real
+# page load reads warm cache instead of bursting the source.
+WARM_SYMBOLS = [s.strip().upper() for s in
+                os.getenv("GEX_WARM_SYMBOLS", "SPX,SPY,QQQ,IWM,NDX,RUT").split(",") if s.strip()]
 RISK_FREE = float(os.getenv("GEX_RISK_FREE", "0.04"))
 # Cap how many expirations we sweep for "all"/cumulative/0DTE-split requests.
-# Gamma far out in time is negligible; this bounds the number of HTTP calls.
-MAX_EXPIRATIONS = int(os.getenv("GEX_MAX_EXPIRATIONS", "12"))
+# Gamma far out in time is negligible; this bounds the number of HTTP calls per
+# page (each expiration past the nearest is its own fetch behind the gate), so a
+# smaller cap = snappier page + less head-of-line blocking on the serial gate.
+MAX_EXPIRATIONS = int(os.getenv("GEX_MAX_EXPIRATIONS", "8"))
 # Don't append a history point more often than this (seconds).
 HISTORY_MIN_INTERVAL = int(os.getenv("GEX_HISTORY_MIN_INTERVAL", "900"))
 
@@ -105,6 +118,11 @@ _cookie_jar = http.cookiejar.CookieJar()
 _opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(_cookie_jar))
 _crumb: str | None = None
 _crumb_lock = threading.Lock()
+
+# Global gate: only one options fetch in flight at a time, spaced by the min
+# interval. Turns the per-page burst into a serialized trickle the source allows.
+_fetch_gate = threading.Lock()
+_last_fetch_at = 0.0
 
 # Per-key chain cache: key = (yahoo_symbol, expiration_unix|0). value = {"data", "at"}.
 _cache: dict[tuple[str, int], dict] = {}
@@ -127,6 +145,20 @@ def resolve_symbol(underlying: str) -> tuple[str, bool]:
     if u in PROXY_ETF:
         return PROXY_ETF[u], True
     return u, False
+
+
+def _fresh_spot(underlying: str, fallback: float | None) -> float | None:
+    """Live spot from the throttle-safe v8 chart endpoint (live_spot), so the
+    profile keeps breathing intraday even when the (daily) option chain is served
+    from a long cache. Falls back to the chain's own quote spot on any miss."""
+    if get_live_spots is None:
+        return fallback
+    try:
+        u = underlying.upper()
+        px = get_live_spots({u}).get(u, {}).get("price")
+        return float(px) if px else fallback
+    except Exception:
+        return fallback
 
 
 def _now_iso() -> str:
@@ -181,32 +213,43 @@ def _refresh_crumb() -> str | None:
 
 
 def _fetch_options_json(symbol: str, expiration_unix: int | None) -> dict | None:
-    """GET the Yahoo options chain with cookie+crumb; refresh the crumb once on 401."""
-    global _crumb
-    for attempt in range(2):
-        with _crumb_lock:
-            crumb = _crumb or _refresh_crumb()
-        if not crumb:
-            return None
-        params = {"crumb": crumb}
-        if expiration_unix:
-            params["date"] = str(int(expiration_unix))
-        url = _OPTIONS_URL.format(sym=urllib.parse.quote(symbol)) + "?" + urllib.parse.urlencode(params)
+    """GET the Yahoo options chain with cookie+crumb; refresh the crumb once on 401.
+
+    Serialized behind `_fetch_gate` with a min interval between network hits so a
+    page's fan-out of chain fetches can't burst the source from a datacenter IP.
+    """
+    global _crumb, _last_fetch_at
+    with _fetch_gate:
+        wait = GEX_FETCH_MIN_INTERVAL - (time.time() - _last_fetch_at)
+        if wait > 0:
+            time.sleep(wait)
         try:
-            with _opener.open(
-                urllib.request.Request(url, headers={"User-Agent": _UA}),
-                timeout=_HTTP_TIMEOUT,
-            ) as resp:
-                return json.load(resp)
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403) and attempt == 0:
+            for attempt in range(2):
                 with _crumb_lock:
-                    _crumb = None  # stale crumb — refresh and retry once
-                continue
+                    crumb = _crumb or _refresh_crumb()
+                if not crumb:
+                    return None
+                params = {"crumb": crumb}
+                if expiration_unix:
+                    params["date"] = str(int(expiration_unix))
+                url = _OPTIONS_URL.format(sym=urllib.parse.quote(symbol)) + "?" + urllib.parse.urlencode(params)
+                try:
+                    with _opener.open(
+                        urllib.request.Request(url, headers={"User-Agent": _UA}),
+                        timeout=_HTTP_TIMEOUT,
+                    ) as resp:
+                        return json.load(resp)
+                except urllib.error.HTTPError as exc:
+                    if exc.code in (401, 403) and attempt == 0:
+                        with _crumb_lock:
+                            _crumb = None  # stale crumb — refresh and retry once
+                        continue
+                    return None
+                except Exception:
+                    return None
             return None
-        except Exception:
-            return None
-    return None
+        finally:
+            _last_fetch_at = time.time()
 
 
 def _get_chain(yahoo_symbol: str, expiration_unix: int | None = None) -> dict:
@@ -512,6 +555,22 @@ def _classify(rows: list[dict], spot: float, flip: float | None) -> dict:
 
 # ─── Public API ─────────────────────────────────────────────────────────────────
 
+def warm_cache() -> int:
+    """Gently pre-populate the chain cache for the desk symbols (serialized via the
+    fetch gate) so the first real page load reads warm cache instead of bursting
+    Yahoo. Warms the *default profile path* (nearest live expiration) — the exact
+    chain the page opens on — not just the bare first/0DTE chain. Best-effort;
+    never raises. Returns the count of symbols warmed."""
+    warmed = 0
+    for u in WARM_SYMBOLS:
+        try:
+            compute_profile(u)
+            warmed += 1
+        except Exception:
+            continue
+    return warmed
+
+
 def list_expirations(underlying: str) -> dict:
     """Available expirations (+ spot + proxy info) for the picker."""
     yahoo_symbol, is_proxy = resolve_symbol(underlying)
@@ -566,7 +625,9 @@ def compute_profile(underlying: str, expiration: str | None = None, cumulative: 
     """
     yahoo_symbol, is_proxy = resolve_symbol(underlying)
     base = _get_chain(yahoo_symbol)
-    spot = base["spot"]
+    # Chain (OI/IV) is cached long since it's daily; refresh spot live so the
+    # profile re-prices against the latest price and keeps breathing intraday.
+    spot = _fresh_spot(underlying, base["spot"])
     if not spot:
         raise GexError(f"No spot for {yahoo_symbol}")
 
