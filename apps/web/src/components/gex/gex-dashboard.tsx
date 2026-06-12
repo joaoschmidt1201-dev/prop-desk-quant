@@ -112,7 +112,7 @@ export function GexDashboard({ underlying: initialUnderlying, initialExpirations
 
       {/* Main grid */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <section className="glass rounded-2xl p-4 xl:col-span-8">
+        <section className="glass min-w-0 rounded-2xl p-4 xl:col-span-8">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
               <BarChart3 className="h-4 w-4 text-primary" />
@@ -137,7 +137,7 @@ export function GexDashboard({ underlying: initialUnderlying, initialExpirations
           )}
         </section>
 
-        <div className="flex flex-col gap-4 xl:col-span-4">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
           <RangeCard data={rangeQ.data} />
           <NetExposureCard data={horizonsQ.data} />
           <GammaProfileCard profile={profile} />
@@ -217,7 +217,7 @@ function ChipRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2">
       <span className="w-16 shrink-0 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="flex flex-1 flex-wrap items-center gap-1.5">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</div>
     </div>
   );
 }

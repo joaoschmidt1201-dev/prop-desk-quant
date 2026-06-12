@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar pathname={pathname} healthAge={health?.snapshot_age_seconds} />
-      <div className="ml-[240px] flex min-h-screen flex-1 flex-col">
+      <div className="ml-[240px] flex min-h-screen min-w-0 flex-1 flex-col">
         {children}
       </div>
     </div>
