@@ -306,44 +306,38 @@ def _get_chain(yahoo_symbol: str, expiration_unix: int | None = None) -> dict:
 
 # ─── Aggregation ────────────────────────────────────────────────────────────────
 
-def _option_metrics(opt: dict, spot: float, sign: float):
-    """Per-option metrics, or None for junk.
-
-    Returns (strike, gex, dex, oi, vol, leg). `leg` = (sign, oi, strike, T, iv)
-    feeds the zero-gamma spot sweep. Yahoo's own `impliedVolatility` is unreliable
-    (often 0 / 1e-5), so we invert IV from the option price — mid when quotes are
-    live, last trade after hours — and only fall back to a *plausible* Yahoo IV if
-    inversion fails. GEX uses gamma; DEX uses signed delta (calls +, puts -).
-    """
+def _invert_iv(opt: dict, spot: float, T: float, is_call: bool) -> float | None:
+    """IV inverted from the option's own price (mid when quotes are live, else last
+    trade). None when the price is junk / sub-intrinsic and inversion fails."""
     try:
         strike = float(opt["strike"])
     except (KeyError, TypeError, ValueError):
         return None
-    oi = opt.get("openInterest") or 0
-    if oi <= 0 or strike <= 0:
-        return None
-
-    T = _years_to_exp(int(opt.get("expiration") or 0))
-    if T <= 0.0:
-        return None  # expired (past 16:00 ET on its expiry date) — no live gamma/delta
-    is_call = sign > 0
     bid = opt.get("bid") or 0.0
     ask = opt.get("ask") or 0.0
     price = (bid + ask) / 2.0 if bid > 0 and ask > 0 else (opt.get("lastPrice") or 0.0)
+    return implied_vol(price, spot, strike, T, RISK_FREE, is_call=is_call)
 
-    iv = implied_vol(price, spot, strike, T, RISK_FREE, is_call=is_call)
-    if iv is None:
-        y_iv = opt.get("impliedVolatility") or 0.0
-        iv = y_iv if 0.01 < y_iv < 3.0 else None
-    if iv is None:
-        return None
 
-    oi = float(oi)
-    vol = float(opt.get("volume") or 0.0)
-    gex = sign * bs_gamma(spot, strike, T, iv, RISK_FREE) * oi * 100.0 * spot * spot * 0.01
-    # delta is already signed (call +, put −), so DEX carries direction without `sign`.
-    dex = bs_delta(spot, strike, T, iv, RISK_FREE, is_call=is_call) * oi * 100.0 * spot
-    return strike, gex, dex, oi, vol, (sign, oi, strike, T, iv)
+def _strike_iv(call: dict | None, put: dict | None, strike: float, spot: float, T: float) -> float | None:
+    """One IV for a (strike, expiration), taken from the *OTM* side (put below spot,
+    call above). Gamma is a strike property, so call and put MUST share it; using
+    the OTM side dodges the deep-ITM trap where a quote prints below intrinsic
+    (delayed spot) → inversion fails → Yahoo's 1.0 placeholder IV is pulled in and
+    fabricates enormous gamma at high-OI strikes (the 7000 monthly bug). Yahoo's own
+    IV is a last resort and only when plausible (never the 1.0 placeholder)."""
+    otm, itm = ((put, False), (call, True)) if strike < spot else ((call, True), (put, False))
+    for opt, is_call in (otm, itm):
+        if opt is not None:
+            iv = _invert_iv(opt, spot, T, is_call)
+            if iv is not None:
+                return iv
+    for opt, _is_call in (otm, itm):  # last resort: a *plausible* Yahoo IV
+        if opt is not None:
+            y = opt.get("impliedVolatility") or 0.0
+            if 0.03 < y < 1.5 and abs(y - 1.0) > 1e-6:
+                return y
+    return None
 
 
 _ZERO_STRIKE = {
@@ -356,24 +350,48 @@ def _aggregate(calls: list[dict], puts: list[dict], spot: float):
     """(rows, legs): per-strike GEX/DEX/OI/Volume at spot (sorted asc), plus the
     raw legs (sign, oi, K, T, iv) used by the zero-gamma sweep.
 
-    Each row carries call/put + net for every family, plus abs_gex, so the
-    classification engine (walls, Abs GEX, DEX, OI/Vol levels) reads one table.
+    Call and put at a (strike, expiration) are paired and share ONE IV/gamma from
+    the OTM side, so a deep-ITM mispricing can't fabricate gamma. Strikes accumulate
+    across expirations (cumulative view) into one row. Each row carries call/put +
+    net for every family, plus abs_gex, so the classification engine reads one table.
     """
+    pairs: dict[tuple[float, int], dict] = {}
+    for opt_list, side in ((calls, "call"), (puts, "put")):
+        for opt in opt_list:
+            try:
+                strike = float(opt["strike"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if strike <= 0:
+                continue
+            exp_unix = int(opt.get("expiration") or 0)
+            pairs.setdefault((strike, exp_unix), {})[side] = opt
+
     by_strike: dict[float, dict[str, float]] = {}
     legs: list[tuple] = []
-    for opt_list, sign in ((calls, 1.0), (puts, -1.0)):
-        side = "call" if sign > 0 else "put"
-        for opt in opt_list:
-            m = _option_metrics(opt, spot, sign)
-            if m is None:
+    for (strike, exp_unix), cp in pairs.items():
+        T = _years_to_exp(exp_unix)
+        if T <= 0.0:
+            continue  # expired (past 16:00 ET) — no live gamma/delta
+        call, put = cp.get("call"), cp.get("put")
+        iv = _strike_iv(call, put, strike, spot, T)
+        if iv is None:
+            continue
+        g = bs_gamma(spot, strike, T, iv, RISK_FREE)
+        for opt, side, sign, is_call in (
+            (call, "call", 1.0, True), (put, "put", -1.0, False),
+        ):
+            if opt is None:
                 continue
-            strike, gex, dex, oi, vol, leg = m
+            oi = float(opt.get("openInterest") or 0.0)
+            if oi <= 0:
+                continue
             row = by_strike.setdefault(strike, dict(_ZERO_STRIKE))
-            row[f"{side}_gex"] += gex
-            row[f"{side}_dex"] += dex
+            row[f"{side}_gex"] += sign * g * oi * 100.0 * spot * spot * 0.01
+            row[f"{side}_dex"] += bs_delta(spot, strike, T, iv, RISK_FREE, is_call=is_call) * oi * 100.0 * spot
             row[f"{side}_oi"] += oi
-            row[f"{side}_vol"] += vol
-            legs.append(leg)
+            row[f"{side}_vol"] += float(opt.get("volume") or 0.0)
+            legs.append((sign, oi, strike, T, iv))
     rows = []
     for k, v in by_strike.items():
         rows.append({
