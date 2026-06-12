@@ -8,10 +8,13 @@ no Barchart, no historical parquet backfill. Accumulated snapshots build our own
 Net GEX time-series going forward.
 
 Data source & honesty (see context/known_issues.md, mirrors live_spot.py):
-  - Yahoo serves *ETF* option chains reliably (SPY/QQQ/IWM), NOT index chains
-    (^GSPC etc). So SPX/NDX/RUT are read through their ETF proxy and the response
-    is flagged `proxy=True`. A live index/ETF spot ratio is offered so the UI can
-    relabel strikes as index-equivalent.
+  - Yahoo serves the *native* cash-index option chains under their caret tickers
+    (^SPX/^NDX/^RUT) — dense, real institutional OI, sane IV — so SPX/NDX/RUT are
+    read directly, no ETF proxy, `proxy=False`. (Verified 2026-06-12: ^SPX returns
+    50 expirations, ~250 strikes/expiry, OI in the thousands.) The ETF proxy map is
+    kept only as a fallback (GEX_NATIVE_INDEX=0) for SPY/QQQ/IWM-space if a native
+    caret chain ever goes dark. When proxied, a live index/ETF spot ratio is
+    offered so the UI can relabel strikes as index-equivalent.
   - Quotes are delayed ~15 min on the free endpoint.
   - Open interest is an OCC settlement figure that updates ONCE PER DAY. The
     profile "breathes" intraday only because we re-price gamma against the latest
@@ -22,6 +25,12 @@ Data source & honesty (see context/known_issues.md, mirrors live_spot.py):
 GEX convention (matches Barchart / common retail tools, so levels are comparable):
     GEX_strike_side = gamma * OI * 100 * spot^2 * 0.01   (dollar gamma per 1% move)
     sign: calls (+), puts (-);  NetGEX(K) = call_gex(K) + put_gex(K)
+DEX (delta exposure) convention:
+    DEX_strike_side = delta * OI * 100 * spot   (delta already signed: calls 0..1, puts -1..0)
+    NetDEX(K) = call_dex(K) + put_dex(K)        (validate magnitude/sign vs Tanuki "Net Delta")
+Per-strike also carries: Net OI = call_oi - put_oi, Net Vol = call_vol - put_vol,
+AbsGEX = |call_gex| + |put_gex|. The classification engine ranks these into levels
+(C1..C6 / P1..P6 walls, Ab1..Ab3, DEX +/-, OI/Vol) — see _classify_* below.
 """
 
 from __future__ import annotations
@@ -34,14 +43,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, time as dtime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 try:  # robust to both `uvicorn main:app` (from apps/api) and package import
-    from .greeks import gamma as bs_gamma, implied_vol
+    from .greeks import gamma as bs_gamma, delta as bs_delta, implied_vol
 except ImportError:  # pragma: no cover
-    from greeks import gamma as bs_gamma, implied_vol
+    from greeks import gamma as bs_gamma, delta as bs_delta, implied_vol
 
 try:  # spot for the index/ETF proxy ratio; never fatal
     from .live_spot import get_live_spots
@@ -60,7 +69,12 @@ except Exception:  # pragma: no cover - tzdata missing; fall back to UTC dates
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HISTORY_DIR = REPO_ROOT / "state" / "gex"
 
-# Index → ETF whose Yahoo chain we actually read (Yahoo lacks index option chains).
+# Index → Yahoo's native cash-index caret ticker (real institutional chain).
+NATIVE_INDEX: dict[str, str] = {"SPX": "^SPX", "NDX": "^NDX", "RUT": "^RUT"}
+# Default to the native index chain; set GEX_NATIVE_INDEX=0 to fall back to the
+# ETF proxy below (SPY/QQQ/IWM-space) if a caret chain ever stops serving.
+USE_NATIVE_INDEX = os.getenv("GEX_NATIVE_INDEX", "1").strip().lower() not in ("0", "false", "no")
+# Index → ETF proxy (fallback only). Read when native is disabled/unavailable.
 PROXY_ETF: dict[str, str] = {"SPX": "SPY", "NDX": "QQQ", "RUT": "IWM"}
 # ETF → the index it proxies, for relabeling strikes to index-equivalent in the UI.
 ETF_INDEX: dict[str, str] = {"SPY": "SPX", "QQQ": "NDX", "IWM": "RUT"}
@@ -105,8 +119,11 @@ class GexError(Exception):
 # ─── Symbol resolution ──────────────────────────────────────────────────────────
 
 def resolve_symbol(underlying: str) -> tuple[str, bool]:
-    """(yahoo_symbol, is_proxy). 'SPX'->('SPY', True); 'SPY'->('SPY', False)."""
+    """(yahoo_symbol, is_proxy). Native: 'SPX'->('^SPX', False). Proxy fallback
+    (GEX_NATIVE_INDEX=0): 'SPX'->('SPY', True). 'SPY'->('SPY', False)."""
     u = (underlying or "").strip().upper()
+    if USE_NATIVE_INDEX and u in NATIVE_INDEX:
+        return NATIVE_INDEX[u], False
     if u in PROXY_ETF:
         return PROXY_ETF[u], True
     return u, False
@@ -124,9 +141,21 @@ def _exp_date(unix: int):
     return datetime.fromtimestamp(unix, tz=timezone.utc).date()
 
 
+_SECONDS_PER_YEAR = 365.0 * 24 * 3600.0
+
+
 def _years_to_exp(exp_unix: int) -> float:
-    dte = (_exp_date(exp_unix) - _today_et()).days
-    return max(dte, 0) / 365.0
+    """Intraday-aware year fraction to the 16:00 ET expiration moment.
+
+    Whole-day resolution made 0DTE gamma explode — T floored to MIN_T all day and
+    even after the close, so a dead same-day 0DTE dominated the all-expiry GEX with
+    spurious gamma. Counting real time to 4pm ET on the expiry date keeps 0DTE
+    realistic during the session and lets expired contracts fall to T=0 so
+    _option_metrics drops them.
+    """
+    expiry = datetime.combine(_exp_date(exp_unix), dtime(16, 0), tzinfo=ET)
+    secs = (expiry - datetime.now(ET)).total_seconds()
+    return max(secs, 0.0) / _SECONDS_PER_YEAR
 
 
 # ─── HTTP + cache ───────────────────────────────────────────────────────────────
@@ -235,12 +264,13 @@ def _get_chain(yahoo_symbol: str, expiration_unix: int | None = None) -> dict:
 # ─── Aggregation ────────────────────────────────────────────────────────────────
 
 def _option_metrics(opt: dict, spot: float, sign: float):
-    """Per-option (strike, signed GEX at spot, leg) or None for junk.
+    """Per-option metrics, or None for junk.
 
-    `leg` = (sign, oi, strike, T, iv) feeds the zero-gamma spot sweep. Yahoo's own
-    `impliedVolatility` is unreliable (often 0 / 1e-5), so we invert IV from the
-    option price — mid when quotes are live, last trade after hours — and only
-    fall back to a *plausible* Yahoo IV if inversion fails.
+    Returns (strike, gex, dex, oi, vol, leg). `leg` = (sign, oi, strike, T, iv)
+    feeds the zero-gamma spot sweep. Yahoo's own `impliedVolatility` is unreliable
+    (often 0 / 1e-5), so we invert IV from the option price — mid when quotes are
+    live, last trade after hours — and only fall back to a *plausible* Yahoo IV if
+    inversion fails. GEX uses gamma; DEX uses signed delta (calls +, puts -).
     """
     try:
         strike = float(opt["strike"])
@@ -251,6 +281,8 @@ def _option_metrics(opt: dict, spot: float, sign: float):
         return None
 
     T = _years_to_exp(int(opt.get("expiration") or 0))
+    if T <= 0.0:
+        return None  # expired (past 16:00 ET on its expiry date) — no live gamma/delta
     is_call = sign > 0
     bid = opt.get("bid") or 0.0
     ask = opt.get("ask") or 0.0
@@ -264,28 +296,55 @@ def _option_metrics(opt: dict, spot: float, sign: float):
         return None
 
     oi = float(oi)
+    vol = float(opt.get("volume") or 0.0)
     gex = sign * bs_gamma(spot, strike, T, iv, RISK_FREE) * oi * 100.0 * spot * spot * 0.01
-    return strike, gex, (sign, oi, strike, T, iv)
+    # delta is already signed (call +, put −), so DEX carries direction without `sign`.
+    dex = bs_delta(spot, strike, T, iv, RISK_FREE, is_call=is_call) * oi * 100.0 * spot
+    return strike, gex, dex, oi, vol, (sign, oi, strike, T, iv)
+
+
+_ZERO_STRIKE = {
+    "call_gex": 0.0, "put_gex": 0.0, "call_dex": 0.0, "put_dex": 0.0,
+    "call_oi": 0.0, "put_oi": 0.0, "call_vol": 0.0, "put_vol": 0.0,
+}
 
 
 def _aggregate(calls: list[dict], puts: list[dict], spot: float):
-    """(rows, legs): per-strike call/put/net GEX at spot (sorted asc), plus the
-    raw legs (sign, oi, K, T, iv) used by the zero-gamma sweep."""
+    """(rows, legs): per-strike GEX/DEX/OI/Volume at spot (sorted asc), plus the
+    raw legs (sign, oi, K, T, iv) used by the zero-gamma sweep.
+
+    Each row carries call/put + net for every family, plus abs_gex, so the
+    classification engine (walls, Abs GEX, DEX, OI/Vol levels) reads one table.
+    """
     by_strike: dict[float, dict[str, float]] = {}
     legs: list[tuple] = []
     for opt_list, sign in ((calls, 1.0), (puts, -1.0)):
-        key = "call" if sign > 0 else "put"
+        side = "call" if sign > 0 else "put"
         for opt in opt_list:
             m = _option_metrics(opt, spot, sign)
             if m is None:
                 continue
-            strike, gex, leg = m
-            by_strike.setdefault(strike, {"call": 0.0, "put": 0.0})[key] += gex
+            strike, gex, dex, oi, vol, leg = m
+            row = by_strike.setdefault(strike, dict(_ZERO_STRIKE))
+            row[f"{side}_gex"] += gex
+            row[f"{side}_dex"] += dex
+            row[f"{side}_oi"] += oi
+            row[f"{side}_vol"] += vol
             legs.append(leg)
-    rows = [
-        {"strike": k, "call_gex": v["call"], "put_gex": v["put"], "net_gex": v["call"] + v["put"]}
-        for k, v in by_strike.items()
-    ]
+    rows = []
+    for k, v in by_strike.items():
+        rows.append({
+            "strike": k,
+            "call_gex": v["call_gex"], "put_gex": v["put_gex"],
+            "net_gex": v["call_gex"] + v["put_gex"],
+            "abs_gex": abs(v["call_gex"]) + abs(v["put_gex"]),
+            "call_dex": v["call_dex"], "put_dex": v["put_dex"],
+            "net_dex": v["call_dex"] + v["put_dex"],
+            "call_oi": v["call_oi"], "put_oi": v["put_oi"],
+            "net_oi": v["call_oi"] - v["put_oi"],
+            "call_vol": v["call_vol"], "put_vol": v["put_vol"],
+            "net_vol": v["call_vol"] - v["put_vol"],
+        })
     rows.sort(key=lambda r: r["strike"])
     return rows, legs
 
@@ -331,6 +390,124 @@ def _walls(rows: list[dict]) -> tuple[float | None, float | None]:
     cw = call_wall["strike"] if call_wall["net_gex"] > 0 else None
     pw = put_wall["strike"] if put_wall["net_gex"] < 0 else None
     return cw, pw
+
+
+# ─── Classification engine (Tanuki "Gamma Classification Engine" parity) ──────────
+
+def _rank(rows: list[dict], key: str, *, positive: bool = True, n: int = 6, strict: bool = True) -> list[float]:
+    """Top-n strikes by `key`. positive=True → most positive first (C-walls);
+    positive=False → most negative first (P-walls). strict drops the wrong sign /
+    zeros so a flat side yields fewer than n (or none)."""
+    if positive:
+        pool = [r for r in rows if (not strict or r[key] > 0)]
+        pool.sort(key=lambda r: -r[key])
+    else:
+        pool = [r for r in rows if (not strict or r[key] < 0)]
+        pool.sort(key=lambda r: r[key])
+    return [r["strike"] for r in pool[:n]]
+
+
+def _argmax_strike(rows: list[dict], key: str, *, positive: bool = True) -> float | None:
+    """Strike of the max (positive=True) or min (False) `key`, or None if degenerate."""
+    if not rows:
+        return None
+    r = (max if positive else min)(rows, key=lambda r: r[key])
+    if positive and r[key] <= 0:
+        return None
+    if not positive and r[key] >= 0:
+        return None
+    return r["strike"]
+
+
+def _transitions(rows: list[dict], flip: float | None) -> tuple[float | None, float | None]:
+    """(pTrans, cTrans) — strikes bracketing the zero-gamma flip on the grid.
+
+    The flip (HVL) itself is exact (zero-gamma sweep). The transition band is our
+    best-effort interpretation pending cross-validation vs Tanuki: the nearest
+    listed strikes just below / above the flip.
+    """
+    if flip is None or not rows:
+        return None, None
+    strikes = [r["strike"] for r in rows]
+    below = [s for s in strikes if s <= flip]
+    above = [s for s in strikes if s >= flip]
+    return (max(below) if below else None), (min(above) if above else None)
+
+
+def _gex_state(spot, flip, c1, p1, ptrans, ctrans) -> str:
+    """Price regime vs gamma structure (Tanuki GEX States)."""
+    if spot is None or flip is None:
+        return "unknown"
+    if c1 is not None and spot > c1:
+        return "positive_extension"
+    if p1 is not None and spot < p1:
+        return "negative_extension"
+    if ptrans is not None and ctrans is not None and ptrans <= spot <= ctrans:
+        return "transition"
+    return "positive" if spot >= flip else "negative"
+
+
+def _regime(spot, flip, ptrans, ctrans) -> str:
+    """3-state HVL badge: positive (green) / transition (blue) / negative (red)."""
+    if spot is None or flip is None:
+        return "neutral"
+    if ptrans is not None and ctrans is not None and ptrans <= spot <= ctrans:
+        return "transition"
+    return "positive" if spot >= flip else "negative"
+
+
+def _chain_activity(rows: list[dict]) -> dict:
+    """Lean / Shift / Activity from volume vs OI. NOT a directional signal —
+    describes the current state (Tanuki convention: Lean = 70/30 volume/OI blend)."""
+    cv = sum(r["call_vol"] for r in rows)
+    pv = sum(r["put_vol"] for r in rows)
+    co = sum(r["call_oi"] for r in rows)
+    po = sum(r["put_oi"] for r in rows)
+    vol_tot, oi_tot = cv + pv, co + po
+    vol_share = cv / vol_tot if vol_tot > 0 else None   # 1.0 = all calls
+    oi_share = co / oi_tot if oi_tot > 0 else None
+    parts = [(0.70, vol_share), (0.30, oi_share)]
+    avail = [(w, s) for w, s in parts if s is not None]
+    lean = (sum(w * s for w, s in avail) / sum(w for w, _ in avail)) if avail else None
+    shift = (vol_share is not None and oi_share is not None
+             and (vol_share > 0.5) != (oi_share > 0.5))
+    return {
+        "call_vol": cv, "put_vol": pv, "call_oi": co, "put_oi": po,
+        "vol_cp": (cv / pv) if pv > 0 else None,
+        "oi_cp": (co / po) if po > 0 else None,
+        "lean": lean,                                   # 0..1 toward calls
+        "lean_label": (None if lean is None else ("calls" if lean > 0.5 else "puts")),
+        "shift": bool(shift),
+        "activity": (vol_tot / oi_tot) if oi_tot > 0 else None,
+    }
+
+
+def _classify(rows: list[dict], spot: float, flip: float | None) -> dict:
+    """Build the full level / state set from the per-strike table (the engine)."""
+    call_walls = _rank(rows, "net_gex", positive=True, n=6)     # C1..C6
+    put_walls = _rank(rows, "net_gex", positive=False, n=6)     # P1..P6
+    ptrans, ctrans = _transitions(rows, flip)
+    c1 = call_walls[0] if call_walls else None
+    p1 = put_walls[0] if put_walls else None
+    return {
+        "levels": {
+            "call_walls": call_walls,
+            "put_walls": put_walls,
+            "hvl": flip,
+            "c_trans": ctrans,
+            "p_trans": ptrans,
+            "abs_gex": _rank(rows, "abs_gex", positive=True, n=3, strict=False),   # Ab1..Ab3
+            "dex_pos": _argmax_strike(rows, "net_dex", positive=True),             # D+
+            "dex_neg": _argmax_strike(rows, "net_dex", positive=False),            # D-
+            "oi_call": _argmax_strike(rows, "call_oi", positive=True),             # COI
+            "oi_put": _argmax_strike(rows, "put_oi", positive=True),               # POI
+        },
+        "state": _gex_state(spot, flip, c1, p1, ptrans, ctrans),
+        "regime": _regime(spot, flip, ptrans, ctrans),
+        "activity": _chain_activity(rows),
+        "call_wall": c1,
+        "put_wall": p1,
+    }
 
 
 # ─── Public API ─────────────────────────────────────────────────────────────────
@@ -419,8 +596,9 @@ def compute_profile(underlying: str, expiration: str | None = None, cumulative: 
 
     rows, legs = _aggregate(calls, puts, spot)
     flip = _zero_gamma(legs, spot)
-    call_wall, put_wall = _walls(rows)
-    net_total = sum(r["net_gex"] for r in rows)
+    cls = _classify(rows, spot, flip)
+    net_gex_total = sum(r["net_gex"] for r in rows)
+    net_dex_total = sum(r["net_dex"] for r in rows)
 
     out = {
         "underlying": underlying.upper(),
@@ -433,12 +611,18 @@ def compute_profile(underlying: str, expiration: str | None = None, cumulative: 
         "cumulative": cumulative,
         "strikes": rows,
         "gamma_flip": flip,
-        "call_wall": call_wall,
-        "put_wall": put_wall,
-        "net_gex_total": net_total,
+        "call_wall": cls["call_wall"],
+        "put_wall": cls["put_wall"],
+        "net_gex_total": net_gex_total,
+        "net_dex_total": net_dex_total,
+        "levels": cls["levels"],
+        "state": cls["state"],
+        "regime": cls["regime"],
+        "activity": cls["activity"],
         "asof": base["asof"],
     }
-    _maybe_record_history(underlying.upper(), yahoo_symbol, spot, flip, call_wall, put_wall)
+    _maybe_record_history(underlying.upper(), yahoo_symbol, spot, flip,
+                          cls["call_wall"], cls["put_wall"])
     return out
 
 
@@ -463,14 +647,85 @@ def zero_dte_split(underlying: str) -> dict:
             zero_calls += chain["calls"]
             zero_puts += chain["puts"]
 
-    net_all = sum(r["net_gex"] for r in _aggregate(all_calls, all_puts, spot)[0])
-    net_0dte = sum(r["net_gex"] for r in _aggregate(zero_calls, zero_puts, spot)[0])
+    all_rows = _aggregate(all_calls, all_puts, spot)[0]
+    zero_rows = _aggregate(zero_calls, zero_puts, spot)[0]
     return {
         "underlying": underlying.upper(),
         "spot": spot,
-        "net_gex_all": net_all,
-        "net_gex_0dte": net_0dte,
+        "net_gex_all": sum(r["net_gex"] for r in all_rows),
+        "net_gex_0dte": sum(r["net_gex"] for r in zero_rows),
+        "net_dex_all": sum(r["net_dex"] for r in all_rows),
+        "net_dex_0dte": sum(r["net_dex"] for r in zero_rows),
         "has_0dte": bool(zero_calls or zero_puts),
+        "asof": base["asof"],
+    }
+
+
+def _pick_optimal(all_exp_unix: list[int], today) -> int | None:
+    """Expiration nearest ~50 DTE inside the 35-70 DTE band (Tanuki 'OPTIMAL');
+    fallback to whichever is closest to 50 DTE."""
+    if not all_exp_unix:
+        return None
+    def dte(u):
+        return (_exp_date(u) - today).days
+    band = [u for u in all_exp_unix if 35 <= dte(u) <= 70]
+    pool = band or all_exp_unix
+    return min(pool, key=lambda u: abs(dte(u) - 50))
+
+
+def gex_horizons(underlying: str) -> dict:
+    """FIRST (nearest) / OPTIMAL (~monthly 35-70 DTE) / EVERY (all) Net GEX & DEX.
+
+    Tanuki's honest horizon framing (their screener's FIRST/OPTIMAL/EVERY): the
+    EVERY total is LEAPS-sensitive and least comparable across tools, so we show it
+    *alongside* FIRST and OPTIMAL — the near-term reads the desk actually trades —
+    instead of a single noisy 'all expiries' number. Δ1d on EVERY comes from our
+    forward history (null until two sessions accumulate — never fabricated).
+    """
+    yahoo_symbol, is_proxy = resolve_symbol(underlying)
+    base = _get_chain(yahoo_symbol)
+    spot = base["spot"]
+    if not spot:
+        raise GexError(f"No spot for {yahoo_symbol}")
+    today = _today_et()
+    all_exp = sorted(int(u) for u in base["expirations"])[:MAX_EXPIRATIONS]
+    # Only LIVE expirations (drop a same-day 0DTE already past 16:00 ET) so FIRST
+    # rolls to the next real expiry after the close instead of reading 0.
+    live_exp = [u for u in all_exp if _years_to_exp(u) > 0.0] or all_exp
+    first_u = live_exp[0] if live_exp else None
+    optimal_u = _pick_optimal(live_exp, today)
+
+    def _totals(exp_list: list[int]) -> tuple[float, float]:
+        calls: list[dict] = []
+        puts: list[dict] = []
+        for u in exp_list:
+            ch = base if u == base["exp_unix"] else _get_chain(yahoo_symbol, u)
+            calls += ch["calls"]
+            puts += ch["puts"]
+        rows = _aggregate(calls, puts, spot)[0]
+        return sum(r["net_gex"] for r in rows), sum(r["net_dex"] for r in rows)
+
+    def _horizon(u: int | None) -> dict:
+        if u is None:
+            return {"exp": None, "dte": None, "net_gex": None, "net_dex": None}
+        g, d = _totals([u])
+        return {"exp": _exp_date(u).isoformat(), "dte": (_exp_date(u) - today).days,
+                "net_gex": g, "net_dex": d}
+
+    every_g, every_d = _totals(live_exp)
+    return {
+        "underlying": underlying.upper(),
+        "yahoo_symbol": yahoo_symbol,
+        "proxy": is_proxy,
+        "index_symbol": ETF_INDEX.get(yahoo_symbol),
+        "index_scale": _index_scale(yahoo_symbol, spot) if is_proxy else None,
+        "spot": spot,
+        "first": _horizon(first_u),
+        "optimal": _horizon(optimal_u),
+        "every": {
+            "net_gex": every_g, "net_dex": every_d, "n_exp": len(live_exp),
+            "change_1d": _change_1d(underlying.upper(), every_g, every_d),
+        },
         "asof": base["asof"],
     }
 
@@ -489,6 +744,36 @@ def load_history(underlying: str) -> list[dict]:
         except (json.JSONDecodeError, OSError):
             return []
     return []
+
+
+def _change_1d(underlying: str, cur_gex: float | None, cur_dex: float | None) -> dict:
+    """Δ vs ~24h ago from our forward history. Returns None until a prior session's
+    snapshot actually exists — we never fabricate a change we can't source."""
+    out = {"gex": None, "dex": None, "ref_ts": None}
+    hist = load_history(underlying)
+    if not hist:
+        return out
+    now = time.time()
+    target = now - 24 * 3600.0
+    prior, best = None, None
+    for h in hist:
+        try:
+            ts = datetime.fromisoformat(h["ts"]).timestamp()
+        except (KeyError, ValueError):
+            continue
+        if now - ts < 12 * 3600.0:        # too recent to count as a prior session
+            continue
+        gap = abs(ts - target)
+        if best is None or gap < best:
+            best, prior = gap, h
+    if prior is None:
+        return out
+    if cur_gex is not None and prior.get("net_gex_total") is not None:
+        out["gex"] = cur_gex - prior["net_gex_total"]
+    if cur_dex is not None and prior.get("net_dex_total") is not None:
+        out["dex"] = cur_dex - prior["net_dex_total"]
+    out["ref_ts"] = prior.get("ts")
+    return out
 
 
 def _maybe_record_history(
@@ -519,6 +804,8 @@ def _maybe_record_history(
         "spot": spot,
         "net_gex_total": split["net_gex_all"],
         "net_gex_0dte": split["net_gex_0dte"],
+        "net_dex_total": split.get("net_dex_all"),
+        "net_dex_0dte": split.get("net_dex_0dte"),
         "gamma_flip": flip,
         "call_wall": call_wall,
         "put_wall": put_wall,

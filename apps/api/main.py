@@ -59,6 +59,7 @@ try:
         GEX_CACHE_TTL,
         GexError,
         compute_profile as gex_compute_profile,
+        gex_horizons,
         list_expirations as gex_list_expirations,
         load_history as gex_load_history,
         zero_dte_split as gex_zero_dte_split,
@@ -68,10 +69,19 @@ except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/
         GEX_CACHE_TTL,
         GexError,
         compute_profile as gex_compute_profile,
+        gex_horizons,
         list_expirations as gex_list_expirations,
         load_history as gex_load_history,
         zero_dte_split as gex_zero_dte_split,
     )
+
+try:  # 52w range + MAs (index-native); non-fatal — card hides if unavailable
+    from .market_stats import range_stats as gex_range_stats
+except ImportError:  # pragma: no cover
+    try:
+        from market_stats import range_stats as gex_range_stats
+    except Exception:
+        gex_range_stats = None
 
 # ─── Paths & env ──────────────────────────────────────────────────────────────
 
@@ -838,6 +848,27 @@ def get_gex_0dte(response: Response, underlying: str = "SPY") -> dict[str, Any]:
 def get_gex_timeseries(underlying: str = "SPY") -> dict[str, Any]:
     """Net GEX history we accumulate forward (empty until snapshots build up)."""
     return {"underlying": underlying.upper(), "points": gex_load_history(underlying)}
+
+
+@app.get("/api/gex/horizons")
+def get_gex_horizons(response: Response, underlying: str = "SPY") -> dict[str, Any]:
+    """FIRST / OPTIMAL (35-70 DTE) / EVERY Net GEX & DEX — Tanuki's honest horizon framing."""
+    try:
+        data = gex_horizons(underlying)
+    except GexError as exc:
+        raise HTTPException(503, f"GEX chain unavailable: {exc}") from exc
+    response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
+
+
+@app.get("/api/gex/range")
+def get_gex_range(response: Response, underlying: str = "SPY") -> dict[str, Any]:
+    """52-week range + 50/200-day MA (index-native where Yahoo serves it)."""
+    data = gex_range_stats(underlying) if gex_range_stats else None
+    if data is None:
+        raise HTTPException(503, "Range stats unavailable")
+    response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
 
 
 def _trigger_export_script(*, source: str = "manual") -> bool:

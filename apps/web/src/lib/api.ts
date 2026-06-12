@@ -513,7 +513,44 @@ export type GexExpirations = {
   asof: string;
 };
 
-export type GexStrike = { strike: number; call_gex: number; put_gex: number; net_gex: number };
+export type GexStrike = {
+  strike: number;
+  call_gex: number; put_gex: number; net_gex: number; abs_gex: number;
+  call_dex: number; put_dex: number; net_dex: number;
+  call_oi: number; put_oi: number; net_oi: number;
+  call_vol: number; put_vol: number; net_vol: number;
+};
+
+// The metric a profile column / level family can render (Tanuki's 8 + abs gex).
+export type GexMetric =
+  | "net_gex" | "abs_gex" | "net_dex" | "net_oi" | "net_vol";
+
+export type GexLevels = {
+  call_walls: number[];   // C1..C6
+  put_walls: number[];    // P1..P6
+  hvl: number | null;
+  c_trans: number | null;
+  p_trans: number | null;
+  abs_gex: number[];      // Ab1..Ab3
+  dex_pos: number | null; // D+
+  dex_neg: number | null; // D-
+  oi_call: number | null; // COI
+  oi_put: number | null;  // POI
+};
+
+export type GexActivity = {
+  call_vol: number; put_vol: number; call_oi: number; put_oi: number;
+  vol_cp: number | null; oi_cp: number | null;
+  lean: number | null;                  // 0..1 toward calls
+  lean_label: "calls" | "puts" | null;
+  shift: boolean;
+  activity: number | null;              // volume intensity vs OI
+};
+
+export type GexState =
+  | "positive" | "negative" | "transition"
+  | "positive_extension" | "negative_extension" | "unknown";
+export type GexRegime = "positive" | "negative" | "transition" | "neutral";
 
 export type GexProfile = {
   underlying: string;
@@ -529,6 +566,11 @@ export type GexProfile = {
   call_wall: number | null;
   put_wall: number | null;
   net_gex_total: number;
+  net_dex_total: number;
+  levels: GexLevels;
+  state: GexState;
+  regime: GexRegime;
+  activity: GexActivity;
   asof: string;
 };
 
@@ -553,6 +595,45 @@ export type GexHistoryPoint = {
 };
 
 export type GexTimeseries = { underlying: string; points: GexHistoryPoint[] };
+
+export type GexHorizon = {
+  exp: string | null;
+  dte: number | null;
+  net_gex: number | null;
+  net_dex: number | null;
+};
+
+export type GexHorizons = {
+  underlying: string;
+  yahoo_symbol: string;
+  proxy: boolean;
+  index_symbol: string | null;
+  index_scale: number | null;
+  spot: number;
+  first: GexHorizon;     // nearest live expiration
+  optimal: GexHorizon;   // ~monthly, 35-70 DTE
+  every: {
+    net_gex: number | null;
+    net_dex: number | null;
+    n_exp: number;
+    change_1d: { gex: number | null; dex: number | null; ref_ts: string | null };
+  };
+  asof: string;
+};
+
+export type GexRange = {
+  underlying: string;
+  yahoo_symbol: string;
+  index_native: boolean;
+  spot: number;
+  high_52w: number;
+  low_52w: number;
+  pct_of_range: number | null;
+  ma50: number | null;
+  ma200: number | null;
+  samples: number;
+  asof: string;
+};
 
 function qs(filter: Partial<Filter>): string {
   const params = new URLSearchParams();
@@ -608,6 +689,10 @@ export const api = {
     get<Gex0dte>(`/api/gex/0dte?underlying=${encodeURIComponent(underlying)}`),
   gexTimeseries: (underlying = "SPY") =>
     get<GexTimeseries>(`/api/gex/timeseries?underlying=${encodeURIComponent(underlying)}`),
+  gexHorizons: (underlying = "SPY") =>
+    get<GexHorizons>(`/api/gex/horizons?underlying=${encodeURIComponent(underlying)}`),
+  gexRange: (underlying = "SPY") =>
+    get<GexRange>(`/api/gex/range?underlying=${encodeURIComponent(underlying)}`),
   backtest: (id: string, rule?: string, vixFilter?: string, widthRule?: string) => {
     const params: string[] = [];
     if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);

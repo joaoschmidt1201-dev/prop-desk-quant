@@ -52,6 +52,24 @@ def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
+def delta(S: float, K: float, T: float, sigma: float, r: float = 0.0, q: float = 0.0, *, is_call: bool = True) -> float:
+    """Black-Scholes delta. Call: e^{-qT}·N(d1); Put: e^{-qT}·(N(d1)−1).
+
+    Carries the option's own sign (calls 0..1, puts −1..0) so a DEX aggregation
+    can just sum delta·OI without a separate call/put multiplier. Returns 0.0 for
+    degenerate inputs — one junk strike never breaks the whole DEX profile.
+    """
+    if S <= 0.0 or K <= 0.0 or sigma <= 0.0:
+        return 0.0
+    T = max(T, MIN_T)
+    try:
+        _d1 = (math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+    disc = math.exp(-q * T)
+    return disc * (_norm_cdf(_d1) if is_call else _norm_cdf(_d1) - 1.0)
+
+
 def bs_price(S: float, K: float, T: float, sigma: float, r: float = 0.0, *, is_call: bool = True) -> float:
     """Black-Scholes price. Returns intrinsic value for degenerate T/sigma."""
     if S <= 0.0 or K <= 0.0:
