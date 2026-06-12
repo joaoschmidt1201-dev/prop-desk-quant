@@ -139,7 +139,7 @@ export function GexDashboard({ underlying: initialUnderlying, initialExpirations
 
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
           <RangeCard data={rangeQ.data} />
-          <NetExposureCard data={horizonsQ.data} />
+          <NetExposureCard data={horizonsQ.data} profile={profile} />
           <GammaProfileCard profile={profile} />
           <ChainActivityCard profile={profile} />
         </div>

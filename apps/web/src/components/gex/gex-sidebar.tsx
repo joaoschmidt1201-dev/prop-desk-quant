@@ -112,24 +112,35 @@ function HorizonRow({ label, sub, v }: { label: string; sub: string; v: number |
   );
 }
 
-export function NetExposureCard({ data }: { data?: GexHorizons }) {
+export function NetExposureCard({ data, profile }: { data?: GexHorizons; profile?: GexProfile }) {
   const dte = (h?: { dte: number | null }) => (h?.dte == null ? "" : `${h.dte}d`);
+  // Headline = the SELECTED expiration's exposure (matches Tanuki's per-expiry view).
+  // Δ1d is left blank here: our forward history snapshots the all-expiry aggregate,
+  // so a per-expiration Δ1d would be apples-to-oranges. The horizon rows below keep
+  // the broader First/Optimal/Every context.
+  const expLabel = !profile
+    ? "—"
+    : profile.cumulative
+      ? `≤ ${profile.expirations_used.at(-1)?.slice(5) ?? ""}`
+      : profile.expirations_used[0]?.slice(5) ?? "selected";
   return (
-    <Card title="Net Exposure" icon={<Activity className="h-3.5 w-3.5" />} note="all exp">
-      {!data ? (
+    <Card title="Net Exposure" icon={<Activity className="h-3.5 w-3.5" />} note={expLabel}>
+      {!profile ? (
         <Skeleton h={150} />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <ExposureTile label="Net Gamma" value={data.every.net_gex} delta={data.every.change_1d.gex} />
-            <ExposureTile label="Net Delta" value={data.every.net_dex} delta={data.every.change_1d.dex} />
+            <ExposureTile label="Net Gamma" value={profile.net_gex_total} delta={null} />
+            <ExposureTile label="Net Delta" value={profile.net_dex_total} delta={null} />
           </div>
-          <div className="mt-3 space-y-1.5 border-t border-border/40 pt-2.5 text-[11px]">
-            <div className="mb-1 text-[9px] uppercase tracking-wider text-muted-foreground/70">Net GEX by horizon</div>
-            <HorizonRow label="First" sub={dte(data.first)} v={data.first.net_gex} />
-            <HorizonRow label="Optimal" sub={dte(data.optimal)} v={data.optimal.net_gex} />
-            <HorizonRow label="Every" sub={`${data.every.n_exp} exp`} v={data.every.net_gex} />
-          </div>
+          {data && (
+            <div className="mt-3 space-y-1.5 border-t border-border/40 pt-2.5 text-[11px]">
+              <div className="mb-1 text-[9px] uppercase tracking-wider text-muted-foreground/70">Net GEX by horizon</div>
+              <HorizonRow label="First" sub={dte(data.first)} v={data.first.net_gex} />
+              <HorizonRow label="Optimal" sub={dte(data.optimal)} v={data.optimal.net_gex} />
+              <HorizonRow label="Every" sub={`${data.every.n_exp} exp`} v={data.every.net_gex} />
+            </div>
+          )}
         </>
       )}
     </Card>
