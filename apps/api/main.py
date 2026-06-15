@@ -60,6 +60,7 @@ try:
         GexError,
         compute_profile as gex_compute_profile,
         gex_horizons,
+        gex_matrix,
         list_expirations as gex_list_expirations,
         load_history as gex_load_history,
         zero_dte_split as gex_zero_dte_split,
@@ -70,18 +71,20 @@ except ImportError:  # pragma: no cover - supports `uvicorn main:app` from apps/
         GexError,
         compute_profile as gex_compute_profile,
         gex_horizons,
+        gex_matrix,
         list_expirations as gex_list_expirations,
         load_history as gex_load_history,
         zero_dte_split as gex_zero_dte_split,
     )
 
-try:  # 52w range + MAs (index-native); non-fatal — card hides if unavailable
-    from .market_stats import range_stats as gex_range_stats
+try:  # 52w range + MAs + candles (index-native); non-fatal — cards hide if unavailable
+    from .market_stats import range_stats as gex_range_stats, candles as gex_candles
 except ImportError:  # pragma: no cover
     try:
-        from market_stats import range_stats as gex_range_stats
+        from market_stats import range_stats as gex_range_stats, candles as gex_candles
     except Exception:
         gex_range_stats = None
+        gex_candles = None
 
 # ─── Paths & env ──────────────────────────────────────────────────────────────
 
@@ -877,6 +880,17 @@ def get_gex_horizons(response: Response, underlying: str = "SPY") -> dict[str, A
     return data
 
 
+@app.get("/api/gex/matrix")
+def get_gex_matrix(response: Response, underlying: str = "SPY") -> dict[str, Any]:
+    """Per-expiration GEX Matrix: Standalone vs Cumulative NetGEX/DEX + C1/HVL/P1."""
+    try:
+        data = gex_matrix(underlying)
+    except GexError as exc:
+        raise HTTPException(503, f"GEX chain unavailable: {exc}") from exc
+    response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
+
+
 @app.get("/api/gex/range")
 def get_gex_range(response: Response, underlying: str = "SPY") -> dict[str, Any]:
     """52-week range + 50/200-day MA (index-native where Yahoo serves it)."""
@@ -884,6 +898,16 @@ def get_gex_range(response: Response, underlying: str = "SPY") -> dict[str, Any]
     if data is None:
         raise HTTPException(503, "Range stats unavailable")
     response.headers["Cache-Control"] = f"max-age={GEX_CACHE_TTL}"
+    return data
+
+
+@app.get("/api/gex/candles")
+def get_gex_candles(response: Response, underlying: str = "SPY", timeframe: str = "5d") -> dict[str, Any]:
+    """OHLC candles (index-native where Yahoo serves it) for the GEX Live Chart."""
+    data = gex_candles(underlying, timeframe) if gex_candles else None
+    if data is None:
+        raise HTTPException(503, "Candles unavailable")
+    response.headers["Cache-Control"] = "max-age=120"
     return data
 
 

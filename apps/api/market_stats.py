@@ -52,6 +52,76 @@ def _fetch_daily_closes(yahoo_symbol: str) -> list[float]:
     return [float(c) for c in (quote.get("close") or []) if c is not None]
 
 
+_CANDLE_TTL = int(os.getenv("GEX_CANDLE_TTL", "120"))   # intraday bars; short cache
+# Allowed (range, interval) pairs Yahoo serves well, mapped from a simple timeframe key.
+_TIMEFRAMES: dict[str, tuple[str, str]] = {
+    "1d":  ("1d",  "5m"),
+    "5d":  ("5d",  "15m"),
+    "1mo": ("1mo", "1h"),
+    "3mo": ("3mo", "1d"),
+    "6mo": ("6mo", "1d"),
+    "1y":  ("1y",  "1d"),
+}
+_candle_cache: dict[tuple[str, str], dict] = {}
+
+
+def candles(underlying: str, timeframe: str = "5d") -> dict | None:
+    """OHLC candles (index-native where Yahoo serves it) for the GEX Live Chart.
+
+    Yahoo's v8 chart endpoint is reliable and not crumb-gated, so candles come free
+    and stable even when the option chain throttles. Returns None on failure (UI hides
+    the chart rather than show a guess). `timeframe` is one of _TIMEFRAMES keys.
+    """
+    u = (underlying or "").strip().upper()
+    sym = _YAHOO_SYM.get(u, u)
+    tf = timeframe if timeframe in _TIMEFRAMES else "5d"
+    rng, interval = _TIMEFRAMES[tf]
+    key = (u, tf)
+    now = time.time()
+    with _lock:
+        cached = _candle_cache.get(key)
+        if cached and now - cached["at"] < _CANDLE_TTL:
+            return cached["data"]
+    try:
+        url = (_CHART_URL.format(sym=urllib.parse.quote(sym))
+               + f"?range={rng}&interval={interval}&includePrePost=false")
+        req = urllib.request.Request(url, headers={"User-Agent": _UA})
+        with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
+            raw = json.load(resp)
+        result = ((raw.get("chart") or {}).get("result") or [])
+        if not result:
+            return None
+        r0 = result[0]
+        ts = r0.get("timestamp") or []
+        q = ((r0.get("indicators") or {}).get("quote") or [{}])[0]
+        o, h, l, c = (q.get("open") or [], q.get("high") or [],
+                      q.get("low") or [], q.get("close") or [])
+        bars = []
+        for i, t in enumerate(ts):
+            oo, hh, ll, cc = (o[i] if i < len(o) else None, h[i] if i < len(h) else None,
+                              l[i] if i < len(l) else None, c[i] if i < len(c) else None)
+            if None in (oo, hh, ll, cc):
+                continue
+            bars.append({"t": int(t), "o": round(float(oo), 2), "h": round(float(hh), 2),
+                         "l": round(float(ll), 2), "c": round(float(cc), 2)})
+        if not bars:
+            return None
+        data = {
+            "underlying": u,
+            "yahoo_symbol": sym,
+            "index_native": sym.startswith("^"),
+            "timeframe": tf,
+            "interval": interval,
+            "bars": bars,
+            "asof": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now)),
+        }
+        with _lock:
+            _candle_cache[key] = {"data": data, "at": now}
+        return data
+    except Exception:
+        return None
+
+
 def range_stats(underlying: str) -> dict | None:
     """52-week high/low, % of range, and 50/200-day MAs (index-native where possible).
 

@@ -809,6 +809,63 @@ def gex_horizons(underlying: str) -> dict:
     }
 
 
+def gex_matrix(underlying: str, max_exp: int | None = None) -> dict:
+    """Per-expiration comparison (Tanuki 'GEX Matrix'): for each expiration, the
+    Standalone (that expiration alone) vs Cumulative (summed through it) NetGEX/DEX
+    + key levels C1/HVL/P1 + standalone OI share. Serialized via the fetch gate +
+    cache; bounded by max_exp so the fan-out stays sane on the free source."""
+    yahoo_symbol, is_proxy = resolve_symbol(underlying)
+    base = _get_chain(yahoo_symbol)
+    spot = _fresh_spot(underlying, base["spot"])
+    if not spot:
+        raise GexError(f"No spot for {yahoo_symbol}")
+    today = _today_et()
+    cap = max_exp or MAX_EXPIRATIONS
+    all_exp = sorted(int(u) for u in base["expirations"])
+    live = [u for u in all_exp if _years_to_exp(u) > 0.0][:cap] or all_exp[:cap]
+
+    def _summary(rows: list[dict], legs: list[tuple]) -> dict:
+        cls = _classify(rows, spot, _zero_gamma(legs, spot))
+        lv = cls["levels"]
+        return {
+            "net_gex": sum(r["net_gex"] for r in rows),
+            "net_dex": sum(r["net_dex"] for r in rows),
+            "oi": sum(r["call_oi"] + r["put_oi"] for r in rows),
+            "c1": lv["call_walls"][0] if lv["call_walls"] else None,
+            "p1": lv["put_walls"][0] if lv["put_walls"] else None,
+            "hvl": lv["hvl"],
+        }
+
+    rows_out: list[dict] = []
+    cum_calls: list[dict] = []
+    cum_puts: list[dict] = []
+    for u in live:
+        ch = base if u == base["exp_unix"] else _get_chain(yahoo_symbol, u)
+        s_rows, s_legs = _aggregate(ch["calls"], ch["puts"], spot)
+        cum_calls += ch["calls"]
+        cum_puts += ch["puts"]
+        c_rows, c_legs = _aggregate(cum_calls, cum_puts, spot)
+        rows_out.append({
+            "date": _exp_date(u).isoformat(),
+            "dte": (_exp_date(u) - today).days,
+            "standalone": _summary(s_rows, s_legs),
+            "cumulative": _summary(c_rows, c_legs),
+        })
+    total_oi = sum(r["standalone"]["oi"] for r in rows_out) or 1.0
+    for r in rows_out:
+        r["standalone"]["oi_pct"] = r["standalone"]["oi"] / total_oi * 100.0
+    return {
+        "underlying": underlying.upper(),
+        "yahoo_symbol": yahoo_symbol,
+        "proxy": is_proxy,
+        "index_symbol": ETF_INDEX.get(yahoo_symbol),
+        "index_scale": _index_scale(yahoo_symbol, spot) if is_proxy else None,
+        "spot": spot,
+        "rows": rows_out,
+        "asof": base["asof"],
+    }
+
+
 # ─── Forward-built history (the time-series we trust) ────────────────────────────
 
 def _history_path(underlying: str) -> Path:
