@@ -1,41 +1,39 @@
 {
-  "generated_at": "2026-06-08T10:45:04+00:00",
+  "generated_at": "2026-06-15T13:10:07+00:00",
   "source_file": "OP Control Panel.xlsx",
   "portfolio": {
-    "open_pnl_total": -5175.0,
-    "delta_total": 39.9,
-    "max_loss_exposed": 32140.0,
-    "n_active_trades": 3,
-    "n_closed_trades": 77,
+    "open_pnl_total": 359.0,
+    "delta_total": 19.77,
+    "max_loss_exposed": 4625.0,
+    "n_active_trades": 2,
+    "n_closed_trades": 87,
     "rlzd_by_env": {
       "CZ_Forward": -50152.06,
-      "CZ_Live": -43633.0,
-      "JS_Forward": -1881.0,
-      "URL Não Cadastrada": 500.0
+      "CZ_Live": -42863.0,
+      "JS_Forward": -1972.0,
+      "URL Não Cadastrada": 700.0
     },
-    "win_rate": 57.9,
+    "win_rate": 60.0,
     "alerts": [
-      "DTE CRÍTICO: T49 SPX BWIC42 com 4 DTE",
-      "DTE CRÍTICO: T60 GLD BearCS8 com 4 DTE",
-      "50% TARGET: T60 GLD BearCS8 @ 91% do Max Profit",
-      "DTE CRÍTICO: T61 RUT BPS8 com 4 DTE",
-      "STOP ATINGIDO: T61 RUT BPS8 @ -368% do Max Profit"
+      "DTE CRÍTICO: T11 XLE IC8 com 3 DTE",
+      "DTE CRÍTICO: T62 EWY BPS10 com 3 DTE",
+      "50% TARGET: T62 EWY BPS10 @ 70% do Max Profit"
     ]
   },
   "sheet_summaries": {
     "CZ_Live": [
       {
         "month": "JUN26",
-        "open_pnl": -3275.0,
-        "rlzd": 1228.0,
-        "delta": 36.84999999999999,
-        "max_profit": 1440.0
+        "open_pnl": 950.0,
+        "rlzd": 1008.0,
+        "delta": 11.6,
+        "max_profit": 1100.0
       },
       {
         "month": "MAY26",
-        "open_pnl": -1900.0,
+        "open_pnl": -1510.0,
         "rlzd": -15022.0,
-        "delta": 3.05,
+        "delta": 0.0,
         "max_profit": 3920.0
       },
       {
@@ -56,10 +54,10 @@
     "JS_Forward": [
       {
         "month": "JS JUN26",
-        "open_pnl": 0.0,
-        "rlzd": 31.0,
-        "delta": 0.0,
-        "max_profit": 0.0
+        "open_pnl": 9.0,
+        "rlzd": -69.0,
+        "delta": 8.17,
+        "max_profit": 25.0
       },
       {
         "month": "JS MAY26",
@@ -96,10 +94,16 @@
   "individual_trade_pnls": {
     "T58 SMH BPS3": 324.0,
     "T57 GLD IC4": 345.0,
-    "T60 GLD BearCS8": 400.0,
-    "T61 RUT BPS8": -3675.0,
+    "T60 GLD BearCS8": 370.0,
+    "T61 RUT BPS8": -2000.0,
     "T59 USO BearCS7": 559.0,
-    "T49 SPX BWIC42": -1900.0,
+    "T64 SMH BearCS7": 300.0,
+    "T63 RUT BW PutFly4": 500.0,
+    "T62 EWY BPS10": 350.0,
+    "T64 SPX BW PutFly3": 380.0,
+    "T63 EWY BearCS7": 330.0,
+    "T65 RUT BW CallFly7": -100.0,
+    "T49 SPX BWIC42": -1510.0,
     "T53 RUT BullPutCreditSpread7 (PCS7)": -350.0,
     "T54 GLD TC22/29": -1759.0,
     "T50 NDX BWIC7": -400.0,
@@ -135,6 +139,8 @@
     "T39 NDX BEAR CALL 7": 1600.0,
     "T40 RUT CALL BEAR + SP 7": -7674.0,
     "T09 IWM PUT-FLY4": 31.0,
+    "T10 IWM IC3": -100.0,
+    "T11 XLE IC8": 9.0,
     "T02 XSP IC42": -53.0,
     "T04 SLV Triple Calendar 11/18DTE": -13.0,
     "T06 IWM PUT-FLY": 27.0,
@@ -247,12 +253,12 @@
       {
         "date": "2026-06-08",
         "row": 23,
-        "pnl": 1228.0,
+        "pnl": -402.0,
         "open_pnl": 0.0,
-        "rlzd": 1228.0,
-        "daily_pnl": 3275.0,
+        "rlzd": -402.0,
+        "daily_pnl": 1645.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
+        "n_trades": 5,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -262,6 +268,16 @@
           {
             "name": "T57 GLD IC4",
             "pnl": 345.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T60 GLD BearCS8",
+            "pnl": 370.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T61 RUT BPS8",
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
@@ -274,93 +290,12 @@
       {
         "date": "2026-06-09",
         "row": 24,
-        "pnl": 1228.0,
-        "open_pnl": 0.0,
-        "rlzd": 1228.0,
-        "daily_pnl": 0.0,
+        "pnl": -2207.0,
+        "open_pnl": -1805.0,
+        "rlzd": -402.0,
+        "daily_pnl": -1805.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
-        "trades": [
-          {
-            "name": "T58 SMH BPS3",
-            "pnl": 324.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T57 GLD IC4",
-            "pnl": 345.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T59 USO BearCS7",
-            "pnl": 559.0,
-            "bucket": "rlzd"
-          }
-        ]
-      },
-      {
-        "date": "2026-06-10",
-        "row": 25,
-        "pnl": 1228.0,
-        "open_pnl": 0.0,
-        "rlzd": 1228.0,
-        "daily_pnl": 0.0,
-        "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
-        "trades": [
-          {
-            "name": "T58 SMH BPS3",
-            "pnl": 324.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T57 GLD IC4",
-            "pnl": 345.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T59 USO BearCS7",
-            "pnl": 559.0,
-            "bucket": "rlzd"
-          }
-        ]
-      },
-      {
-        "date": "2026-06-11",
-        "row": 26,
-        "pnl": 1228.0,
-        "open_pnl": 0.0,
-        "rlzd": 1228.0,
-        "daily_pnl": 0.0,
-        "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 3,
-        "trades": [
-          {
-            "name": "T58 SMH BPS3",
-            "pnl": 324.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T57 GLD IC4",
-            "pnl": 345.0,
-            "bucket": "rlzd"
-          },
-          {
-            "name": "T59 USO BearCS7",
-            "pnl": 559.0,
-            "bucket": "rlzd"
-          }
-        ]
-      },
-      {
-        "date": "2026-06-12",
-        "row": 27,
-        "pnl": -2047.0,
-        "open_pnl": 0.0,
-        "rlzd": -2047.0,
-        "daily_pnl": -3275.0,
-        "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 9,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -374,17 +309,228 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 230.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": -500.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": -175.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": -1360.0,
+            "bucket": "open"
+          }
+        ]
+      },
+      {
+        "date": "2026-06-10",
+        "row": 25,
+        "pnl": -1908.0,
+        "open_pnl": -1506.0,
+        "rlzd": -402.0,
+        "daily_pnl": 299.0,
+        "pnl_type": "total_open_plus_rlzd",
+        "n_trades": 10,
+        "trades": [
+          {
+            "name": "T58 SMH BPS3",
+            "pnl": 324.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T57 GLD IC4",
+            "pnl": 345.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T60 GLD BearCS8",
+            "pnl": 370.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T61 RUT BPS8",
+            "pnl": -2000.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T59 USO BearCS7",
+            "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 295.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": -300.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": -175.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": -1655.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 329.0,
+            "bucket": "open"
+          }
+        ]
+      },
+      {
+        "date": "2026-06-11",
+        "row": 26,
+        "pnl": 1413.0,
+        "open_pnl": 1815.0,
+        "rlzd": -402.0,
+        "daily_pnl": 3321.0,
+        "pnl_type": "total_open_plus_rlzd",
+        "n_trades": 10,
+        "trades": [
+          {
+            "name": "T58 SMH BPS3",
+            "pnl": 324.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T57 GLD IC4",
+            "pnl": 345.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T60 GLD BearCS8",
+            "pnl": 370.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T61 RUT BPS8",
+            "pnl": -2000.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T59 USO BearCS7",
+            "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 220.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 465.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 375.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 300.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 455.0,
+            "bucket": "open"
+          }
+        ]
+      },
+      {
+        "date": "2026-06-12",
+        "row": 27,
+        "pnl": 1358.0,
+        "open_pnl": 350.0,
+        "rlzd": 1008.0,
+        "daily_pnl": -55.0,
+        "pnl_type": "total_open_plus_rlzd",
+        "n_trades": 11,
+        "trades": [
+          {
+            "name": "T58 SMH BPS3",
+            "pnl": 324.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T57 GLD IC4",
+            "pnl": 345.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T60 GLD BearCS8",
+            "pnl": 370.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T61 RUT BPS8",
+            "pnl": -2000.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T59 USO BearCS7",
+            "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -392,12 +538,12 @@
       {
         "date": "2026-06-15",
         "row": 28,
-        "pnl": -2047.0,
+        "pnl": 1008.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
-        "daily_pnl": 0.0,
+        "rlzd": 1008.0,
+        "daily_pnl": -350.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 10,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -411,17 +557,42 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -429,12 +600,12 @@
       {
         "date": "2026-06-16",
         "row": 29,
-        "pnl": -2047.0,
+        "pnl": 1008.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1008.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 10,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -448,17 +619,42 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -466,12 +662,12 @@
       {
         "date": "2026-06-17",
         "row": 30,
-        "pnl": -2047.0,
+        "pnl": 1008.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1008.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 10,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -485,17 +681,42 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -503,12 +724,12 @@
       {
         "date": "2026-06-18",
         "row": 31,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
-        "daily_pnl": 0.0,
+        "rlzd": 1358.0,
+        "daily_pnl": 350.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -522,17 +743,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -540,12 +791,12 @@
       {
         "date": "2026-06-22",
         "row": 32,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -559,17 +810,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -577,12 +858,12 @@
       {
         "date": "2026-06-23",
         "row": 33,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -596,17 +877,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -614,12 +925,12 @@
       {
         "date": "2026-06-24",
         "row": 34,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -633,17 +944,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -651,12 +992,12 @@
       {
         "date": "2026-06-25",
         "row": 35,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -670,17 +1011,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -688,12 +1059,12 @@
       {
         "date": "2026-06-26",
         "row": 36,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -707,17 +1078,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -725,12 +1126,12 @@
       {
         "date": "2026-06-29",
         "row": 37,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -744,17 +1145,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -762,12 +1193,12 @@
       {
         "date": "2026-06-30",
         "row": 38,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -781,17 +1212,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -799,12 +1260,12 @@
       {
         "date": "2026-07-01",
         "row": 39,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -818,17 +1279,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -836,12 +1327,12 @@
       {
         "date": "2026-07-02",
         "row": 40,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -855,17 +1346,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -873,12 +1394,12 @@
       {
         "date": "2026-07-03",
         "row": 41,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -892,17 +1413,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -910,12 +1461,12 @@
       {
         "date": "2026-07-06",
         "row": 42,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -929,17 +1480,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -947,12 +1528,12 @@
       {
         "date": "2026-07-07",
         "row": 43,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -966,17 +1547,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -984,12 +1595,12 @@
       {
         "date": "2026-07-08",
         "row": 44,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -1003,17 +1614,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -1021,12 +1662,12 @@
       {
         "date": "2026-07-09",
         "row": 45,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -1040,17 +1681,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -1058,12 +1729,12 @@
       {
         "date": "2026-07-10",
         "row": 46,
-        "pnl": -2047.0,
+        "pnl": 1358.0,
         "open_pnl": 0.0,
-        "rlzd": -2047.0,
+        "rlzd": 1358.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 5,
+        "n_trades": 11,
         "trades": [
           {
             "name": "T58 SMH BPS3",
@@ -1077,17 +1748,47 @@
           },
           {
             "name": "T60 GLD BearCS8",
-            "pnl": 400.0,
+            "pnl": 370.0,
             "bucket": "rlzd"
           },
           {
             "name": "T61 RUT BPS8",
-            "pnl": -3675.0,
+            "pnl": -2000.0,
             "bucket": "rlzd"
           },
           {
             "name": "T59 USO BearCS7",
             "pnl": 559.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SMH BearCS7",
+            "pnl": 300.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 RUT BW PutFly4",
+            "pnl": 500.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T62 EWY BPS10",
+            "pnl": 350.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T64 SPX BW PutFly3",
+            "pnl": 380.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T63 EWY BearCS7",
+            "pnl": 330.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T65 RUT BW CallFly7",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -2309,13 +3010,18 @@
       {
         "date": "2026-06-08",
         "row": 44,
-        "pnl": -15022.0,
-        "open_pnl": 0.0,
+        "pnl": -16664.5,
+        "open_pnl": -1642.5,
         "rlzd": -15022.0,
-        "daily_pnl": 1900.0,
+        "daily_pnl": 257.5,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 9,
         "trades": [
+          {
+            "name": "T49 SPX BWIC42",
+            "pnl": -1642.5,
+            "bucket": "open"
+          },
           {
             "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
             "pnl": -350.0,
@@ -2361,13 +3067,18 @@
       {
         "date": "2026-06-09",
         "row": 45,
-        "pnl": -15022.0,
-        "open_pnl": 0.0,
+        "pnl": -16807.0,
+        "open_pnl": -1785.0,
         "rlzd": -15022.0,
-        "daily_pnl": 0.0,
+        "daily_pnl": -142.5,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 9,
         "trades": [
+          {
+            "name": "T49 SPX BWIC42",
+            "pnl": -1785.0,
+            "bucket": "open"
+          },
           {
             "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
             "pnl": -350.0,
@@ -2413,13 +3124,18 @@
       {
         "date": "2026-06-10",
         "row": 46,
-        "pnl": -15022.0,
-        "open_pnl": 0.0,
+        "pnl": -16727.0,
+        "open_pnl": -1705.0,
         "rlzd": -15022.0,
-        "daily_pnl": 0.0,
+        "daily_pnl": 80.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 9,
         "trades": [
+          {
+            "name": "T49 SPX BWIC42",
+            "pnl": -1705.0,
+            "bucket": "open"
+          },
           {
             "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
             "pnl": -350.0,
@@ -2465,13 +3181,18 @@
       {
         "date": "2026-06-11",
         "row": 47,
-        "pnl": -15022.0,
-        "open_pnl": 0.0,
+        "pnl": -16572.0,
+        "open_pnl": -1550.0,
         "rlzd": -15022.0,
-        "daily_pnl": 0.0,
+        "daily_pnl": 155.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 8,
+        "n_trades": 9,
         "trades": [
+          {
+            "name": "T49 SPX BWIC42",
+            "pnl": -1550.0,
+            "bucket": "open"
+          },
           {
             "name": "T53 RUT BullPutCreditSpread7 (PCS7)",
             "pnl": -350.0,
@@ -2517,16 +3238,16 @@
       {
         "date": "2026-06-12",
         "row": 48,
-        "pnl": -16922.0,
+        "pnl": -16532.0,
         "open_pnl": 0.0,
-        "rlzd": -16922.0,
-        "daily_pnl": -1900.0,
+        "rlzd": -16532.0,
+        "daily_pnl": 40.0,
         "pnl_type": "total_open_plus_rlzd",
         "n_trades": 9,
         "trades": [
           {
             "name": "T49 SPX BWIC42",
-            "pnl": -1900.0,
+            "pnl": -1510.0,
             "bucket": "rlzd"
           },
           {
@@ -7007,84 +7728,124 @@
       {
         "date": "2026-06-09",
         "row": 24,
-        "pnl": 31.0,
-        "open_pnl": 0.0,
+        "pnl": 29.0,
+        "open_pnl": -2.0,
         "rlzd": 31.0,
-        "daily_pnl": 0.0,
+        "daily_pnl": -2.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
             "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -2.0,
+            "bucket": "open"
           }
         ]
       },
       {
         "date": "2026-06-10",
         "row": 25,
-        "pnl": 31.0,
-        "open_pnl": 0.0,
+        "pnl": 49.0,
+        "open_pnl": 18.0,
         "rlzd": 31.0,
-        "daily_pnl": 0.0,
+        "daily_pnl": 20.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
             "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": 16.5,
+            "bucket": "open"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 1.5,
+            "bucket": "open"
           }
         ]
       },
       {
         "date": "2026-06-11",
         "row": 26,
-        "pnl": 31.0,
-        "open_pnl": 0.0,
+        "pnl": -50.0,
+        "open_pnl": -81.0,
         "rlzd": 31.0,
-        "daily_pnl": 0.0,
+        "daily_pnl": -99.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
             "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -30.0,
+            "bucket": "open"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": -51.0,
+            "bucket": "open"
           }
         ]
       },
       {
         "date": "2026-06-12",
         "row": 27,
-        "pnl": 31.0,
-        "open_pnl": 0.0,
-        "rlzd": 31.0,
-        "daily_pnl": 0.0,
+        "pnl": -60.0,
+        "open_pnl": 9.0,
+        "rlzd": -69.0,
+        "daily_pnl": -10.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
             "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
+            "bucket": "open"
           }
         ]
       },
       {
         "date": "2026-06-15",
         "row": 28,
-        "pnl": 31.0,
+        "pnl": -69.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
-        "daily_pnl": 0.0,
+        "rlzd": -69.0,
+        "daily_pnl": -9.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -7092,16 +7853,21 @@
       {
         "date": "2026-06-16",
         "row": 29,
-        "pnl": 31.0,
+        "pnl": -69.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -69.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -7109,16 +7875,21 @@
       {
         "date": "2026-06-17",
         "row": 30,
-        "pnl": 31.0,
+        "pnl": -69.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -69.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 2,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
             "bucket": "rlzd"
           }
         ]
@@ -7126,16 +7897,26 @@
       {
         "date": "2026-06-18",
         "row": 31,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
-        "daily_pnl": 0.0,
+        "rlzd": -60.0,
+        "daily_pnl": 9.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7143,16 +7924,26 @@
       {
         "date": "2026-06-22",
         "row": 32,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7160,16 +7951,26 @@
       {
         "date": "2026-06-23",
         "row": 33,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7177,16 +7978,26 @@
       {
         "date": "2026-06-24",
         "row": 34,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7194,16 +8005,26 @@
       {
         "date": "2026-06-25",
         "row": 35,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7211,16 +8032,26 @@
       {
         "date": "2026-06-26",
         "row": 36,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7228,16 +8059,26 @@
       {
         "date": "2026-06-29",
         "row": 37,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7245,16 +8086,26 @@
       {
         "date": "2026-06-30",
         "row": 38,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7262,16 +8113,26 @@
       {
         "date": "2026-07-01",
         "row": 39,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7279,16 +8140,26 @@
       {
         "date": "2026-07-02",
         "row": 40,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7296,16 +8167,26 @@
       {
         "date": "2026-07-03",
         "row": 41,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7313,16 +8194,26 @@
       {
         "date": "2026-07-06",
         "row": 42,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7330,16 +8221,26 @@
       {
         "date": "2026-07-07",
         "row": 43,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7347,16 +8248,26 @@
       {
         "date": "2026-07-08",
         "row": 44,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7364,16 +8275,26 @@
       {
         "date": "2026-07-09",
         "row": 45,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -7381,16 +8302,26 @@
       {
         "date": "2026-07-10",
         "row": 46,
-        "pnl": 31.0,
+        "pnl": -60.0,
         "open_pnl": 0.0,
-        "rlzd": 31.0,
+        "rlzd": -60.0,
         "daily_pnl": 0.0,
         "pnl_type": "total_open_plus_rlzd",
-        "n_trades": 1,
+        "n_trades": 3,
         "trades": [
           {
             "name": "T09 IWM PUT-FLY4",
             "pnl": 31.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T10 IWM IC3",
+            "pnl": -100.0,
+            "bucket": "rlzd"
+          },
+          {
+            "name": "T11 XLE IC8",
+            "pnl": 9.0,
             "bucket": "rlzd"
           }
         ]
@@ -8825,139 +9756,111 @@
   "forwardtest_strategies": [],
   "trades": [
     {
-      "name": "T49 SPX BWIC42",
-      "environment_raw": "Live",
-      "environment": "CZ_Live",
-      "underlying": "SPX",
+      "name": "T11 XLE IC8",
+      "environment_raw": "FOR JS",
+      "environment": "JS_Forward",
+      "underlying": "XLE",
       "is_active": true,
-      "last_update": "2026-06-05",
-      "open_date": "2026-04-30",
-      "exp_date": "2026-06-12",
-      "dte_open": 43,
-      "dte_open_raw": "43",
-      "dte_remaining": 4,
-      "underlying_price_at_open": 7165.0,
-      "strikes": "6750P | 6800P | 7500C | 7600C",
-      "net_credit": 3920.0,
-      "max_loss": 16080.0,
-      "sd": NaN,
-      "lw_be": 6780.4,
-      "up_be": 7519.6,
-      "pct_to_lw_be": -5.37,
-      "pct_to_up_be": 4.95,
-      "pnl_current": -1900.0,
-      "pnl_pct_max": -48.5,
-      "delta_current": 3.05,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-10",
+      "exp_date": "2026-06-18",
+      "dte_open": 8,
+      "dte_open_raw": "8",
+      "dte_remaining": 3,
+      "underlying_price_at_open": 58.42,
+      "strikes": "54P | 55.5P | 61.5P | 63P",
+      "net_credit": 25.0,
+      "max_loss": 125.0,
+      "sd": 0.047,
+      "lw_be": 55.25,
+      "up_be": 61.75,
+      "pct_to_lw_be": -5.43,
+      "pct_to_up_be": 5.7,
+      "pnl_current": 9.0,
+      "pnl_pct_max": 36.0,
+      "delta_current": 8.17,
       "alert_dte": true,
       "alert_profit_50": false,
       "alert_stop": false,
-      "tent_status": "loss",
-      "sheet": "MAY26",
-      "visual_pnl": -1900.0,
-      "dte_bucket": "35/42 DTE",
+      "tent_status": "profit",
+      "sheet": "JS JUN26",
+      "visual_pnl": 9.0,
+      "dte_bucket": "7 DTE",
       "visual_status": "Active",
-      "visual_open_date": "2026-04-30",
-      "visual_exp_date": "2026-06-12",
-      "visual_dte_open": 43,
-      "visual_open_price": 7165.0,
-      "visual_last_pnl": -1900.0,
-      "visual_last_pnl_date": "2026-06-05",
+      "visual_open_date": "2026-06-10",
+      "visual_exp_date": "2026-06-18",
+      "visual_dte_open": 8,
+      "visual_open_price": 58.42,
+      "visual_last_pnl": 9.0,
+      "visual_last_pnl_date": "2026-06-12",
       "visual_last_pnl_weekday": "Fri",
-      "visual_last_pnl_row": 43,
+      "visual_last_pnl_row": 27,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 36
+      "days_open_as_of_last_pnl": 2,
+      "daily_history": [
+        {
+          "date": "2026-06-10",
+          "pnl": 1.5,
+          "delta": -0.738
+        },
+        {
+          "date": "2026-06-11",
+          "pnl": -51.0,
+          "delta": 19.3
+        },
+        {
+          "date": "2026-06-12",
+          "pnl": 9.0,
+          "delta": 8.17
+        }
+      ]
     },
     {
-      "name": "T60 GLD BearCS8",
+      "name": "T62 EWY BPS10",
       "environment_raw": "Live",
       "environment": "CZ_Live",
-      "underlying": "GLD",
+      "underlying": "?",
       "is_active": true,
-      "last_update": "2026-06-05",
-      "open_date": "2026-06-04",
-      "exp_date": "2026-06-12",
-      "dte_open": 8,
-      "dte_open_raw": "8",
-      "dte_remaining": 4,
-      "underlying_price_at_open": 411.18,
-      "strikes": "425C | 430C",
-      "net_credit": 440.0,
-      "max_loss": 4560.0,
-      "sd": 0.03,
-      "lw_be": NaN,
-      "up_be": 425.44,
-      "pct_to_lw_be": NaN,
-      "pct_to_up_be": 3.47,
-      "pnl_current": 400.0,
-      "pnl_pct_max": 90.9,
-      "delta_current": -8.45,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-08",
+      "exp_date": "2026-06-18",
+      "dte_open": 10,
+      "dte_open_raw": "10",
+      "dte_remaining": 3,
+      "underlying_price_at_open": 185.6,
+      "strikes": "150P | 155P",
+      "net_credit": 500.0,
+      "max_loss": 4500.0,
+      "sd": 0.15,
+      "lw_be": 1154.5,
+      "up_be": NaN,
+      "pct_to_lw_be": 522.04,
+      "pct_to_up_be": NaN,
+      "pnl_current": 350.0,
+      "pnl_pct_max": 70.0,
+      "delta_current": 11.6,
       "alert_dte": true,
       "alert_profit_50": true,
       "alert_stop": false,
       "tent_status": "profit_target",
       "sheet": "JUN26",
-      "visual_pnl": 400.0,
+      "visual_pnl": 350.0,
       "dte_bucket": "14/21 DTE",
       "visual_status": "Active",
-      "visual_open_date": "2026-06-04",
-      "visual_exp_date": "2026-06-12",
-      "visual_dte_open": 8,
-      "visual_open_price": 411.18,
-      "visual_last_pnl": 400.0,
-      "visual_last_pnl_date": "2026-06-05",
+      "visual_open_date": "2026-06-08",
+      "visual_exp_date": "2026-06-18",
+      "visual_dte_open": 10,
+      "visual_open_price": 185.6,
+      "visual_last_pnl": 350.0,
+      "visual_last_pnl_date": "2026-06-12",
       "visual_last_pnl_weekday": "Fri",
-      "visual_last_pnl_row": 22,
+      "visual_last_pnl_row": 27,
       "inferred_close_date": null,
       "inferred_close_weekday": null,
       "days_held": null,
-      "days_open_as_of_last_pnl": 1
-    },
-    {
-      "name": "T61 RUT BPS8",
-      "environment_raw": "Live",
-      "environment": "CZ_Live",
-      "underlying": "RUT",
-      "is_active": true,
-      "last_update": "2026-06-05",
-      "open_date": "2026-06-04",
-      "exp_date": "2026-06-12",
-      "dte_open": 8,
-      "dte_open_raw": "8",
-      "dte_remaining": 4,
-      "underlying_price_at_open": 2939.0,
-      "strikes": "2800P | 2825P",
-      "net_credit": 1000.0,
-      "max_loss": 11500.0,
-      "sd": 0.03,
-      "lw_be": 2823.0,
-      "up_be": NaN,
-      "pct_to_lw_be": -3.95,
-      "pct_to_up_be": NaN,
-      "pnl_current": -3675.0,
-      "pnl_pct_max": -367.5,
-      "delta_current": 45.3,
-      "alert_dte": true,
-      "alert_profit_50": false,
-      "alert_stop": true,
-      "tent_status": "stop_loss",
-      "sheet": "JUN26",
-      "visual_pnl": -3675.0,
-      "dte_bucket": "14/21 DTE",
-      "visual_status": "Active",
-      "visual_open_date": "2026-06-04",
-      "visual_exp_date": "2026-06-12",
-      "visual_dte_open": 8,
-      "visual_open_price": 2939.0,
-      "visual_last_pnl": -3675.0,
-      "visual_last_pnl_date": "2026-06-05",
-      "visual_last_pnl_weekday": "Fri",
-      "visual_last_pnl_row": 22,
-      "inferred_close_date": null,
-      "inferred_close_weekday": null,
-      "days_held": null,
-      "days_open_as_of_last_pnl": 1
+      "days_open_as_of_last_pnl": 4
     },
     {
       "name": "FOR TC 01 RUT 7/10; 8/11",
@@ -9112,8 +10015,8 @@
       "up_be": 2959.98,
       "pct_to_lw_be": -3.43,
       "pct_to_up_be": 3.48,
-      "pnl_current": -287.5,
-      "pnl_pct_max": -23.6,
+      "pnl_current": -345.0,
+      "pnl_pct_max": -28.3,
       "delta_current": 3.82,
       "alert_dte": true,
       "alert_profit_50": false,
@@ -9213,12 +10116,12 @@
         },
         {
           "date": "2026-05-29",
-          "pnl": -345.0,
+          "pnl": -287.5,
           "delta": 3.82
         },
         {
           "date": "2026-05-29",
-          "pnl": -287.5,
+          "pnl": -345.0,
           "delta": 3.82
         }
       ]
@@ -9589,13 +10492,13 @@
         },
         {
           "date": "2026-05-27",
-          "pnl": 530.0,
-          "delta": -3.59
+          "pnl": 572.5,
+          "delta": -4.16
         },
         {
           "date": "2026-05-27",
-          "pnl": 572.5,
-          "delta": -4.16
+          "pnl": 530.0,
+          "delta": -3.59
         },
         {
           "date": "2026-05-27",
@@ -9956,13 +10859,13 @@
         },
         {
           "date": "2026-04-08",
-          "pnl": -112.5,
-          "delta": -44.6
+          "pnl": -272.5,
+          "delta": -45.7
         },
         {
           "date": "2026-04-08",
-          "pnl": -272.5,
-          "delta": -45.7
+          "pnl": -112.5,
+          "delta": -44.6
         },
         {
           "date": "2026-04-09",
@@ -9986,23 +10889,18 @@
         },
         {
           "date": "2026-04-10",
-          "pnl": 595.0,
-          "delta": -45.4
-        },
-        {
-          "date": "2026-04-10",
           "pnl": 140.0,
           "delta": -50.1
         },
         {
           "date": "2026-04-10",
-          "pnl": 522.5,
-          "delta": -46.1
+          "pnl": 595.0,
+          "delta": -45.4
         },
         {
-          "date": "2026-04-13",
-          "pnl": -152.5,
-          "delta": -56.2
+          "date": "2026-04-10",
+          "pnl": 522.5,
+          "delta": -46.1
         },
         {
           "date": "2026-04-13",
@@ -10013,6 +10911,11 @@
           "date": "2026-04-13",
           "pnl": -1342.5,
           "delta": -67.5
+        },
+        {
+          "date": "2026-04-13",
+          "pnl": -152.5,
+          "delta": -56.2
         },
         {
           "date": "2026-04-14",
@@ -10036,23 +10939,23 @@
         },
         {
           "date": "2026-04-16",
-          "pnl": -4640.0,
-          "delta": -106.0
-        },
-        {
-          "date": "2026-04-16",
           "pnl": -3675.0,
           "delta": -92.8
         },
         {
-          "date": "2026-04-17",
-          "pnl": -9342.5,
-          "delta": -123.0
+          "date": "2026-04-16",
+          "pnl": -4640.0,
+          "delta": -106.0
         },
         {
           "date": "2026-04-17",
           "pnl": -11385.0,
           "delta": -124.0
+        },
+        {
+          "date": "2026-04-17",
+          "pnl": -9342.5,
+          "delta": -123.0
         },
         {
           "date": "2026-04-20",
@@ -10066,23 +10969,23 @@
         },
         {
           "date": "2026-04-21",
-          "pnl": -15817.5,
-          "delta": -112.0
-        },
-        {
-          "date": "2026-04-21",
           "pnl": -9920.0,
           "delta": -120.0
         },
         {
-          "date": "2026-04-22",
-          "pnl": -11750.0,
-          "delta": -150.0
+          "date": "2026-04-21",
+          "pnl": -15817.5,
+          "delta": -112.0
         },
         {
           "date": "2026-04-22",
           "pnl": -13675.0,
           "delta": -135.0
+        },
+        {
+          "date": "2026-04-22",
+          "pnl": -11750.0,
+          "delta": -150.0
         },
         {
           "date": "2026-04-23",
@@ -10523,6 +11426,11 @@
         },
         {
           "date": "2026-04-08",
+          "pnl": 4995.0,
+          "delta": -22.2
+        },
+        {
+          "date": "2026-04-08",
           "pnl": 5045.0,
           "delta": -21.3
         },
@@ -10533,18 +11441,13 @@
         },
         {
           "date": "2026-04-08",
-          "pnl": 4995.0,
-          "delta": -22.2
+          "pnl": 4510.0,
+          "delta": -24.6
         },
         {
           "date": "2026-04-08",
           "pnl": 4192.5,
           "delta": -26.1
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4510.0,
-          "delta": -24.6
         },
         {
           "date": "2026-04-09",
@@ -10558,13 +11461,13 @@
         },
         {
           "date": "2026-04-09",
-          "pnl": 3845.0,
-          "delta": -33.1
+          "pnl": 4842.5,
+          "delta": -22.9
         },
         {
           "date": "2026-04-09",
-          "pnl": 4842.5,
-          "delta": -22.9
+          "pnl": 3845.0,
+          "delta": -33.1
         },
         {
           "date": "2026-04-10",
@@ -10583,13 +11486,13 @@
         },
         {
           "date": "2026-04-13",
-          "pnl": 4705.0,
-          "delta": -30.4
+          "pnl": 4120.0,
+          "delta": -34.5
         },
         {
           "date": "2026-04-13",
-          "pnl": 4120.0,
-          "delta": -34.5
+          "pnl": 4705.0,
+          "delta": -30.4
         },
         {
           "date": "2026-04-13",
@@ -10618,23 +11521,23 @@
         },
         {
           "date": "2026-04-16",
-          "pnl": -7685.0,
-          "delta": -82.3
-        },
-        {
-          "date": "2026-04-16",
           "pnl": -6172.5,
           "delta": -72.7
         },
         {
-          "date": "2026-04-17",
-          "pnl": -13195.0,
-          "delta": -84.5
+          "date": "2026-04-16",
+          "pnl": -7685.0,
+          "delta": -82.3
         },
         {
           "date": "2026-04-17",
           "pnl": -14620.0,
           "delta": -83.2
+        },
+        {
+          "date": "2026-04-17",
+          "pnl": -13195.0,
+          "delta": -84.5
         },
         {
           "date": "2026-04-20",
@@ -10648,23 +11551,23 @@
         },
         {
           "date": "2026-04-21",
-          "pnl": -15315.0,
-          "delta": -81.3
-        },
-        {
-          "date": "2026-04-21",
           "pnl": -9210.0,
           "delta": -85.4
         },
         {
-          "date": "2026-04-22",
-          "pnl": -14952.5,
-          "delta": 3.73
+          "date": "2026-04-21",
+          "pnl": -15315.0,
+          "delta": -81.3
         },
         {
           "date": "2026-04-22",
           "pnl": -14280.0,
           "delta": -93.7
+        },
+        {
+          "date": "2026-04-22",
+          "pnl": -14952.5,
+          "delta": 3.73
         },
         {
           "date": "2026-04-23",
@@ -11105,6 +12008,11 @@
         },
         {
           "date": "2026-04-08",
+          "pnl": 4400.0,
+          "delta": -16.0
+        },
+        {
+          "date": "2026-04-08",
           "pnl": 4445.0,
           "delta": -15.6
         },
@@ -11112,11 +12020,6 @@
           "date": "2026-04-08",
           "pnl": 4405.0,
           "delta": -16.6
-        },
-        {
-          "date": "2026-04-08",
-          "pnl": 4400.0,
-          "delta": -16.0
         },
         {
           "date": "2026-04-08",
@@ -11170,13 +12073,13 @@
         },
         {
           "date": "2026-04-13",
-          "pnl": 2525.0,
-          "delta": -36.1
+          "pnl": 4375.0,
+          "delta": -21.7
         },
         {
           "date": "2026-04-13",
-          "pnl": 4375.0,
-          "delta": -21.7
+          "pnl": 2525.0,
+          "delta": -36.1
         },
         {
           "date": "2026-04-14",
@@ -11230,23 +12133,23 @@
         },
         {
           "date": "2026-04-21",
-          "pnl": -12625.0,
-          "delta": -89.4
-        },
-        {
-          "date": "2026-04-21",
           "pnl": -6800.0,
           "delta": -78.9
         },
         {
-          "date": "2026-04-22",
-          "pnl": -11587.5,
-          "delta": 0.0334
+          "date": "2026-04-21",
+          "pnl": -12625.0,
+          "delta": -89.4
         },
         {
           "date": "2026-04-22",
           "pnl": -11075.0,
           "delta": -91.9
+        },
+        {
+          "date": "2026-04-22",
+          "pnl": -11587.5,
+          "delta": 0.0334
         },
         {
           "date": "2026-04-23",
@@ -11726,13 +12629,13 @@
         },
         {
           "date": "2026-05-14",
-          "pnl": 25.0,
-          "delta": 0.115
+          "pnl": 18.5,
+          "delta": 0.767
         },
         {
           "date": "2026-05-14",
-          "pnl": 18.5,
-          "delta": 0.767
+          "pnl": 25.0,
+          "delta": 0.115
         },
         {
           "date": "2026-05-14",
@@ -11828,13 +12731,13 @@
         },
         {
           "date": "2026-05-21",
-          "pnl": -13.5,
-          "delta": 1.71
+          "pnl": 6.5,
+          "delta": 5.06
         },
         {
           "date": "2026-05-21",
-          "pnl": 6.5,
-          "delta": 5.06
+          "pnl": -13.5,
+          "delta": 1.71
         },
         {
           "date": "2026-05-22",
@@ -11955,18 +12858,13 @@
         },
         {
           "date": "2026-04-27",
-          "pnl": 9.5,
-          "delta": -10.7
-        },
-        {
-          "date": "2026-04-27",
           "pnl": 14.0,
           "delta": -4.86
         },
         {
-          "date": "2026-04-28",
-          "pnl": 13.0,
-          "delta": -13.2
+          "date": "2026-04-27",
+          "pnl": 9.5,
+          "delta": -10.7
         },
         {
           "date": "2026-04-28",
@@ -11975,13 +12873,13 @@
         },
         {
           "date": "2026-04-28",
-          "pnl": 5.0,
-          "delta": -13.4
+          "pnl": 13.0,
+          "delta": -13.2
         },
         {
-          "date": "2026-04-29",
-          "pnl": -20.0,
-          "delta": -33.7
+          "date": "2026-04-28",
+          "pnl": 5.0,
+          "delta": -13.4
         },
         {
           "date": "2026-04-29",
@@ -11989,14 +12887,19 @@
           "delta": -25.0
         },
         {
-          "date": "2026-04-30",
-          "pnl": -17.5,
-          "delta": -34.8
+          "date": "2026-04-29",
+          "pnl": -20.0,
+          "delta": -33.7
         },
         {
           "date": "2026-04-30",
           "pnl": -30.5,
           "delta": -46.5
+        },
+        {
+          "date": "2026-04-30",
+          "pnl": -17.5,
+          "delta": -34.8
         },
         {
           "date": "2026-05-01",
@@ -13568,13 +14471,13 @@
         },
         {
           "date": "2026-06-05",
-          "pnl": 31.0,
-          "delta": 0.0
+          "pnl": 25.0,
+          "delta": 1.31
         },
         {
           "date": "2026-06-05",
-          "pnl": 25.0,
-          "delta": 1.31
+          "pnl": 31.0,
+          "delta": 0.0
         },
         {
           "date": "2026-06-05",
@@ -13762,6 +14665,73 @@
           "date": "2026-04-01",
           "pnl": -1337.5,
           "delta": 152.0
+        }
+      ]
+    },
+    {
+      "name": "T10 IWM IC3",
+      "environment_raw": "FOR JS",
+      "environment": "JS_Forward",
+      "underlying": "IWM",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-09",
+      "exp_date": "2026-06-12",
+      "dte_open": 3,
+      "dte_open_raw": "3",
+      "dte_remaining": 0,
+      "underlying_price_at_open": 280.44,
+      "strikes": "268P | 270P | 292C | 294C",
+      "net_credit": 37.0,
+      "max_loss": 163.0,
+      "sd": 0.032,
+      "lw_be": 269.63,
+      "up_be": 292.37,
+      "pct_to_lw_be": -3.85,
+      "pct_to_up_be": 4.25,
+      "pnl_current": -100.0,
+      "pnl_pct_max": -270.3,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": false,
+      "alert_stop": true,
+      "tent_status": "stop_loss",
+      "sheet": "JS JUN26",
+      "visual_pnl": -100.0,
+      "dte_bucket": "7 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-09",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 3,
+      "visual_open_price": 280.44,
+      "visual_last_pnl": -100.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 27,
+      "inferred_close_date": "2026-06-12",
+      "inferred_close_weekday": "Fri",
+      "days_held": 3,
+      "days_open_as_of_last_pnl": 3,
+      "daily_history": [
+        {
+          "date": "2026-06-09",
+          "pnl": -2.0,
+          "delta": -5.1
+        },
+        {
+          "date": "2026-06-10",
+          "pnl": 16.5,
+          "delta": -1.58
+        },
+        {
+          "date": "2026-06-11",
+          "pnl": -30.0,
+          "delta": -13.6
+        },
+        {
+          "date": "2026-06-12",
+          "pnl": -100.0,
+          "delta": 0.0
         }
       ]
     },
@@ -14134,13 +15104,13 @@
         },
         {
           "date": "2026-04-08",
-          "pnl": -4175.0,
-          "delta": -450.0
+          "pnl": -5660.0,
+          "delta": -384.0
         },
         {
           "date": "2026-04-08",
-          "pnl": -5660.0,
-          "delta": -384.0
+          "pnl": -4175.0,
+          "delta": -450.0
         },
         {
           "date": "2026-04-08",
@@ -14396,6 +15366,11 @@
         },
         {
           "date": "2026-04-08",
+          "pnl": 960.0,
+          "delta": 13.9
+        },
+        {
+          "date": "2026-04-08",
           "pnl": 990.0,
           "delta": 9.72
         },
@@ -14405,11 +15380,6 @@
           "delta": 13.9
         },
         {
-          "date": "2026-04-08",
-          "pnl": 960.0,
-          "delta": 13.9
-        },
-        {
           "date": "2026-04-09",
           "pnl": 960.0,
           "delta": 13.9
@@ -14418,16 +15388,16 @@
           "date": "2026-04-09",
           "pnl": 960.0,
           "delta": 13.9
-        },
-        {
-          "date": "2026-04-09",
-          "pnl": 1010.0,
-          "delta": 7.02
         },
         {
           "date": "2026-04-09",
           "pnl": 1040.0,
           "delta": 1.58
+        },
+        {
+          "date": "2026-04-09",
+          "pnl": 1010.0,
+          "delta": 7.02
         },
         {
           "date": "2026-04-10",
@@ -14690,13 +15660,13 @@
         },
         {
           "date": "2026-04-08",
-          "pnl": 965.0,
-          "delta": 15.6
+          "pnl": 920.0,
+          "delta": 17.7
         },
         {
           "date": "2026-04-08",
-          "pnl": 920.0,
-          "delta": 17.7
+          "pnl": 965.0,
+          "delta": 15.6
         },
         {
           "date": "2026-04-08",
@@ -14710,13 +15680,13 @@
         },
         {
           "date": "2026-04-09",
-          "pnl": null,
-          "delta": null
+          "pnl": 905.0,
+          "delta": 21.3
         },
         {
           "date": "2026-04-09",
-          "pnl": 905.0,
-          "delta": 21.3
+          "pnl": null,
+          "delta": null
         },
         {
           "date": "2026-04-09",
@@ -14750,13 +15720,13 @@
         },
         {
           "date": "2026-04-13",
-          "pnl": 1145.0,
-          "delta": -0.284
+          "pnl": 915.0,
+          "delta": 26.3
         },
         {
           "date": "2026-04-13",
-          "pnl": 915.0,
-          "delta": 26.3
+          "pnl": 1145.0,
+          "delta": -0.284
         },
         {
           "date": "2026-04-14",
@@ -14902,13 +15872,13 @@
         },
         {
           "date": "2026-04-08",
-          "pnl": -1360.0,
-          "delta": -373.0
+          "pnl": -1420.0,
+          "delta": -387.0
         },
         {
           "date": "2026-04-08",
-          "pnl": -1420.0,
-          "delta": -387.0
+          "pnl": -1360.0,
+          "delta": -373.0
         },
         {
           "date": "2026-04-08",
@@ -14937,13 +15907,13 @@
         },
         {
           "date": "2026-04-09",
-          "pnl": -2890.0,
-          "delta": -548.0
+          "pnl": -955.0,
+          "delta": -525.0
         },
         {
           "date": "2026-04-09",
-          "pnl": -955.0,
-          "delta": -525.0
+          "pnl": -2890.0,
+          "delta": -548.0
         },
         {
           "date": "2026-04-10",
@@ -16013,9 +16983,9 @@
       "up_be": NaN,
       "pct_to_lw_be": -3.96,
       "pct_to_up_be": NaN,
-      "pnl_current": 5970.0,
-      "pnl_pct_max": 75.4,
-      "delta_current": 48.3,
+      "pnl_current": 5790.0,
+      "pnl_pct_max": 73.1,
+      "delta_current": 53.0,
       "alert_dte": true,
       "alert_profit_50": true,
       "alert_stop": false,
@@ -16081,6 +17051,51 @@
       "inferred_close_weekday": "Fri",
       "days_held": 3,
       "days_open_as_of_last_pnl": 3
+    },
+    {
+      "name": "T49 SPX BWIC42",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "SPX",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-04-30",
+      "exp_date": "2026-06-12",
+      "dte_open": 43,
+      "dte_open_raw": "43",
+      "dte_remaining": 0,
+      "underlying_price_at_open": 7165.0,
+      "strikes": "6750P | 6800P | 7500C | 7600C",
+      "net_credit": 3920.0,
+      "max_loss": 16080.0,
+      "sd": NaN,
+      "lw_be": 6780.4,
+      "up_be": 7519.6,
+      "pct_to_lw_be": -5.37,
+      "pct_to_up_be": 4.95,
+      "pnl_current": -1510.0,
+      "pnl_pct_max": -38.5,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": false,
+      "alert_stop": false,
+      "tent_status": "loss",
+      "sheet": "MAY26",
+      "visual_pnl": -1510.0,
+      "dte_bucket": "35/42 DTE",
+      "visual_status": "Active",
+      "visual_open_date": "2026-04-30",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 43,
+      "visual_open_price": 7165.0,
+      "visual_last_pnl": -1510.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 48,
+      "inferred_close_date": null,
+      "inferred_close_weekday": null,
+      "days_held": null,
+      "days_open_as_of_last_pnl": 43
     },
     {
       "name": "T50 GLD IC4",
@@ -16273,7 +17288,7 @@
       "exp_date": "2026-06-18",
       "dte_open": 45,
       "dte_open_raw": "45",
-      "dte_remaining": 10,
+      "dte_remaining": 3,
       "underlying_price_at_open": 2823.0,
       "strikes": "2580P | 2700P",
       "net_credit": 6309.0,
@@ -16286,7 +17301,7 @@
       "pnl_current": -350.0,
       "pnl_pct_max": -5.5,
       "delta_current": 0.0,
-      "alert_dte": false,
+      "alert_dte": true,
       "alert_profit_50": false,
       "alert_stop": false,
       "tent_status": "loss",
@@ -16508,9 +17523,9 @@
       "up_be": NaN,
       "pct_to_lw_be": -5.1,
       "pct_to_up_be": NaN,
-      "pnl_current": 324.0,
-      "pnl_pct_max": 84.4,
-      "delta_current": 14.8,
+      "pnl_current": 312.0,
+      "pnl_pct_max": 81.2,
+      "delta_current": 7.41,
       "alert_dte": true,
       "alert_profit_50": true,
       "alert_stop": false,
@@ -16543,7 +17558,7 @@
       "exp_date": "2026-06-10",
       "dte_open": 7,
       "dte_open_raw": "7",
-      "dte_remaining": 2,
+      "dte_remaining": 0,
       "underlying_price_at_open": 139.67,
       "strikes": "155C | 165C",
       "net_credit": 650.0,
@@ -16578,12 +17593,357 @@
       "days_open_as_of_last_pnl": 2
     },
     {
+      "name": "T60 GLD BearCS8",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "GLD",
+      "is_active": false,
+      "last_update": "2026-06-08",
+      "open_date": "2026-06-04",
+      "exp_date": "2026-06-12",
+      "dte_open": 8,
+      "dte_open_raw": "8",
+      "dte_remaining": 0,
+      "underlying_price_at_open": 411.18,
+      "strikes": "425C | 430C",
+      "net_credit": 440.0,
+      "max_loss": 4560.0,
+      "sd": 0.03,
+      "lw_be": NaN,
+      "up_be": 425.44,
+      "pct_to_lw_be": NaN,
+      "pct_to_up_be": 3.47,
+      "pnl_current": 370.0,
+      "pnl_pct_max": 84.1,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "JUN26",
+      "visual_pnl": 370.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-04",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 8,
+      "visual_open_price": 411.18,
+      "visual_last_pnl": 370.0,
+      "visual_last_pnl_date": "2026-06-08",
+      "visual_last_pnl_weekday": "Mon",
+      "visual_last_pnl_row": 23,
+      "inferred_close_date": "2026-06-08",
+      "inferred_close_weekday": "Mon",
+      "days_held": 4,
+      "days_open_as_of_last_pnl": 4
+    },
+    {
+      "name": "T61 RUT BPS8",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "RUT",
+      "is_active": false,
+      "last_update": "2026-06-08",
+      "open_date": "2026-06-04",
+      "exp_date": "2026-06-12",
+      "dte_open": 8,
+      "dte_open_raw": "8",
+      "dte_remaining": 0,
+      "underlying_price_at_open": 2939.0,
+      "strikes": "2800P | 2825P",
+      "net_credit": 1000.0,
+      "max_loss": 11500.0,
+      "sd": 0.03,
+      "lw_be": 2823.0,
+      "up_be": NaN,
+      "pct_to_lw_be": -3.95,
+      "pct_to_up_be": NaN,
+      "pnl_current": -2000.0,
+      "pnl_pct_max": -200.0,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": false,
+      "alert_stop": true,
+      "tent_status": "stop_loss",
+      "sheet": "JUN26",
+      "visual_pnl": -2000.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-04",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 8,
+      "visual_open_price": 2939.0,
+      "visual_last_pnl": -2000.0,
+      "visual_last_pnl_date": "2026-06-08",
+      "visual_last_pnl_weekday": "Mon",
+      "visual_last_pnl_row": 23,
+      "inferred_close_date": "2026-06-08",
+      "inferred_close_weekday": "Mon",
+      "days_held": 4,
+      "days_open_as_of_last_pnl": 4
+    },
+    {
+      "name": "T63 EWY BearCS7",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "?",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-05",
+      "exp_date": "2026-06-12",
+      "dte_open": 7,
+      "dte_open_raw": "7",
+      "dte_remaining": 0,
+      "underlying_price_at_open": NaN,
+      "strikes": "217.5C | 222.5C",
+      "net_credit": 330.0,
+      "max_loss": 4670.0,
+      "sd": NaN,
+      "lw_be": NaN,
+      "up_be": 217.83,
+      "pct_to_lw_be": null,
+      "pct_to_up_be": null,
+      "pnl_current": 330.0,
+      "pnl_pct_max": 100.0,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "JUN26",
+      "visual_pnl": 330.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-05",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 7,
+      "visual_open_price": null,
+      "visual_last_pnl": 330.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 27,
+      "inferred_close_date": "2026-06-12",
+      "inferred_close_weekday": "Fri",
+      "days_held": 7,
+      "days_open_as_of_last_pnl": 7
+    },
+    {
+      "name": "T63 RUT BW PutFly4",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "RUT",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-08",
+      "exp_date": "2026-06-12",
+      "dte_open": 4,
+      "dte_open_raw": "4",
+      "dte_remaining": 0,
+      "underlying_price_at_open": 2876.0,
+      "strikes": "2775P | 2800P | 2805P",
+      "net_credit": 1000.0,
+      "max_loss": 7000.0,
+      "sd": 0.027,
+      "lw_be": 2792.55,
+      "up_be": NaN,
+      "pct_to_lw_be": -2.9,
+      "pct_to_up_be": NaN,
+      "pnl_current": 500.0,
+      "pnl_pct_max": 50.0,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "JUN26",
+      "visual_pnl": 500.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-08",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 4,
+      "visual_open_price": 2876.0,
+      "visual_last_pnl": 500.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 27,
+      "inferred_close_date": "2026-06-12",
+      "inferred_close_weekday": "Fri",
+      "days_held": 4,
+      "days_open_as_of_last_pnl": 4
+    },
+    {
+      "name": "T64 SMH BearCS7",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "?",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-05",
+      "exp_date": "2026-06-12",
+      "dte_open": 7,
+      "dte_open_raw": "7",
+      "dte_remaining": 0,
+      "underlying_price_at_open": NaN,
+      "strikes": "660C | 665C",
+      "net_credit": 300.0,
+      "max_loss": 4700.0,
+      "sd": NaN,
+      "lw_be": NaN,
+      "up_be": 660.3,
+      "pct_to_lw_be": null,
+      "pct_to_up_be": null,
+      "pnl_current": 300.0,
+      "pnl_pct_max": 100.0,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "JUN26",
+      "visual_pnl": 300.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-05",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 7,
+      "visual_open_price": null,
+      "visual_last_pnl": 300.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 27,
+      "inferred_close_date": "2026-06-12",
+      "inferred_close_weekday": "Fri",
+      "days_held": 7,
+      "days_open_as_of_last_pnl": 7
+    },
+    {
+      "name": "T64 SPX BW PutFly3",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "SPX",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-09",
+      "exp_date": "2026-06-12",
+      "dte_open": 3,
+      "dte_open_raw": "3",
+      "dte_remaining": 0,
+      "underlying_price_at_open": 7456.0,
+      "strikes": "7285P | 7325P | 7335P",
+      "net_credit": 480.0,
+      "max_loss": 5520.0,
+      "sd": 0.019,
+      "lw_be": 7312.6,
+      "up_be": NaN,
+      "pct_to_lw_be": -1.92,
+      "pct_to_up_be": NaN,
+      "pnl_current": 380.0,
+      "pnl_pct_max": 79.2,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": "JUN26",
+      "visual_pnl": 380.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-09",
+      "visual_exp_date": "2026-06-12",
+      "visual_dte_open": 3,
+      "visual_open_price": 7456.0,
+      "visual_last_pnl": 380.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 27,
+      "inferred_close_date": "2026-06-12",
+      "inferred_close_weekday": "Fri",
+      "days_held": 3,
+      "days_open_as_of_last_pnl": 3
+    },
+    {
+      "name": "T65 RUT BW CallFly7",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "RUT",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-11",
+      "exp_date": "2026-06-18",
+      "dte_open": 7,
+      "dte_open_raw": "7",
+      "dte_remaining": 3,
+      "underlying_price_at_open": 2938.9,
+      "strikes": "3005C | 3010C | 3030C",
+      "net_credit": 260.0,
+      "max_loss": 1240.0,
+      "sd": 0.036,
+      "lw_be": NaN,
+      "up_be": 3017.6,
+      "pct_to_lw_be": NaN,
+      "pct_to_up_be": 2.68,
+      "pnl_current": -100.0,
+      "pnl_pct_max": -38.5,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": false,
+      "alert_stop": false,
+      "tent_status": "loss",
+      "sheet": "JUN26",
+      "visual_pnl": -100.0,
+      "dte_bucket": "14/21 DTE",
+      "visual_status": "Closed",
+      "visual_open_date": "2026-06-11",
+      "visual_exp_date": "2026-06-18",
+      "visual_dte_open": 7,
+      "visual_open_price": 2938.9,
+      "visual_last_pnl": -100.0,
+      "visual_last_pnl_date": "2026-06-12",
+      "visual_last_pnl_weekday": "Fri",
+      "visual_last_pnl_row": 27,
+      "inferred_close_date": "2026-06-12",
+      "inferred_close_weekday": "Fri",
+      "days_held": 1,
+      "days_open_as_of_last_pnl": 1
+    },
+    {
+      "name": "T65 SMH BearCS7",
+      "environment_raw": "Live",
+      "environment": "CZ_Live",
+      "underlying": "?",
+      "is_active": false,
+      "last_update": "2026-06-12",
+      "open_date": "2026-06-05",
+      "exp_date": "2026-06-12",
+      "dte_open": 7,
+      "dte_open_raw": "7",
+      "dte_remaining": 0,
+      "underlying_price_at_open": NaN,
+      "strikes": "660C | 670C",
+      "net_credit": 600.0,
+      "max_loss": 9400.0,
+      "sd": NaN,
+      "lw_be": NaN,
+      "up_be": 660.6,
+      "pct_to_lw_be": null,
+      "pct_to_up_be": null,
+      "pnl_current": 600.0,
+      "pnl_pct_max": 100.0,
+      "delta_current": 0.0,
+      "alert_dte": true,
+      "alert_profit_50": true,
+      "alert_stop": false,
+      "tent_status": "profit_target",
+      "sheet": null
+    },
+    {
       "name": "URL Não Cadastrada",
       "environment_raw": "URL Não Cadastrada",
       "environment": "URL Não Cadastrada",
       "underlying": "?",
       "is_active": false,
-      "last_update": "2026-05-14",
+      "last_update": "2026-06-10",
       "open_date": null,
       "exp_date": null,
       "dte_open": null,
@@ -16598,9 +17958,9 @@
       "up_be": null,
       "pct_to_lw_be": null,
       "pct_to_up_be": null,
-      "pnl_current": 500.0,
+      "pnl_current": 700.0,
       "pnl_pct_max": null,
-      "delta_current": 3.57,
+      "delta_current": 14.2,
       "alert_dte": false,
       "alert_profit_50": false,
       "alert_stop": false,
