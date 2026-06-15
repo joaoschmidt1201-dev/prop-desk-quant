@@ -3,10 +3,12 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BarChart3, Clock, Layers } from "lucide-react";
+import { Activity, BarChart3, Clock, Layers, LayoutGrid, LineChart, Table } from "lucide-react";
 import { api, type GexExpirations, type GexMetric, type GexProfile } from "@/lib/api";
 import { DASHBOARD_REFETCH_INTERVAL_MS } from "@/lib/refresh";
 import { GexProfileChart } from "./gex-profile-chart";
+import { GexLiveChart } from "./gex-live-chart";
+import { GexMatrix } from "./gex-matrix";
 import { NetGexTimeseries } from "./net-gex-timeseries";
 import { ChainActivityCard, GammaProfileCard, NetExposureCard, RangeCard } from "./gex-sidebar";
 import { fmtLevel, scaleStrike } from "./gex-format";
@@ -43,6 +45,7 @@ export function GexDashboard({ underlying: initialUnderlying, initialExpirations
   const [exp, setExp] = useState<string | undefined>(undefined);
   const [cumulative, setCumulative] = useState(false);
   const [metric, setMetric] = useState<GexMetric>("net_gex");
+  const [view, setView] = useState<"table" | "chart" | "matrix">("table");
 
   const isInitial = underlying === initialUnderlying;
   const poll = { refetchInterval: DASHBOARD_REFETCH_INTERVAL_MS, refetchIntervalInBackground: true };
@@ -79,6 +82,13 @@ export function GexDashboard({ underlying: initialUnderlying, initialExpirations
     <div className="flex flex-col gap-4 p-4 md:p-6">
       <PriceHeader profile={profile} meta={expQ.data} />
 
+      {/* View tabs — Live Table / Live Chart / Matrix (all under GEX, like Tanuki) */}
+      <div className="flex items-center gap-1.5">
+        <ViewTab active={view === "table"} onClick={() => setView("table")} icon={<Table className="h-3.5 w-3.5" />}>Live Table</ViewTab>
+        <ViewTab active={view === "chart"} onClick={() => setView("chart")} icon={<LineChart className="h-3.5 w-3.5" />}>Live Chart</ViewTab>
+        <ViewTab active={view === "matrix"} onClick={() => setView("matrix")} icon={<LayoutGrid className="h-3.5 w-3.5" />}>Matrix</ViewTab>
+      </div>
+
       {/* Controls */}
       <div className="glass flex flex-col gap-2.5 rounded-2xl p-3">
         <ChipRow label="Symbol">
@@ -86,75 +96,110 @@ export function GexDashboard({ underlying: initialUnderlying, initialExpirations
             <Chip key={u} active={u === underlying} onClick={() => switchUnderlying(u)}>{u}</Chip>
           ))}
         </ChipRow>
-        <ChipRow label="Expiry">
-          {expirations.length === 0 ? (
-            <span className="text-xs text-muted-foreground">—</span>
-          ) : (
-            <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-              {expirations.map((e) => (
-                <Chip key={e.unix} active={!cumulative && usedExps.includes(e.date)} onClick={() => { setCumulative(false); setExp(e.date); }}>
-                  <span className="whitespace-nowrap">{e.date.slice(5)}</span>
-                  <span className="ml-1 text-[10px] opacity-70">{e.dte}d</span>
-                </Chip>
-              ))}
-            </div>
-          )}
-          <Chip active={cumulative} onClick={() => setCumulative((c) => !c)}>
-            <Layers className="h-3 w-3" /> Cumulative
-          </Chip>
-        </ChipRow>
-        <ChipRow label="Metric">
-          {METRICS.map((m) => (
-            <Chip key={m.key} active={m.key === metric} onClick={() => setMetric(m.key)}>{m.label}</Chip>
-          ))}
-        </ChipRow>
+        {view !== "matrix" && (
+          <ChipRow label="Expiry">
+            {expirations.length === 0 ? (
+              <span className="text-xs text-muted-foreground">—</span>
+            ) : (
+              <div className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
+                {expirations.map((e) => (
+                  <Chip key={e.unix} active={!cumulative && usedExps.includes(e.date)} onClick={() => { setCumulative(false); setExp(e.date); }}>
+                    <span className="whitespace-nowrap">{e.date.slice(5)}</span>
+                    <span className="ml-1 text-[10px] opacity-70">{e.dte}d</span>
+                  </Chip>
+                ))}
+              </div>
+            )}
+            <Chip active={cumulative} onClick={() => setCumulative((c) => !c)}>
+              <Layers className="h-3 w-3" /> Cumulative
+            </Chip>
+          </ChipRow>
+        )}
+        {view === "table" && (
+          <ChipRow label="Metric">
+            {METRICS.map((m) => (
+              <Chip key={m.key} active={m.key === metric} onClick={() => setMetric(m.key)}>{m.label}</Chip>
+            ))}
+          </ChipRow>
+        )}
       </div>
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <section className="glass min-w-0 rounded-2xl p-4 xl:col-span-8">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              {metricLabel} Profile{cumulative ? " · cumulative" : ""}
-            </h2>
-            <div className="flex items-center gap-3 text-[11px]">
-              {profile && (
-                <span className="rounded-full px-2 py-0.5 font-medium ring-1"
-                  style={{ color: STATE_COLOR[profile.state], borderColor: "transparent", boxShadow: `inset 0 0 0 1px ${STATE_COLOR[profile.state]}40` }}>
-                  {STATE_LABEL[profile.state] ?? profile.state}
-                </span>
+      {view === "matrix" ? (
+        <GexMatrix underlying={underlying} />
+      ) : (
+        <>
+          {/* Main grid: profile/chart (left) + shared sidebar (right) */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section className="glass min-w-0 rounded-2xl p-4 xl:col-span-8">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  {view === "chart" ? "Price + GEX Levels" : `${metricLabel} Profile${cumulative ? " · cumulative" : ""}`}
+                </h2>
+                <div className="flex items-center gap-3 text-[11px]">
+                  {profile && (
+                    <span className="rounded-full px-2 py-0.5 font-medium ring-1"
+                      style={{ color: STATE_COLOR[profile.state], borderColor: "transparent", boxShadow: `inset 0 0 0 1px ${STATE_COLOR[profile.state]}40` }}>
+                      {STATE_LABEL[profile.state] ?? profile.state}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground">{usedExps.join(" · ")}</span>
+                </div>
+              </div>
+              {view === "chart" ? (
+                <GexLiveChart underlying={underlying} profile={profile} />
+              ) : (
+                <>
+                  {profileQ.isError && <ErrorBox msg="Chain unavailable — market closed or source throttled. Retrying…" />}
+                  {!profile && !profileQ.isError && <Skeleton h={460} />}
+                  {profile && (
+                    <div className="max-h-[680px] overflow-y-auto pr-1">
+                      <GexProfileChart profile={profile} metric={metric} />
+                    </div>
+                  )}
+                </>
               )}
-              <span className="text-muted-foreground">{usedExps.join(" · ")}</span>
+            </section>
+
+            <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
+              <RangeCard data={rangeQ.data} />
+              <NetExposureCard data={horizonsQ.data} profile={profile} />
+              <GammaProfileCard profile={profile} />
+              <ChainActivityCard profile={profile} />
             </div>
           </div>
-          {profileQ.isError && <ErrorBox msg="Chain unavailable — market closed or source throttled. Retrying…" />}
-          {!profile && !profileQ.isError && <Skeleton h={460} />}
-          {profile && (
-            <div className="max-h-[680px] overflow-y-auto pr-1">
-              <GexProfileChart profile={profile} metric={metric} />
-            </div>
+
+          {/* Forward history — our own series, nobody else has it (table view only) */}
+          {view === "table" && (
+            <section className="glass rounded-2xl p-4">
+              <div className="mb-1 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold tracking-tight">Net GEX — forward history</h2>
+              </div>
+              <p className="mb-3 text-[11px] text-muted-foreground">Built from our own snapshots going forward — fills in as the tool runs.</p>
+              <NetGexTimeseries points={tsQ.data?.points ?? []} />
+            </section>
           )}
-        </section>
-
-        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
-          <RangeCard data={rangeQ.data} />
-          <NetExposureCard data={horizonsQ.data} profile={profile} />
-          <GammaProfileCard profile={profile} />
-          <ChainActivityCard profile={profile} />
-        </div>
-      </div>
-
-      {/* Forward history — our own series, nobody else has it */}
-      <section className="glass rounded-2xl p-4">
-        <div className="mb-1 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-primary" />
-          <h2 className="text-sm font-semibold tracking-tight">Net GEX — forward history</h2>
-        </div>
-        <p className="mb-3 text-[11px] text-muted-foreground">Built from our own snapshots going forward — fills in as the tool runs.</p>
-        <NetGexTimeseries points={tsQ.data?.points ?? []} />
-      </section>
+        </>
+      )}
     </div>
+  );
+}
+
+function ViewTab({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: ReactNode; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ring-1 transition ${
+        active
+          ? "bg-primary/15 text-primary ring-primary/30"
+          : "bg-background/30 text-muted-foreground ring-border/40 hover:bg-card/60 hover:text-foreground"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 

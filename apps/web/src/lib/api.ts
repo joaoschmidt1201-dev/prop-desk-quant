@@ -635,6 +635,49 @@ export type GexRange = {
   asof: string;
 };
 
+export type GexMatrixCell = {
+  net_gex: number;
+  net_dex: number;
+  oi: number;
+  oi_pct?: number;
+  c1: number | null;
+  p1: number | null;
+  hvl: number | null;
+};
+
+export type GexMatrixRow = {
+  date: string;
+  dte: number;
+  standalone: GexMatrixCell;
+  cumulative: GexMatrixCell;
+};
+
+export type GexMatrix = {
+  underlying: string;
+  yahoo_symbol: string;
+  proxy: boolean;
+  index_symbol: string | null;
+  index_scale: number | null;
+  spot: number;
+  rows: GexMatrixRow[];
+  asof: string;
+};
+
+export type GexCandle = { t: number; o: number; h: number; l: number; c: number };
+
+export type GexCandles = {
+  underlying: string;
+  yahoo_symbol: string;
+  index_native: boolean;
+  timeframe: string;
+  interval: string;
+  bars: GexCandle[];
+  asof: string;
+};
+
+export const GEX_TIMEFRAMES = ["1d", "5d", "1mo", "3mo", "6mo", "1y"] as const;
+export type GexTimeframe = (typeof GEX_TIMEFRAMES)[number];
+
 function qs(filter: Partial<Filter>): string {
   const params = new URLSearchParams();
   if (filter.live) {
@@ -693,6 +736,10 @@ export const api = {
     get<GexHorizons>(`/api/gex/horizons?underlying=${encodeURIComponent(underlying)}`),
   gexRange: (underlying = "SPY") =>
     get<GexRange>(`/api/gex/range?underlying=${encodeURIComponent(underlying)}`),
+  gexCandles: (underlying = "SPY", timeframe = "5d") =>
+    get<GexCandles>(`/api/gex/candles?underlying=${encodeURIComponent(underlying)}&timeframe=${encodeURIComponent(timeframe)}`),
+  gexMatrix: (underlying = "SPY") =>
+    get<GexMatrix>(`/api/gex/matrix?underlying=${encodeURIComponent(underlying)}`),
   backtest: (id: string, rule?: string, vixFilter?: string, widthRule?: string) => {
     const params: string[] = [];
     if (rule && rule !== "Hold to Expiration") params.push(`rule=${encodeURIComponent(rule)}`);
