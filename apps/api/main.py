@@ -1698,7 +1698,9 @@ for _ptag, _pdte in _PL5_CONFIGS:
             f"Modified broken-wing put butterfly on SPX. Legs selected by target delta: +1 put @ 30Δ, "
             f"−2 puts @ 18Δ, +2 puts @ 3Δ (net debit, defined risk). Enters every Friday at 10:00 ET, "
             f"targeting ~{_pdte} DTE. Use the exit-rule selector to close at N DTE remaining instead of "
-            f"holding to expiration. P&L at mid."
+            f"holding to expiration. ⚠️ P&L shown at MID (no-slippage, optimistic). This 5-leg structure "
+            f"has a wide bid/ask, so realistic fills (25-50% of spread) are materially lower — see the PDF "
+            f"report for the full fill sensitivity. Settle = exact intrinsic at the official close."
         ),
         "trades_csv": f"pl5_backtest_app/{_ptag}/trades.csv",
         "daily_csv": f"pl5_backtest_app/{_ptag}/daily.csv",
