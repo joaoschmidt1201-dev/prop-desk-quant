@@ -1672,6 +1672,44 @@ for _rtag, _wlabel, _hz, _wide, _narrow in _RJL_CONFIGS:
         "close_rules": _JL_RULES,
     })
 
+# ───────── PL5 — BWB 1-2-2 de PUTS SPX (vídeo "PL5" · redirect CZ saída antecipada) ─────────
+# Estrutura: +1 put @ -30Δ / -2 puts @ -18Δ / +2 puts @ -3Δ (net débito; cauda convexa de crash).
+# Entrada sexta 10:00 ET; tracking sintético (P&L analítico do bid/ask, MID). A TESE do CZ: NÃO
+# segurar até o expiry (o vale reforma e devolve) — SAIR ANTES vira positivo. Por isso o seletor de
+# saída = "sair com D DTE restantes" (record-and-derive; D < dte_entry).
+_PL5_DIR = BACKTESTS_ROOT / "pl5_backtest_app"
+_PL5_EXIT_GRID = [30, 21, 14, 10, 7, 5, 3]
+_PL5_CONFIGS = [("pl5_d21_std", 21), ("pl5_d28_std", 28), ("pl5_d45_std", 45), ("pl5_d60_std", 60)]
+for _ptag, _pdte in _PL5_CONFIGS:
+    if not (_PL5_DIR / _ptag / "trades.csv").exists():
+        continue
+    _applic = [d for d in _PL5_EXIT_GRID if d < _pdte]
+    _pl5_rules = {"Hold to expiration": None}
+    for _d in _applic:
+        _pl5_rules[f"Exit at {_d} DTE remaining"] = f"pnl_exit{_d}"
+    BACKTESTS_REGISTRY.append({
+        "id": f"pl5-spx-d{_pdte}",
+        "name": f"PL5 BWB Puts SPX · {_pdte}DTE",
+        "underlying": "SPX",
+        "strategy": f"PL5 · BWB 1-2-2 de puts (+1/-2/+2) · SPX · {_pdte}DTE · entra sexta 10:00 ET · deltas 30/18/3",
+        "family": "PL5 / BWB Puts",
+        "horizon": f"{_pdte}DTE",
+        "description": (
+            f"PL5 — modified broken-wing butterfly de PUTS em SPX ({_pdte}DTE). Pernas: compra 1 put @ "
+            f"−30Δ, vende 2 puts @ −18Δ, compra 2 puts @ −3Δ (ratio +1/−2/+2; net débito). Entra toda "
+            f"sexta às 10:00 ET; deltas-alvo 30/18/3. ★ Tese do CZ: a estrutura fica positiva no MEIO do "
+            f"trade e DEVOLVE perto do vencimento (a tenda reforma) — por isso o jogo é SAIR ANTES. Use o "
+            f"seletor de regra de saída p/ ver: 'Hold to expiration' é o baseline (perdedor); 'Exit at D "
+            f"DTE remaining' = sair com D dias restantes (vira positivo). P&L no MID (sem slippage; "
+            f"execução real fica um pouco abaixo, sobretudo na cauda −3Δ). Diagrama de pernas = "
+            f"aproximação de borboleta de puts (a ratio real é +1/−2/+2)."
+        ),
+        "trades_csv": f"pl5_backtest_app/{_ptag}/trades.csv",
+        "daily_csv": f"pl5_backtest_app/{_ptag}/daily.csv",
+        "kind": "batman", "multiplier": 1,
+        "close_rules": _pl5_rules,
+    })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
