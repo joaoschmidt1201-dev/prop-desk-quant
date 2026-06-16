@@ -222,7 +222,7 @@ export type BacktestDetail = {
     family?: string;
     horizon: string;
     description?: string | null;
-    kind: "ss42" | "ic7" | "triplecal" | "batman" | "ic0dte" | "ironfly";
+    kind: "ss42" | "ic7" | "triplecal" | "batman" | "ic0dte" | "ironfly" | "pl5";
     period: string | null;
     multiplier: number;
     rule: string;

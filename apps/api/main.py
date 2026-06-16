@@ -1689,24 +1689,20 @@ for _ptag, _pdte in _PL5_CONFIGS:
         _pl5_rules[f"Exit at {_d} DTE remaining"] = f"pnl_exit{_d}"
     BACKTESTS_REGISTRY.append({
         "id": f"pl5-spx-d{_pdte}",
-        "name": f"PL5 BWB Puts SPX · {_pdte}DTE",
+        "name": f"PL5 · {_pdte}DTE",
         "underlying": "SPX",
-        "strategy": f"PL5 · BWB 1-2-2 de puts (+1/-2/+2) · SPX · {_pdte}DTE · entra sexta 10:00 ET · deltas 30/18/3",
-        "family": "PL5 / BWB Puts",
+        "strategy": f"PL5 modified broken-wing put butterfly · SPX · ~{_pdte} DTE · enters Fri 10:00 ET",
+        "family": "PL5",
         "horizon": f"{_pdte}DTE",
         "description": (
-            f"PL5 — modified broken-wing butterfly de PUTS em SPX ({_pdte}DTE). Pernas: compra 1 put @ "
-            f"−30Δ, vende 2 puts @ −18Δ, compra 2 puts @ −3Δ (ratio +1/−2/+2; net débito). Entra toda "
-            f"sexta às 10:00 ET; deltas-alvo 30/18/3. ★ Tese do CZ: a estrutura fica positiva no MEIO do "
-            f"trade e DEVOLVE perto do vencimento (a tenda reforma) — por isso o jogo é SAIR ANTES. Use o "
-            f"seletor de regra de saída p/ ver: 'Hold to expiration' é o baseline (perdedor); 'Exit at D "
-            f"DTE remaining' = sair com D dias restantes (vira positivo). P&L no MID (sem slippage; "
-            f"execução real fica um pouco abaixo, sobretudo na cauda −3Δ). Diagrama de pernas = "
-            f"aproximação de borboleta de puts (a ratio real é +1/−2/+2)."
+            f"Modified broken-wing put butterfly on SPX. Legs selected by target delta: +1 put @ 30Δ, "
+            f"−2 puts @ 18Δ, +2 puts @ 3Δ (net debit, defined risk). Enters every Friday at 10:00 ET, "
+            f"targeting ~{_pdte} DTE. Use the exit-rule selector to close at N DTE remaining instead of "
+            f"holding to expiration. P&L at mid."
         ),
         "trades_csv": f"pl5_backtest_app/{_ptag}/trades.csv",
         "daily_csv": f"pl5_backtest_app/{_ptag}/daily.csv",
-        "kind": "batman", "multiplier": 1,
+        "kind": "pl5", "multiplier": 1,
         "close_rules": _pl5_rules,
     })
 
@@ -2357,12 +2353,21 @@ def get_backtest(
         "put_lower", "put_center", "put_upper", "put_debit",
         "pnl_usd", "pnl_usd_at_exp", "effective_close_date", "in_range", "result", "exit_method",
     ]
+    # PL5 (BWB de puts): SPOT IN / IV% / EM% / strikes K1-K2-K3 (put_upper/center/lower) + payoff próprio.
+    display_cols_pl5 = [
+        "trade_date", "exp_date", "underlying", "dte_entry", "spot_entry", "iv_atm_pct",
+        "em_pct", "expected_move", "put_upper", "put_center", "put_lower", "total_credit",
+        "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
+        "effective_dit_at_close", "result", "exit_method",
+    ]
     if meta["kind"] == "ss42":
         cols = display_cols_ss42
     elif meta["kind"] == "triplecal":
         cols = display_cols_triplecal
     elif meta["kind"] == "batman":
         cols = display_cols_batman
+    elif meta["kind"] == "pl5":
+        cols = display_cols_pl5
     else:
         cols = display_cols_ic7
     trades_view = [{c: t.get(c) for c in cols} for t in trades_with_rule]

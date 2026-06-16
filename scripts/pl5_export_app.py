@@ -20,7 +20,7 @@
 ===============================================================================
 """
 from __future__ import annotations
-import json, base64, hashlib, time, os, csv
+import json, base64, hashlib, time, os, csv, math
 import datetime as dt
 from pathlib import Path
 
@@ -111,6 +111,10 @@ def export_tag(tag, bid):
             "put_upper": r.get("K1"), "put_center": r.get("K2"), "put_lower": r.get("K3"),
             "total_credit": round(float(r.get("cost") or 0) * 100.0, 2),   # débito pago (×100); BWB é net débito
             "vix_entry": r.get("vix"),
+            # IV%/EM%: motor não logou ATM IV por-trade -> VIX como proxy de ATM IV (SPX); EM = IV·√(DTE/365).
+            "iv_atm_pct": round(float(r.get("vix") or 0), 2) if (r.get("vix") or 0) else "",
+            "em_pct": round(float(r.get("vix") or 0) * math.sqrt((int(r.get("dte") or dte_entry)) / 365.0), 2) if (r.get("vix") or 0) else "",
+            "expected_move": round(float(r.get("Se") or 0) * (float(r.get("vix") or 0) / 100.0) * math.sqrt((int(r.get("dte") or dte_entry)) / 365.0), 1) if (r.get("vix") and r.get("Se")) else "",
             "pnl_usd": round(hold, 2),                                     # hold-to-expiry (settle)
             "result": "WIN" if hold > 0 else "LOSS", "exit_method": "expiration",
             "mfe": r.get("mfe"), "mae": r.get("mae"),

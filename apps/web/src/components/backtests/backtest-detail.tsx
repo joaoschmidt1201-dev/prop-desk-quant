@@ -728,8 +728,11 @@ function TradesTable({
   onSelect: (idx: number) => void;
 }) {
   const isSs42 = detail.meta.kind === "ss42";
+  const isPl5 = detail.meta.kind === "pl5";
   const headers = isSs42
     ? ["Trade", "Exp", "Spot in", "IV%", "Put / Call", "Credit", "Spot out", "P&L", "Result"]
+    : isPl5
+    ? ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (K1/K2/K3)", "Credit", "P&L", "Result"]
     : ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (P/C)", "Credit", "P&L", "Result"];
   const rows = detail.trades;
   return (
@@ -780,9 +783,15 @@ function TradesTable({
                     <>
                       <td className="px-4 py-2.5 tabular text-muted-foreground">{t.em_pct != null ? `${Number(t.em_pct).toFixed(2)}%` : "—"}</td>
                       <td className="px-4 py-2.5 tabular text-muted-foreground">
-                        {t.long_put != null ? Number(t.long_put).toFixed(0) : "—"}/{t.short_put != null ? Number(t.short_put).toFixed(0) : "—"}
-                        {" · "}
-                        {t.short_call != null ? Number(t.short_call).toFixed(0) : "—"}/{t.long_call != null ? Number(t.long_call).toFixed(0) : "—"}
+                        {isPl5 ? (
+                          `${t.put_upper != null ? Number(t.put_upper).toFixed(0) : "—"}/${t.put_center != null ? Number(t.put_center).toFixed(0) : "—"}/${t.put_lower != null ? Number(t.put_lower).toFixed(0) : "—"}`
+                        ) : (
+                          <>
+                            {t.long_put != null ? Number(t.long_put).toFixed(0) : "—"}/{t.short_put != null ? Number(t.short_put).toFixed(0) : "—"}
+                            {" · "}
+                            {t.short_call != null ? Number(t.short_call).toFixed(0) : "—"}/{t.long_call != null ? Number(t.long_call).toFixed(0) : "—"}
+                          </>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 tabular">{fmtNum(Number(t.total_credit))}</td>
                     </>
@@ -1453,6 +1462,44 @@ function buildPayoffSeries(
         : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
     };
   }
+  if (kind === "pl5") {
+    // BWB de puts 1-2-2: K1 (long −30Δ) > K2 (short −18Δ, a tenda) > K3 (long −3Δ, a cauda).
+    const k1 = asNum(trade.put_upper), k2 = asNum(trade.put_center), k3 = asNum(trade.put_lower);
+    const credit = asNum(trade.total_credit);
+    if (k1 == null || k2 == null || k3 == null || credit == null) return null;
+    const settle = asNum(trade.spot_exit);
+    const entrySpot = asNum(trade.spot_entry);
+    const anchor = entrySpot ?? k1;
+    const refs = [k1, k2, k3];
+    if (settle != null) refs.push(settle);
+    if (entrySpot != null) refs.push(entrySpot);
+    let xMin = Math.min(...refs), xMax = Math.max(...refs);
+    const pad = Math.max((xMax - xMin) * 0.08, anchor * 0.006);
+    xMin = Math.max(0, xMin - pad);
+    xMax += pad;
+    const steps = 240;
+    const points = Array.from({ length: steps + 1 }, (_, idx) => {
+      const spot = xMin + ((xMax - xMin) * idx) / steps;
+      const pnl = payoffAtSpot(spot, trade, kind, multiplier);
+      return { spot, pnl, profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0, pctFromEntry: anchor ? ((spot - anchor) / anchor) * 100 : 0 };
+    });
+    const references: PayoffReference[] = [
+      { key: "tent", label: "Tent (−18Δ)", value: k2, color: "var(--gain)", dash: "4 4" },
+      { key: "long-top", label: "Long (−30Δ)", value: k1, color: "var(--border)", dash: "2 4" },
+      { key: "tail", label: "Tail (−3Δ)", value: k3, color: "var(--border)", dash: "2 4" },
+    ];
+    if (entrySpot != null) {
+      references.unshift({ key: "entry", label: "SPOT IN", value: entrySpot, color: "var(--primary)", dash: "4 4" });
+    }
+    return {
+      points,
+      references,
+      domain: [xMin, xMax],
+      marker: settle == null || settle < xMin || settle > xMax
+        ? null
+        : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+    };
+  }
   const spotEntry = asNum(trade.spot_entry);
   const credit = asNum(trade.total_credit);
   const shortPut = asNum(trade.short_put);
@@ -1532,6 +1579,13 @@ function payoffAtSpot(
     const callFly = Math.max(0, spot - cl) - 2 * Math.max(0, spot - cc) + Math.max(0, spot - cu);
     const putFly = Math.max(0, pl - spot) - 2 * Math.max(0, pc - spot) + Math.max(0, pu - spot);
     return (callFly + putFly) * SPX_PT - (asNum(trade.total_credit) ?? 0);
+  }
+  if (kind === "pl5") {
+    // BWB de puts 1-2-2: +1 K1 (put_upper) / -2 K2 (put_center) / +2 K3 (put_lower). Tenda em K2,
+    // vale em ~K3, e VOLTA a ganhar abaixo de K3 (cauda convexa). total_credit = débito pago (USD).
+    const k1 = asNum(trade.put_upper) ?? 0, k2 = asNum(trade.put_center) ?? 0, k3 = asNum(trade.put_lower) ?? 0;
+    const bwb = Math.max(0, k1 - spot) - 2 * Math.max(0, k2 - spot) + 2 * Math.max(0, k3 - spot);
+    return bwb * SPX_PT - (asNum(trade.total_credit) ?? 0);
   }
   if (kind === "ic0dte" || kind === "ironfly") {
     // Iron Condor / Iron Fly: long put + short put (credit spread) + short call + long call (credit spread).
