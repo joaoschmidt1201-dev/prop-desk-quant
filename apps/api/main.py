@@ -141,6 +141,32 @@ TRADE_UNDERLYINGS = (
     "XLY",
     "BTC",
     "BITCOIN",
+    # commodity / country / macro ETFs (CZ trades estes; antes caíam em "?")
+    "USO",
+    "UNG",
+    "EWY",
+    "EWZ",
+    "EEM",
+    "FXI",
+    "EFA",
+    "EWJ",
+    "TLT",
+    "HYG",
+    "GDX",
+    "XOP",
+    "SMH",
+    "XBI",
+    # nomes que aparecem no book do CZ (atribuir em vez de deixar em branco)
+    "NVDA",
+    "META",
+    "GOOGL",
+    "AMZN",
+    "AAPL",
+    "MSFT",
+    "TSLA",
+    "JPM",
+    "QCOM",
+    "BRK",
 )
 UNDERLYING_ALIASES = {
     "SPXW": "SPX",
@@ -483,38 +509,41 @@ def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def strategy_family(name: str) -> str:
-    n = name.upper()
-    if (
-        "TRIPLE CALENDAR" in n
-        or "TRIPLECALENDAR" in n
-        or "TRIPLE CAL" in n
-        or "TRIP CAL" in n
-        or re.search(r"\bTC\b", n)
-    ):
+    """Nome (bagunçado) do trade -> família canônica. Cobre as variantes que o CZ listou.
+    NUNCA fica vazio (cai em 'Other' só se nada casar). Word-boundary deixa IC8/BPS10/BAT42
+    casarem; ordem específica->genérica evita colisões (ex.: HALF BAT vira Call Fly, não Batman;
+    'Bull Call Spread' vira Bull Call, não Bear Call). Famílias batem com _DEBIT_FAMILIES."""
+    n = (name or "").upper()
+    if not n.strip():
+        return "Other"
+    def has(p: str) -> bool:
+        return re.search(p, n) is not None
+    if has(r"TRIPLE\s*CAL|TRIPLECALENDAR|TRIP\s*CAL|\bTC\d*\b"):
         return "Triple Calendar"
-    if (
-        "DOUBLE CALENDAR" in n
-        or "DOUBLECALENDAR" in n
-        or "DOUBLE CAL" in n
-        or re.search(r"\bDC\b", n)
-    ):
+    if has(r"DOUBLE\s*CAL|DOUBLECALENDAR|\bDC\d*\b"):
         return "Double Calendar"
-    if "IRON CONDOR" in n or " IC" in n or "IC7" in n or "IC8" in n:
+    if has(r"IRON\s*CONDOR|\bBWIC\d*\b|\bIC\d*\b"):
         return "Iron Condor"
-    if "RJL" in n:
+    if has(r"\bRJL\d*\b|\bRLJ\d*\b"):
         return "RJL"
-    if "BATMAN" in n or " BAT" in n or "BAT42" in n or "BAT7" in n:
-        return "Batman / BWB"
-    if "CALL BEAR" in n or "BEAR CALL" in n:
-        return "Bear Call"
-    if "BULL PUT" in n or "PUT CREDIT" in n or "PCS" in n:
-        return "Bull Put"
-    if "BULL CALL" in n:
+    # Call Fly (inclui HALF BAT / HALF-CALL / CALL-HALF / Bull Fly) — ANTES de Batman e de Bear Call
+    if has(r"HALF[-\s]?CALL|CALL[-\s]?HALF|HALF\s*BAT|CALL[-\s]?FLY|CALL\s*BROKEN|BW\s*CALL|BULL\s*FLY"):
+        return "Call Fly"
+    # Put Fly (inclui Bear Fly) — ANTES de Bull Put
+    if has(r"PUT[-\s]?FLY|PUT\s*BROKEN|BW\s*PUT|PUT[-\s]?HALF|BEAR\s*FLY"):
+        return "Put Fly"
+    # Batman (BATMAN, HYB BAT, BAT, BWB) — depois de HALF BAT
+    if has(r"BATMAN|HYB\s*BAT|\bBAT\d*\b|\bBWB\d*\b"):
+        return "Batman"
+    # Bull Call (DÉBITO) — ANTES de Bear Call, pois "Bull Call Spread" contém "Call Spread"
+    if has(r"BULL\s*CALL"):
         return "Bull Call"
-    if "HALF-CALL" in n or "CALL-HALF" in n:
-        return "Half Call"
-    if "PUT-HALF" in n or "PUT BROKEN" in n:
-        return "Put Broken Wing"
+    # Bear Call Spread (Bear Call, BCS, Call Spread, BearCS)
+    if has(r"BEAR\s*CALL|CALL\s*BEAR|\bBCS\d*\b|\bBEARCS\d*\b|CALL\s*SPREAD|CALL\s*CREDIT"):
+        return "Bear Call Spread"
+    # Bull Put Spread (Bull Put, BPS, Put Spread, BullPutCreditSpread, PCS, Put Credit, BearPS)
+    if has(r"BULL\s*PUT|\bBPS\d*\b|BULLPUTCRE|PUT\s*SPREAD|PUT\s*CREDIT|\bPCS\d*\b|\bBEARPS\b"):
+        return "Bull Put Spread"
     return "Other"
 
 
@@ -1686,7 +1715,7 @@ for _ptag, _pdte in _PL5_CONFIGS:
     _applic = [d for d in _PL5_EXIT_GRID if d < _pdte]
     _pl5_rules = {"Hold to expiration": None}
     for _d in _applic:
-        _pl5_rules[f"Exit at {_d} DTE remaining"] = f"pnl_exit{_d}"
+        _pl5_rules[f"Exit at {_d} DTE"] = f"pnl_exit{_d}"
     BACKTESTS_REGISTRY.append({
         "id": f"pl5-spx-d{_pdte}",
         "name": f"PL5 · {_pdte}DTE",
@@ -1695,15 +1724,9 @@ for _ptag, _pdte in _PL5_CONFIGS:
         "family": "PL5",
         "horizon": f"{_pdte}DTE",
         "description": (
-            f"Modified broken-wing put butterfly on SPX. Legs selected by target delta: +1 put @ 30Δ, "
-            f"−2 puts @ 18Δ, +2 puts @ 3Δ (net debit, defined risk). Enters every Friday at 10:00 ET, "
-            f"targeting ~{_pdte} DTE. Use the exit-rule selector to close at N DTE remaining instead of "
-            f"holding to expiration. P&L shown at MID = the combo's net mid (the price you aim for with a "
-            f"limit order). The columns total_credit / entry_cons / entry_spread show, per trade, the mid "
-            f"debit, the worst-case (every leg crossed separately) and the spread between them — the spread "
-            f"lives in the illiquid −3Δ tail and was verified real at minute data. Traded as ONE combo at a "
-            f"limit, realistic fill is near mid; full fill sensitivity is in the PDF report. Settle = exact "
-            f"intrinsic at the official close (no exit spread)."
+            f"Broken-wing put butterfly on SPX: +1 put @ 30Δ / −2 puts @ 18Δ / +2 puts @ 3Δ "
+            f"(net debit, defined risk). Enters every Friday 10:00 ET, ~{_pdte} DTE. Use the "
+            f"exit-rule selector to close before expiration. P&L at MID; SPX cash-settles at the official close."
         ),
         "trades_csv": f"pl5_backtest_app/{_ptag}/trades.csv",
         "daily_csv": f"pl5_backtest_app/{_ptag}/daily.csv",
@@ -1956,6 +1979,8 @@ def _apply_rule(
                 nt["effective_pnl_usd"] = hold
                 nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
                 nt["effective_dit_at_close"] = None
+            # Result segue o P&L DA REGRA escolhida (não o da expiração).
+            nt["result"] = "WIN" if float(nt.get("pnl_usd") or 0) > 0 else "LOSS"
             out.append(nt)
         return out
     if kind == "batman":
@@ -1977,6 +2002,7 @@ def _apply_rule(
                 nt["effective_pnl_usd"] = hold
                 nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
                 nt["effective_dit_at_close"] = None
+            nt["result"] = "WIN" if float(nt.get("pnl_usd") or 0) > 0 else "LOSS"
             out.append(nt)
         return out
 
@@ -1991,6 +2017,7 @@ def _apply_rule(
         nt["pnl_usd_at_exp"] = float(t.get("pnl_usd") or 0)
         # The rule-based PnL becomes the canonical pnl_usd for KPI computation downstream
         nt["pnl_usd"] = eff_pnl
+        nt["result"] = "WIN" if float(eff_pnl or 0) > 0 else "LOSS"
         out.append(nt)
     return out
 
