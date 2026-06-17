@@ -53,6 +53,8 @@ type BacktestTrade = {
   mid_sc?: number | string | null;
   mid_lc?: number | string | null;
   total_credit?: number | string | null;
+  entry_cons?: number | string | null;
+  entry_spread?: number | string | null;
   spot_exit?: number | string | null;
   pnl_usd?: number | string | null;
   pnl_usd_at_exp?: number | string | null;
@@ -732,7 +734,7 @@ function TradesTable({
   const headers = isSs42
     ? ["Trade", "Exp", "Spot in", "IV%", "Put / Call", "Credit", "Spot out", "P&L", "Result"]
     : isPl5
-    ? ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (K1/K2/K3)", "Credit", "P&L", "Result"]
+    ? ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (K1/K2/K3)", "Mid debit", "Spread", "P&L", "Result"]
     : ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (P/C)", "Credit", "P&L", "Result"];
   const rows = detail.trades;
   return (
@@ -794,6 +796,11 @@ function TradesTable({
                         )}
                       </td>
                       <td className="px-4 py-2.5 tabular">{fmtNum(Number(t.total_credit))}</td>
+                      {isPl5 && (
+                        <td className="px-4 py-2.5 tabular text-muted-foreground">
+                          {t.entry_spread != null ? fmtNum(Number(t.entry_spread)) : "—"}
+                        </td>
+                      )}
                     </>
                   )}
                   <td className={`px-4 py-2.5 text-right font-semibold tabular ${pnlClass(pnl)}`}>{fmtMoney(pnl)}</td>

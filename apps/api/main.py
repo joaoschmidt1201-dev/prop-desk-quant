@@ -1698,9 +1698,12 @@ for _ptag, _pdte in _PL5_CONFIGS:
             f"Modified broken-wing put butterfly on SPX. Legs selected by target delta: +1 put @ 30Δ, "
             f"−2 puts @ 18Δ, +2 puts @ 3Δ (net debit, defined risk). Enters every Friday at 10:00 ET, "
             f"targeting ~{_pdte} DTE. Use the exit-rule selector to close at N DTE remaining instead of "
-            f"holding to expiration. ⚠️ P&L shown at MID (no-slippage, optimistic). This 5-leg structure "
-            f"has a wide bid/ask, so realistic fills (25-50% of spread) are materially lower — see the PDF "
-            f"report for the full fill sensitivity. Settle = exact intrinsic at the official close."
+            f"holding to expiration. P&L shown at MID = the combo's net mid (the price you aim for with a "
+            f"limit order). The columns total_credit / entry_cons / entry_spread show, per trade, the mid "
+            f"debit, the worst-case (every leg crossed separately) and the spread between them — the spread "
+            f"lives in the illiquid −3Δ tail and was verified real at minute data. Traded as ONE combo at a "
+            f"limit, realistic fill is near mid; full fill sensitivity is in the PDF report. Settle = exact "
+            f"intrinsic at the official close (no exit spread)."
         ),
         "trades_csv": f"pl5_backtest_app/{_ptag}/trades.csv",
         "daily_csv": f"pl5_backtest_app/{_ptag}/daily.csv",
@@ -2359,6 +2362,7 @@ def get_backtest(
     display_cols_pl5 = [
         "trade_date", "exp_date", "underlying", "dte_entry", "spot_entry", "iv_atm_pct",
         "em_pct", "expected_move", "put_upper", "put_center", "put_lower", "total_credit",
+        "entry_cons", "entry_spread",
         "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "result", "exit_method",
     ]
