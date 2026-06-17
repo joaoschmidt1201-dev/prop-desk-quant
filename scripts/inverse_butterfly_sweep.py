@@ -42,9 +42,26 @@ def q_minchk():
     return [_cell("ibfly_d30_minchk", dte="30", width_sigma="0.15", entry_weekday="4",
                   data_res="minute", strike_half="60", start_date="2025-01-01", end_date="2025-12-31")]
 
+def q_best():
+    # caca do melhor cenario: width largo (alavanca clara) x DTE semanal. TP sai de graca (record-and-derive).
+    out = []
+    for w in ("0.50", "0.60", "0.75"):                       # acha o pico de width (em 30 DTE)
+        out.append(_cell(f"ibfly_w{w}", dte="30", width_sigma=w, entry_weekday="4", **FULL))
+    for d in ("15", "45"):                                    # o melhor width (0.40) em outros DTEs semanais
+        out.append(_cell(f"ibfly_d{d}_w0.40", dte=d, width_sigma="0.40", entry_weekday="4", **FULL))
+    return out
+
+def q_weekly():
+    # CORRECAO (Joao, spec confirmada): 4 DTE = SEGUNDA->SEXTA (entry_weekday="0"=segunda), fechar
+    # sexta na ABERTURA (snapshot e_open). 1 DTE fica DIARIO (ja correto). Roda 0.15 e 0.40 sigma.
+    return [_cell("ibfly_dte4_mon",     dte="4", width_sigma="0.15", entry_weekday="0", **FULL),
+            _cell("ibfly_dte4_mon_w40", dte="4", width_sigma="0.40", entry_weekday="0", **FULL)]
+
 def build_queue(args):
     if "--smoke" in args:  return q_smoke()
     if "--minchk" in args: return q_minchk()
+    if "--best" in args:   return q_best()
+    if "--weekly" in args: return q_weekly()
     if "--ref" in args:    return q_ref()
     ax = next((a.split("=", 1)[1] for a in args if a.startswith("--axis=")), None)
     return q_axis(ax) if ax else q_ref()
