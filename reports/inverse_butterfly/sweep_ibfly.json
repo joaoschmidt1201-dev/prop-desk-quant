@@ -145,14 +145,12 @@
     },
     "backtestId": "822bd72fc4d2668efd60ac66199fc361",
     "runtime": {
-      "Equity": "$100,000.00",
-      "Fees": "-$0.00",
-      "Holdings": "$0.00",
-      "Net Profit": "$0.00",
-      "Probabilistic Sharpe Ratio": "0%",
-      "Return": "0.00 %",
-      "Unrealized": "$0.00",
-      "Volume": "$0.00"
+      "HOLD mid": "$-500/88%",
+      "HOLD cons": "$-128,330/?",
+      "TP 50%": "mid $20,964/?",
+      "n / dte / W": "n=243 dte=7 W=15",
+      "real vs impl": "real 76p / \u03c3 101p / 0.75",
+      "_computed_from_ctrade": true
     }
   },
   "ibfly_dte15": {
@@ -370,6 +368,45 @@
       "TP 25%": "mid $40,528/95%",
       "TP 50%": "mid $43,394/90%",
       "TP 75%": "mid $33,544/83%",
+      "Unrealized": "$0.00",
+      "Volume": "$0.00"
+    }
+  },
+  "ibfly_d30_minchk": {
+    "params": {
+      "dte": "30",
+      "width_sigma": "0.15",
+      "entry_weekday": "4",
+      "data_res": "minute",
+      "strike_half": "60",
+      "start_date": "2025-01-01",
+      "end_date": "2025-12-31",
+      "run_tag": "ibfly_d30_minchk"
+    },
+    "backtestId": "876a6e238a1a69c509abf3a98a1a85f3",
+    "runtime": {
+      "credit med": "mid $245",
+      "Equity": "$100,000.00",
+      "EXIT 10DTE": "mid $1,348/70% | cons $-23,305/4%",
+      "EXIT 14DTE": "mid $400/52% | cons $-28,420/0%",
+      "EXIT 21DTE": "mid $55/39% | cons $-22,330/0%",
+      "EXIT 3DTE": "mid $2,625/83% | cons $-23,380/13%",
+      "EXIT 5DTE": "mid $530/61% | cons $-26,020/4%",
+      "EXIT 7DTE": "mid $368/52% | cons $-21,650/4%",
+      "EXIT expiry 12": "mid $5,000/96%",
+      "EXIT expiry open": "mid $3,525/87%",
+      "Fees": "-$0.00",
+      "HOLD cons": "$890/74%",
+      "HOLD mid": "$5,660/100%",
+      "Holdings": "$0.00",
+      "n / dte / W": "n=23 dte=31 W=40",
+      "Net Profit": "$0.00",
+      "Probabilistic Sharpe Ratio": "0%",
+      "real vs impl": "real 232p / \u03c3 265p / 0.88",
+      "Return": "0.00 %",
+      "TP 25%": "mid $3,525/100%",
+      "TP 50%": "mid $5,405/100%",
+      "TP 75%": "mid $8,300/100%",
       "Unrealized": "$0.00",
       "Volume": "$0.00"
     }
