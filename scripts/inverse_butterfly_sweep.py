@@ -57,10 +57,20 @@ def q_weekly():
     return [_cell("ibfly_dte4_mon",     dte="4", width_sigma="0.15", entry_weekday="0", **FULL),
             _cell("ibfly_dte4_mon_w40", dte="4", width_sigma="0.40", entry_weekday="0", **FULL)]
 
+def q_best2():
+    # completa a matriz DTE x sweet-spot-width (0.50/0.60s = pico no 30DTE) p/ achar o otimo absoluto.
+    out = []
+    for d in ("7", "15", "45"):
+        for w in ("0.50", "0.60"):
+            out.append(_cell(f"ibfly_d{d}_w{w}", dte=d, width_sigma=w, entry_weekday="4", **FULL))
+    out.append(_cell("ibfly_dte4_mon_w60", dte="4", width_sigma="0.60", entry_weekday="0", **FULL))
+    return out
+
 def build_queue(args):
     if "--smoke" in args:  return q_smoke()
     if "--minchk" in args: return q_minchk()
     if "--best" in args:   return q_best()
+    if "--best2" in args:  return q_best2()
     if "--weekly" in args: return q_weekly()
     if "--ref" in args:    return q_ref()
     ax = next((a.split("=", 1)[1] for a in args if a.startswith("--axis=")), None)
