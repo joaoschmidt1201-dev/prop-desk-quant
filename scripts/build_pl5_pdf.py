@@ -216,24 +216,33 @@ def build():
                  fontsize=9, color=GREY, ha="center")
         fig.tight_layout(rect=[0,0.04,1,0.95]); pdf.savefig(fig); plt.close(fig)
 
-        # ============ 6. EARLY EXIT vs HOLD ============
-        ex_rows = []
-        for tag, dte in DTES:
+        # ============ 6. FULL EXIT-RULE x HORIZON MATRIX (mid) ============
+        EXITS = [30, 21, 14, 10, 7, 5, 3]
+        def rule_net(tag, dte, d):
             rows_ = data[tag]
-            def agg(col):
-                pls = [(fnum(r, col) if fnum(r, col) is not None else fnum(r, "pnl_usd")) for r in rows_]
-                return sum(p for p in pls if p is not None)
-            cells = [f"{dte} DTE", money(sum(fnum(r,'pnl_usd') or 0 for r in rows_))]
-            for d in (14, 10, 7):
-                col = f"pnl_exit{d}"
-                cells.append(money(agg(col)) if any(col in r for r in rows_) else "-")
-            ex_rows.append(cells)
-        fig_table(pdf, "6. Early exit vs holding to expiry (mid)",
-                  ["Horizon", "Hold to expiry", "Exit at 14 DTE", "Exit at 10 DTE", "Exit at 7 DTE"], ex_rows,
-                  subtitle="net P&L at mid · exiting before expiry avoids the valley that forms in the final days",
-                  note="The structure is positive mid-life and 'gives it back' near expiry as the tent reforms. Exiting with "
-                       "7-14 DTE remaining captures that. NOTE: part of the 2025 gain is timing (that crash bottomed close "
-                       "to expiry), so we are not over-claiming this edge — it is directional, not free.")
+            if d is None:
+                return sum(fnum(r, "pnl_usd") or 0 for r in rows_)
+            if d >= dte:
+                return None
+            col = f"pnl_exit{d}"
+            return sum((fnum(r, col) if fnum(r, col) is not None else (fnum(r, "pnl_usd") or 0)) for r in rows_)
+        mat_rows = []
+        for label, d in [("Hold to expiry", None)] + [(f"Exit at {d} DTE left", d) for d in EXITS]:
+            cells = [label]
+            for tag, dte in DTES:
+                v = rule_net(tag, dte, d)
+                cells.append(money(v) if v is not None else "-")
+            mat_rows.append(cells)
+        fig_table(pdf, "6. Exit rule x horizon — the full matrix (net P&L, mid)",
+                  ["Close rule", "21 DTE", "28 DTE", "45 DTE", "60 DTE"], mat_rows,
+                  subtitle="every close rule x every horizon · 5-year net at mid",
+                  note="KEY INSIGHT — the horizon ranking FLIPS between holding and exiting early: "
+                       "HELD TO EXPIRY, short horizons win (28 DTE best; 60 DTE collapses to +$2k, its valley is deepest "
+                       "at expiry). With EARLY EXIT (how PL5 is actually traded) LONG horizons win (45/60 DTE; e.g. exit 3 "
+                       "days before expiry: 45 DTE +$118k vs 21 DTE +$13k). Longer DTE gives the downside tent more time to "
+                       "form, and leaving before the final days avoids the valley reforming (60 DTE: +$2k held vs +$117k if "
+                       "exited 3 days early). All at mid; realistic combo fill scales every cell down similarly, so the "
+                       "relative ranking holds.")
 
         # ============ 7. 2025 CRASH EXAMPLE ============
         rows60 = sorted(data["pl5_d60_std"], key=lambda r: fnum(r, "pnl_usd") or 0)
