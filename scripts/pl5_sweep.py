@@ -50,6 +50,12 @@ def _full_queue():
 VALIDATE = [_cell("pl5_validate_d30", target_dte="30",
                   start_date="2024-07-01", end_date="2024-08-23")]
 
+# SPOT-CHECK de SPREAD (resp. ao CZ): roda d60 em MINUTO na janela dos outliers de spread horário
+# (entradas nov/2025-fev/2026 c/ spreads 58/50/39pt em VIX calmo = suspeita de quote stale). Compara
+# o spread de entrada (cons-mid) minuto vs horário nas mesmas datas -> prova se o -195k é artefato.
+MINCHK = [_cell("pl5_d60_minchk", target_dte="60", data_res="minute", strike_lo="-200",
+                start_date="2025-11-01", end_date="2026-04-30")]
+
 QUEUE = _full_queue()
 
 def params_for(tag, ov):
@@ -164,7 +170,7 @@ def do_scenario(tag, params, res, compile_id):
 
 def main():
     args = set(sys.argv[1:])
-    queue = VALIDATE if "--validate" in args else QUEUE
+    queue = VALIDATE if "--validate" in args else (MINCHK if "--minchk" in args else QUEUE)
     if "--dry" in args:
         print(f"Fila ({len(queue)} runs):")
         for tag, ov in queue:

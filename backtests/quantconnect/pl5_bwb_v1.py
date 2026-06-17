@@ -63,6 +63,10 @@ class Pl5BwbV1(QCAlgorithm):
         self.dlt_k1 = float(self.get_parameter("delta_k1", "0.30"))           # long de cima
         self.dlt_k2 = float(self.get_parameter("delta_k2", "0.18"))           # short (corpo)
         self.dlt_k3 = float(self.get_parameter("delta_k3", "0.03"))           # long cauda
+        # resolução dos dados (default hour = baseline v1; "minute" p/ spot-check de spread confiável)
+        _res = self.get_parameter("data_res", "hour").lower()
+        self.data_res = Resolution.MINUTE if _res in ("minute", "min", "1") else Resolution.HOUR
+        self.strike_lo = int(self.get_parameter("strike_lo", "-300"))         # folga p/ -3Δ; estreitar p/ minute
 
         sd = self.get_parameter("start_date", "2021-06-01").split("-")
         ed = self.get_parameter("end_date",   "2026-06-01").split("-")
@@ -92,17 +96,17 @@ class Pl5BwbV1(QCAlgorithm):
         # ---- Universo (SPX/SPXW; VIX p/ bucket) ----
         # inicializador ANTES dos add_*: anula BP das opções (evita o crash do position-group model)
         self.set_security_initializer(_OptBpInit(self.brokerage_model, SecuritySeeder.NULL))
-        index = self.add_index("SPX", Resolution.HOUR)
+        index = self.add_index("SPX", self.data_res)
         self.spx = index.symbol
-        option = self.add_index_option(self.spx, "SPXW", Resolution.HOUR)
+        option = self.add_index_option(self.spx, "SPXW", self.data_res)
         lo = max(1, self.target_dte - 7)
         hi = self.target_dte + 10
         # PL5 só usa PUTS abaixo do spot -> corta strikes acima. -300 cobre K3 (-3Δ) em 60 DTE alta-vol
         # (~1100pts OTM em 2022); +5 folga. Tracking sintético (sem ordens) deixa o compute baixo.
-        option.set_filter(lambda u: u.include_weeklys().expiration(lo, hi).strikes(-300, 5))
+        option.set_filter(lambda u: u.include_weeklys().expiration(lo, hi).strikes(self.strike_lo, 5))
         self.spxw = option.symbol
 
-        self.vix = self.add_index("VIX", Resolution.HOUR).symbol
+        self.vix = self.add_index("VIX", self.data_res).symbol
 
         # ---- Estado ----
         self.rows = []            # uma linha por TRADE (pacote)
@@ -190,6 +194,11 @@ class Pl5BwbV1(QCAlgorithm):
             return (b + a) / 2.0 if (b > 0 and a > 0) else (a or b or 0.0)
         entry_cost     = (c_k1.ask_price + c_k3.ask_price * 2) - c_k2.bid_price * 2
         entry_cost_mid = (_mid(c_k1) + _mid(c_k3) * 2) - _mid(c_k2) * 2
+        # half-spread por perna (pts) p/ atribuir o custo de execução -> qual perna domina o spread
+        def _hs(c):
+            b, a = c.bid_price, c.ask_price
+            return round((a - b) / 2.0, 2) if (b > 0 and a > 0) else 0.0
+        hs_k1, hs_k2, hs_k3 = _hs(c_k1), _hs(c_k2), _hs(c_k3)
         # referências de gestão (em pontos):
         ref_profit = (K1 - K2) - entry_cost            # pico do tent (em S_T == K2)
         ref_loss   = (2 * K2 - K1 - K3) + entry_cost   # módulo do vale (perda máx definida, em S_T==K3)
@@ -214,6 +223,7 @@ class Pl5BwbV1(QCAlgorithm):
             "d_k3": self._delta(c_k3, S, expiry),
             "c_k1": c_k1, "c_k2": c_k2, "c_k3": c_k3,
             "entry_cost": entry_cost, "entry_cost_mid": entry_cost_mid,
+            "hs_k1": hs_k1, "hs_k2": hs_k2, "hs_k3": hs_k3,
             "ref_profit": ref_profit, "ref_loss": ref_loss,
             # gravação de gestão (preenchida na marcação intraday):
             "mfe": 0.0, "mae": 0.0,
@@ -324,6 +334,7 @@ class Pl5BwbV1(QCAlgorithm):
             "d_k2": round(tr["d_k2"], 4) if tr["d_k2"] is not None else "",
             "d_k3": round(tr["d_k3"], 4) if tr["d_k3"] is not None else "",
             "entry_cost": round(cost, 2), "entry_cost_mid": round(cost_mid, 2),
+            "hs_k1": tr.get("hs_k1", 0.0), "hs_k2": tr.get("hs_k2", 0.0), "hs_k3": tr.get("hs_k3", 0.0),
             "ref_profit": round(tr["ref_profit"], 2), "ref_loss": round(tr["ref_loss"], 2),
             "mfe": round(tr["mfe"], 2), "mae": round(tr["mae"], 2),
             "settle_value": round(value, 2),
@@ -534,7 +545,7 @@ class Pl5BwbV1(QCAlgorithm):
         tplv = [int(l * 100) for l in self.tp_levels]
         sllv = [int(l * 100) for l in self.sl_levels]
         hdr = (["id", "od", "dte", "vix", "Se", "Ss", "K1", "K2", "K3",
-                "cost", "rp", "rl", "mfe", "mae"]
+                "cost", "cm", "h1", "h2", "h3", "rp", "rl", "mfe", "mae"]
                + [f"tp{l}" for l in tplv] + [f"tpd{l}" for l in tplv]
                + [f"sl{l}" for l in sllv] + [f"sld{l}" for l in sllv]
                + [f"d{d}" for d in self.dit_marks]
@@ -543,8 +554,9 @@ class Pl5BwbV1(QCAlgorithm):
         self.log("CTRADEHDR|" + ",".join(hdr))
         for r in self.rows:
             row = [r["id"], r["open_date"], r["dte_real"], r["vix"], r["S_entry"], r["S_settle"],
-                   r["K1"], r["K2"], r["K3"], r["entry_cost"], r["ref_profit"], r["ref_loss"],
-                   r["mfe"], r["mae"]]
+                   r["K1"], r["K2"], r["K3"], r["entry_cost"], r["entry_cost_mid"],
+                   r.get("hs_k1", ""), r.get("hs_k2", ""), r.get("hs_k3", ""),
+                   r["ref_profit"], r["ref_loss"], r["mfe"], r["mae"]]
             row += [r.get(f"tp{l}_v", "") for l in tplv]
             row += [r.get(f"tp{l}_dit", "") for l in tplv]
             row += [r.get(f"sl{l}_v", "") for l in sllv]

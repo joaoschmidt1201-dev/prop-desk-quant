@@ -61,6 +61,9 @@ def fetch_log(bid, max_lines=40000):
         start += 200
     return out
 
+def _bwb_payoff(K1, K2, K3, S):   # +1 K1 / -2 K2 / +2 K3 (puts), em pontos
+    return max(0.0, K1 - S) - 2 * max(0.0, K2 - S) + 2 * max(0.0, K3 - S)
+
 def _num(x):
     if x in ("", None):
         return None
@@ -104,12 +107,21 @@ def export_tag(tag, bid):
         except Exception:
             continue
         hold = float(r.get("snet") or 0)
+        # custo de entrada NO MID (consistente com pnl_usd/pnl_exit, que são todos mid). Prefere a coluna
+        # 'cm' (motor novo); senão deriva do payoff no settle: cost_mid = payoff(S_settle) - hold/100.
+        K1f, K2f, K3f = float(r.get("K1") or 0), float(r.get("K2") or 0), float(r.get("K3") or 0)
+        Ssf = float(r.get("Ss") or 0)
+        cm = r.get("cm")
+        cost_mid = float(cm) if cm not in ("", None) else (_bwb_payoff(K1f, K2f, K3f, Ssf) - hold / 100.0)
+        cost_cons = float(r.get("cost") or 0)
         row = {
             "trade_date": od, "exp_date": exp.isoformat(), "underlying": "SPX",
             "dte_entry": int(r.get("dte") or dte_entry), "structure": "BWB 1-2-2 puts (+1/-2/+2)",
             "spot_entry": r.get("Se"), "spot_exit": r.get("Ss"),
             "put_upper": r.get("K1"), "put_center": r.get("K2"), "put_lower": r.get("K3"),
-            "total_credit": round(float(r.get("cost") or 0) * 100.0, 2),   # débito pago (×100); BWB é net débito
+            "total_credit": round(cost_mid * 100.0, 2),                    # débito pago NO MID (×100); BWB é net débito
+            "entry_cons": round(cost_cons * 100.0, 2),                     # entrada spread cheio (referência)
+            "entry_spread": round((cost_cons - cost_mid) * 100.0, 2),      # custo de execução por trade (cons-mid)
             "vix_entry": r.get("vix"),
             # IV%/EM%: motor não logou ATM IV por-trade -> VIX como proxy de ATM IV (SPX); EM = IV·√(DTE/365).
             "iv_atm_pct": round(float(r.get("vix") or 0), 2) if (r.get("vix") or 0) else "",
