@@ -31,9 +31,16 @@ de σ. Só SPX. **Ainda em validação — NÃO colocar no app** (decisão do Jo
 5. **Semântica de "sair com D DTE".** É distância do VENCIMENTO, não da entrada → dias-segurado muda por
    DTE. Cuidado ao comparar saídas entre DTEs (no PL5 isso explicou o ranking).
 
-## Próximos passos (quando os runs fecharem)
-1. Conferir dte7 + as 3 larguras no sweep.
-2. **Spot-check em minuto** (1 janela) pra verificar se o cons near-ATM é inflado (aprendizado #3).
-3. Montar `InverseButterfly_report.pdf` com mid + fill sensitivity (não o cons cru) + real-vs-impl +
-   matriz DTE×saída. Glossário de execução (% do spread) como no PL5.
-4. NÃO colocar no app até o João validar.
+## ✅ CONCLUÍDO (2026-06-17) — verificação + PDF
+- **Eixo DTE (6) + width (3) rodados.** dte7 computado do CTRADE (HOLD mid ~flat −$500, TP50 +$21k).
+- **VERIFICAÇÃO EM MINUTO (aprendizado #3 aplicado):** o cons horário (−$175k) é **ARTEFATO de quote
+  stale** — spread minuto ~$150/trade consistente vs horário errático $95-5.580 (mediana ~7×, picos 37×).
+  **Oposto do PL5** (lá a cauda −3Δ tinha spread REAL). `scripts/ibfly_minute_xcheck.py`.
+- **PDF:** `reports/inverse_butterfly/InverseButterfly_report.pdf` (5 pág, EN).
+- **VEREDITO honesto:** execução é LIMPA, mas o **hold não sobrevive ao slippage** (dte1/4 diário acumula
+  em 1.200+ trades); TP50 é **bruto da saída** → líquido **marginal-a-positivo**, melhor no width largo;
+  **implied > realized (0,73-0,85)** = edge fino. **Borderline; só viável como TP + wide wings.** Forward-
+  test sugerido: 0,40σ + TP. **NÃO no app** (João valida).
+
+## Próximos (se o João quiser aprofundar)
+- Eixo de TP/exit refinado + OOS (treino/val) nas variantes wide; medir o fill REAL de combo.
