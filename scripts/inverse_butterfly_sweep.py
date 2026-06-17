@@ -36,9 +36,16 @@ def q_axis(ax):
             out.append(_cell(f"ibfly_w{w}", dte="30", width_sigma=w, **FULL))
     return out
 
+def q_minchk():
+    # spot-check de spread em MINUTO (aprendizado PL5): near-ATM -> cons horário inflado? Comparar
+    # spread de entrada minuto vs horário no dte30 (mesma janela 2025). strikes estreitos p/ velocidade.
+    return [_cell("ibfly_d30_minchk", dte="30", width_sigma="0.15", entry_weekday="4",
+                  data_res="minute", strike_half="60", start_date="2025-01-01", end_date="2025-12-31")]
+
 def build_queue(args):
-    if "--smoke" in args: return q_smoke()
-    if "--ref" in args:   return q_ref()
+    if "--smoke" in args:  return q_smoke()
+    if "--minchk" in args: return q_minchk()
+    if "--ref" in args:    return q_ref()
     ax = next((a.split("=", 1)[1] for a in args if a.startswith("--axis=")), None)
     return q_axis(ax) if ax else q_ref()
 
