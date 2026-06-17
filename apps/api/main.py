@@ -520,6 +520,8 @@ def strategy_family(name: str) -> str:
         return "Other"
     def has(p: str) -> bool:
         return re.search(p, n) is not None
+    if has(r"\bPL5\b"):                       # broken-wing put fly nomeado do desk (ex.: "T70 PL5 SPY 30D")
+        return "PL5"
     if has(r"TRIPLE\s*CAL|TRIPLECALENDAR|TRIP\s*CAL|\bTC\d*\b"):
         return "Triple Calendar"
     if has(r"DOUBLE\s*CAL|DOUBLECALENDAR|\bDC\d*\b"):
