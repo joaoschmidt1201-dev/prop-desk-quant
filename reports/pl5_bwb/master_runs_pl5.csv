@@ -1,0 +1,7 @@
+tag,backtestId,net_hold,dte_med,cost_med,error,params
+pl5_bwb_d21,810264b511e136488d9f61ac2fae9c6c,"$-39,867 / WR 16%",21,4.50,,"{""target_dte"": ""21"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_bwb_d21""}"
+pl5_d21_std,0776e2a1823d2badcc3c5cd2107a5c5d,"$96,831 / WR 18%",21,4.90,,"{""target_dte"": ""21"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d21_std""}"
+pl5_d28_std,87451bca9b06d01295cba9fa9de9ed4d,"$131,102 / WR 19%",28,5.65,,"{""target_dte"": ""28"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d28_std""}"
+pl5_d45_std,47e8f961a32705caef7984f0016dec0b,"$87,811 / WR 20%",42,6.30,,"{""target_dte"": ""45"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d45_std""}"
+pl5_d60_std,9af5d2d00462b2b240afd770fad3cde7,"$1,897 / WR 18%",56,7.50,,"{""target_dte"": ""60"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d60_std""}"
+pl5_d60_minchk,fdcadd55b3e3b4f79d3cfd32c9dde52e,"$36,073 / WR 24%",63,16.20,,"{""target_dte"": ""60"", ""data_res"": ""minute"", ""strike_lo"": ""-200"", ""start_date"": ""2025-11-01"", ""end_date"": ""2026-04-30"", ""run_tag"": ""pl5_d60_minchk""}"

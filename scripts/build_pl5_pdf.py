@@ -115,7 +115,9 @@ def build():
                   subtitle="net P&L 5 anos · a verdade está nos 25-50% (fill realista de uma estrutura de 5 pernas)",
                   note="A estrutura tem ~5 pts de spread bid/ask somando as 5 pernas (a cauda −3Δ é a mais ilíquida). "
                        "Por isso o mesmo backtest vai de +$131k (mid) a −$195k (spread cheio) só mudando o fill. "
-                       "Conclusão: PL5 é EXECUTION-DOMINATED; em execução realista, 21-45 DTE é modestamente positivo, 60 DTE não.")
+                       "O spread foi VERIFICADO em resolução de minuto (idêntico ao horário, 1.000×) -> é mercado real da "
+                       "cauda, NÃO artefato de dado; logo o 'spread cheio' é um pior-caso legítimo (ordem a mercado). "
+                       "Conclusão: PL5 é EXECUTION-DOMINATED; com ordem-limite (25-50%), 21-45 DTE é modestamente positivo, 60 DTE não.")
 
         # ---- curvas de equity (mid) 2x2
         fig, axes = plt.subplots(2, 2, figsize=(11.7, 8.3)); fig.suptitle("2. Curvas de P&L acumulado (mid) — por prazo", fontsize=16, fontweight="bold", color=NAVY)
