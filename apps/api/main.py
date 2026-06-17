@@ -528,6 +528,12 @@ def strategy_family(name: str) -> str:
         return "Iron Condor"
     if has(r"\bRJL\d*\b|\bRLJ\d*\b"):
         return "RJL"
+    # Jade Lizard = bear call spread + short put (ex.: "CALL BEAR + SP 7"). Distinto do RJL (reverso).
+    # ANTES do Bear Call, pois "CALL BEAR + SP" contém "CALL BEAR".
+    if has(r"JADE\s*LIZARD|JADELIZARD|\bJL\d*\b") or (
+        has(r"CALL\s*BEAR|BEAR\s*CALL") and has(r"\+\s*SP\d*\b")
+    ):
+        return "Jade Lizard"
     # Call Fly (inclui HALF BAT / HALF-CALL / CALL-HALF / Bull Fly) — ANTES de Batman e de Bear Call
     if has(r"HALF[-\s]?CALL|CALL[-\s]?HALF|HALF\s*BAT|CALL[-\s]?FLY|CALL\s*BROKEN|BW\s*CALL|BULL\s*FLY"):
         return "Call Fly"
