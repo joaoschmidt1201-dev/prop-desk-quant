@@ -156,6 +156,8 @@ TRADE_UNDERLYINGS = (
     "XOP",
     "SMH",
     "XBI",
+    "TQQQ",
+    "SQQQ",
     # nomes que aparecem no book do CZ (atribuir em vez de deixar em branco)
     "NVDA",
     "META",
