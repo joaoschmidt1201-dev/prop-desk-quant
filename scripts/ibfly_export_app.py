@@ -105,20 +105,49 @@ def export(dte, width, tag, bid, sw):
     print(f"[d{dte}_w{width}] {len(rows)} trades | HOLD net ${net:,.0f} | exits {exit_ds} -> {d.name}")
     return len(rows)
 
+def _throttled(sw):
+    """1 chamada-teste gentil: throttle ativo se vier vazio/erro."""
+    try:
+        bid = sw.get("ibfly_dte7", {}).get("backtestId")
+        r = api("/backtests/read/log", {"projectId": CLOUD_ID, "backtestId": bid, "start": 0, "end": 5, "query": ""})
+        return not (r.get("logs"))
+    except Exception:
+        return True
+
 def main():
     sw = json.loads(SWEEP.read_text(encoding="utf-8"))
-    total = 0
-    for dte, width, tag in CONFIGS:
-        dest = OUT / f"d{dte}_w{width}" / "trades.csv"
-        if dest.exists():   # idempotente: não re-baixa o que já saiu (evita re-disparar o rate-limit)
-            print(f"[d{dte}_w{width}] já existe — skip"); continue
-        bid = sw.get(tag, {}).get("backtestId")
-        if not bid:
-            print(f"[{tag}] sem backtestId — pula"); continue
-        n = export(dte, width, tag, bid, sw)
-        if n: total += n
-        time.sleep(20)      # pausa entre configs p/ respeitar o rate-limit do QC
-    print(f"\n=== IBFLY EXPORT: {total} trades novos -> {OUT} ===")
+    import re
+    def rn(tag):
+        m = re.search(r"n=(\d+)", (sw.get(tag, {}).get("runtime") or {}).get("n / dte / W", "")); return int(m.group(1)) if m else 0
+    # ALVO = só os baixáveis (n<=249; acima trunca no log do free tier -> ficam p/ chunked re-run)
+    target = [(dte, w, tag) for (dte, w, tag) in CONFIGS if rn(tag) <= 249]
+    def have(dte, w): return (OUT / f"d{dte}_w{w}" / "trades.csv").exists()
+    def done(): return all(have(dte, w) for dte, w, _ in target)
+    # LOOP: cada janela de throttle libera ~4 configs; repete até completar os baixáveis (ou ~12 ciclos).
+    for outer in range(12):
+        if done():
+            break
+        cleared = False
+        for a in range(16):
+            if not _throttled(sw):
+                cleared = True; break
+            print(f"[poll {outer+1}.{a+1}] rate-limit do QC ativo — espera 40min", flush=True); time.sleep(2400)
+        if not cleared:
+            print("[poller] rate-limit persistiu >10h — parando este ciclo."); break
+        print(f"[ciclo {outer+1}] rate-limit LIVRE — baixando o que der nesta janela...", flush=True)
+        for dte, width, tag in CONFIGS:
+            if have(dte, width):
+                continue
+            bid = sw.get(tag, {}).get("backtestId")
+            if not bid:
+                continue
+            export(dte, width, tag, bid, sw)
+            time.sleep(20)
+        n = sum(1 for dte, w, _ in target if have(dte, w))
+        print(f"[ciclo {outer+1}] baixáveis prontos: {n}/{len(target)}", flush=True)
+    n = sum(1 for dte, w, _ in target if have(dte, w))
+    trunc = [(dte, w) for dte, w, tag in CONFIGS if rn(tag) > 249]
+    print(f"\n=== FIM: baixáveis {n}/{len(target)} prontos | truncados (chunking): {trunc} ===")
 
 if __name__ == "__main__":
     main()
