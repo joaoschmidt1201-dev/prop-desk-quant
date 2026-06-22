@@ -26,6 +26,7 @@ CONFIGS = [
     (28, "0.50", "ibfly_w0.50"), (28, "0.60", "ibfly_w0.60"),    (28, "0.75", "ibfly_w0.75"),
     (45, "0.15", "ibfly_dte45"), (45, "0.40", "ibfly_d45_w0.40"),
     (45, "0.50", "ibfly_d45_w0.50"), (45, "0.60", "ibfly_d45_w0.60"),
+    (4,  "0.15", "ibfly_dte4_mon"),  (4,  "0.60", "ibfly_dte4_mon_w60"),   # 4DTE segunda; cabem (245/248)
 ]
 
 _cred = json.load(open(HOME / ".lean" / "credentials"))

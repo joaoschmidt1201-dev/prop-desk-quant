@@ -1744,6 +1744,47 @@ for _ptag, _pdte in _PL5_CONFIGS:
         "close_rules": _pl5_rules,
     })
 
+# ─── Inverse Butterfly 1-2-1 (short call fly · long-vol) — categoria nova ─────────
+# Cards por DTE (7/28/45 = verificados 100% completos; 1/14 entram após chunked re-run).
+# Cada card: seletor de WIDTH (variants -> 1 CSV por width) + close-rule (hold/TP/DTE-rest). mid.
+_IBFLY_DIR = BACKTESTS_ROOT / "ibfly_backtest_app"
+_IBFLY_CONFIGS = [
+    (1,  ["0.15"], [0]),
+    (4,  ["0.15", "0.40", "0.60"], [3]),
+    (7,  ["0.15", "0.50", "0.60"], [5, 3]),
+    (14, ["0.15", "0.40", "0.50", "0.60"], [10, 7, 5, 3]),
+    (28, ["0.15", "0.25", "0.40", "0.50", "0.60", "0.75"], [21, 14, 10, 7, 5, 3]),
+    (45, ["0.15", "0.40", "0.50", "0.60"], [30, 21, 14, 10, 7, 5, 3]),
+]
+for _idte, _iwidths, _iexits in _IBFLY_CONFIGS:
+    _ivariants = {f"{w}σ": f"d{_idte}_w{w}" for w in _iwidths
+                  if (_IBFLY_DIR / f"d{_idte}_w{w}" / "trades.csv").exists()}
+    if not _ivariants:
+        continue
+    _idefw = "0.50σ" if "0.50σ" in _ivariants else next(iter(_ivariants))
+    _ib_rules: dict[str, str | None] = {"Hold to Expiration": None,
+                                        "TP 25%": "pnl_tp25", "TP 50%": "pnl_tp50", "TP 75%": "pnl_tp75"}
+    for _id in _iexits:
+        _ib_rules[f"Exit at {_id} DTE"] = f"pnl_exit{_id}"
+    BACKTESTS_REGISTRY.append({
+        "id": f"ibfly-spx-d{_idte}",
+        "name": f"Inverse Butterfly · {_idte}DTE",
+        "underlying": "SPX",
+        "strategy": f"Inverse Butterfly 1-2-1 (short call fly) · SPX · ~{_idte} DTE · weekly",
+        "family": "Inverse Butterfly",
+        "horizon": f"{_idte}DTE",
+        "description": (
+            f"Inverse (short) call butterfly on SPX: +2 ATM calls / −1 call (ATM−W) / −1 call (ATM+W), "
+            f"net credit, long volatility (profits on movement). ~{_idte} DTE, weekly. Select WIDTH "
+            f"(W in σ) and a close-rule (hold, TP %, or exit at N DTE). P&L at MID."
+        ),
+        "trades_csv": f"ibfly_backtest_app/{_ivariants[_idefw]}/trades.csv",
+        "daily_csv": f"ibfly_backtest_app/{_ivariants[_idefw]}/daily.csv",
+        "kind": "ibfly", "multiplier": 1,
+        "variants": _ivariants, "variants_dir": "ibfly_backtest_app", "default_width": _idefw,
+        "close_rules": _ib_rules,
+    })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
@@ -2330,15 +2371,18 @@ def get_backtest(
     available_width_rules: list[str] = []
     width_rule_to_use: str | None = None
     if meta.get("variants"):
+        _vdir = meta.get("variants_dir", "batman_backtest_app")   # IB e outros kinds usam o próprio dir
+        _vroot = BACKTESTS_ROOT / _vdir
         available_width_rules = [lbl for lbl, tag in meta["variants"].items()
-                                 if (_BATMAN_DIR / tag / "trades.csv").exists()]
+                                 if (_vroot / tag / "trades.csv").exists()]
         if available_width_rules:
+            _defw = meta.get("default_width") or _BATMAN_DEFAULT_WIDTH
             width_rule_to_use = (width_rule if width_rule in available_width_rules
-                                 else (_BATMAN_DEFAULT_WIDTH if _BATMAN_DEFAULT_WIDTH in available_width_rules
+                                 else (_defw if _defw in available_width_rules
                                        else available_width_rules[0]))
             _tag = meta["variants"][width_rule_to_use]
-            meta = {**meta, "trades_csv": f"batman_backtest_app/{_tag}/trades.csv",
-                    "daily_csv": f"batman_backtest_app/{_tag}/daily.csv"}
+            meta = {**meta, "trades_csv": f"{_vdir}/{_tag}/trades.csv",
+                    "daily_csv": f"{_vdir}/{_tag}/daily.csv"}
     raw_trades = _read_backtest_trades(meta)
     daily = _read_backtest_daily(meta)
 
@@ -2403,6 +2447,12 @@ def get_backtest(
         "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "result", "exit_method",
     ]
+    display_cols_ibfly = [
+        "trade_date", "exp_date", "underlying", "dte_entry", "width_sigma", "spot_entry",
+        "iv_atm_pct", "expected_move", "call_lo", "call_atm", "call_up", "total_credit",
+        "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
+        "result", "exit_method",
+    ]
     if meta["kind"] == "ss42":
         cols = display_cols_ss42
     elif meta["kind"] == "triplecal":
@@ -2411,6 +2461,8 @@ def get_backtest(
         cols = display_cols_batman
     elif meta["kind"] == "pl5":
         cols = display_cols_pl5
+    elif meta["kind"] == "ibfly":
+        cols = display_cols_ibfly
     else:
         cols = display_cols_ic7
     trades_view = [{c: t.get(c) for c in cols} for t in trades_with_rule]

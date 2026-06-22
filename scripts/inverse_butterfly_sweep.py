@@ -36,6 +36,37 @@ def q_axis(ax):
             out.append(_cell(f"ibfly_w{w}", dte="30", width_sigma=w, **FULL))
     return out
 
+def q_chunk():
+    # Completa as variações TRUNCADAS pelo log free-tier (n>249): re-roda cada uma em 2 metades de
+    # data (split 2023-07-01) -> cada metade <250 trades cabe no log -> o export concatena h1+h2.
+    # Configs faltantes: 7DTE 0.50/0.60; 14DTE 0.15/0.40/0.50/0.60; 4DTE 0.40 (segunda); 1DTE diário.
+    SPLIT = "2023-07-01"
+    A = {"start_date": "2021-01-01", "end_date": SPLIT}
+    B = {"start_date": SPLIT, "end_date": "2026-06-08"}
+    specs = [
+        ("ibfly_d7_w0.50",  dict(dte="7",  width_sigma="0.50", entry_weekday="4")),
+        ("ibfly_d7_w0.60",  dict(dte="7",  width_sigma="0.60", entry_weekday="4")),
+        ("ibfly_d15_w0.15", dict(dte="15", width_sigma="0.15", entry_weekday="4")),
+        ("ibfly_d15_w0.40", dict(dte="15", width_sigma="0.40", entry_weekday="4")),
+        ("ibfly_d15_w0.50", dict(dte="15", width_sigma="0.50", entry_weekday="4")),
+        ("ibfly_d15_w0.60", dict(dte="15", width_sigma="0.60", entry_weekday="4")),
+        ("ibfly_dte4_mon_w40", dict(dte="4", width_sigma="0.40", entry_weekday="0")),
+    ]
+    out = []
+    for base, params in specs:
+        out.append(_cell(f"{base}_h1", **{**params, **A}))
+        out.append(_cell(f"{base}_h2", **{**params, **B}))
+    return out
+
+def q_chunk1():
+    # 1DTE diário (n=1239) é grande demais p/ 2 metades — divide em 6 janelas (~1 ano cada).
+    edges = ["2021-01-01", "2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31", "2026-06-08"]
+    out = []
+    for i in range(len(edges) - 1):
+        out.append(_cell(f"ibfly_dte1_c{i+1}", dte="1", width_sigma="0.15", entry_weekday="all",
+                         start_date=edges[i], end_date=edges[i+1]))
+    return out
+
 def q_minchk():
     # spot-check de spread em MINUTO (aprendizado PL5): near-ATM -> cons horário inflado? Comparar
     # spread de entrada minuto vs horário no dte30 (mesma janela 2025). strikes estreitos p/ velocidade.
@@ -69,6 +100,8 @@ def q_best2():
 def build_queue(args):
     if "--smoke" in args:  return q_smoke()
     if "--minchk" in args: return q_minchk()
+    if "--chunk1" in args: return q_chunk1()
+    if "--chunk" in args:  return q_chunk()
     if "--best" in args:   return q_best()
     if "--best2" in args:  return q_best2()
     if "--weekly" in args: return q_weekly()
