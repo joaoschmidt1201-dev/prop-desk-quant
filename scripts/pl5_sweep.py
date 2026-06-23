@@ -46,6 +46,15 @@ def _full_queue():
         q.append(_cell(f"pl5_d{dte}_std", target_dte=str(dte), **FULL))
     return q
 
+def _long_queue():
+    # CZ pediu (2026-06-23, p/ reunião amanhã): DTEs LONGOS 75/100/120. Mesma estrutura/deltas (30/18/3).
+    # strike_lo ampliado: a perna -3Δ fica MUITO OTM em prazo longo (ex. 120 DTE alta-vol ~1600+pts) ->
+    # -500 strikes cobre c/ folga. dte_exit_grid do motor já adapta (saídas em 90/75/60/45 restantes).
+    q = []
+    for dte in (75, 100, 120):
+        q.append(_cell(f"pl5_d{dte}_std", target_dte=str(dte), strike_lo="-500", **FULL))
+    return q
+
 # janela curta de validação: jul/2024 (entra) -> expira meados de ago (pega o crash 05/08/2024)
 VALIDATE = [_cell("pl5_validate_d30", target_dte="30",
                   start_date="2024-07-01", end_date="2024-08-23")]
@@ -170,7 +179,10 @@ def do_scenario(tag, params, res, compile_id):
 
 def main():
     args = set(sys.argv[1:])
-    queue = VALIDATE if "--validate" in args else (MINCHK if "--minchk" in args else QUEUE)
+    if "--validate" in args:   queue = VALIDATE
+    elif "--minchk" in args:   queue = MINCHK
+    elif "--long" in args:     queue = _long_queue()   # CZ: DTEs 75/100/120 (prioridade)
+    else:                      queue = QUEUE
     if "--dry" in args:
         print(f"Fila ({len(queue)} runs):")
         for tag, ov in queue:

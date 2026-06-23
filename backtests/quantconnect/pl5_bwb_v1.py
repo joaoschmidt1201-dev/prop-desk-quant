@@ -86,7 +86,9 @@ class Pl5BwbV1(QCAlgorithm):
         self.dit_marks = [7, 14, 21, 28, 35]    # MTM nesses dias-no-trade
         # SAÍDA ANTECIPADA (tese CZ 2026-06-16): a estrutura fica positiva no meio e DEVOLVE no expiry
         # quando a tenda reforma. Gravar MTM (mid+cons) com D DTE RESTANTES -> derivar "sair com D DTE".
-        self.dte_exit_grid = [30, 21, 14, 10, 7, 5, 3]
+        # Grid adaptado ao prazo: DTEs longos (75/100/120) ganham saídas mais cedo (90/75/60/45 restantes);
+        # curtos mantêm o comportamento (só os D < target_dte são gravados).
+        self.dte_exit_grid = [d for d in (90, 75, 60, 45, 30, 21, 14, 10, 7, 5, 3) if d < self.target_dte]
         self.mark_every_min = 30                # cadência intraday (swing; menos compute que 0DTE)
         _tpc = self.get_parameter("tp_close_frac", "none")    # só p/ sanidade (default hold)
         self.tp_close_frac = None if _tpc in ("none", "None", "") else float(_tpc)
