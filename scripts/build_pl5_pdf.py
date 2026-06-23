@@ -21,10 +21,61 @@ import pandas as pd
 REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "reports" / "pl5_backtest_app"
 DEST = REPO / "reports" / "pl5_bwb" / "PL5_report.pdf"
-DTES = [("pl5_d21_std", 21), ("pl5_d28_std", 28), ("pl5_d45_std", 45), ("pl5_d60_std", 60)]
+# inclui os DTEs longos (75/100/120) automaticamente quando a pasta existir
+DTES = [(f"pl5_d{_d}_std", _d) for _d in (21, 28, 45, 60, 75, 100, 120)
+        if (APP / f"pl5_d{_d}_std" / "trades.csv").exists()]
 NAVY = "#0f2b46"; GOLD = "#b8860b"; GAIN = "#1a7f37"; LOSS = "#c0392b"; GREY = "#555"
 plt.rcParams.update({"font.size": 10, "axes.titlesize": 12, "figure.facecolor": "white",
                      "text.parse_math": False})   # '$' são literais (dinheiro), não modo matemático
+
+def margin_analysis(rows):
+    """Margem/capital preso por posições SOBREPOSTAS. Cada pacote é risco definido (vale = max_risk_usd).
+    Margem num dia D = soma dos max_risk dos trades abertos (trade_date <= D <= exp_date).
+    Retorna: pico de margem ($), nº máx de posições simultâneas, margem média, net total (hold)."""
+    from datetime import date as _date
+    evts = []  # (dia, +risk ao abrir, -risk ao fechar)
+    risks = []
+    for r in rows:
+        try:
+            o = _date.fromisoformat(r["trade_date"]); e = _date.fromisoformat(r["exp_date"])
+            mr = fnum(r, "max_risk_usd")
+            if mr is None: continue
+        except Exception:
+            continue
+        evts.append((o, mr, 1)); evts.append((e, -mr, -1)); risks.append(mr)
+    if not evts:
+        return None
+    evts.sort(key=lambda x: x[0])
+    cur_m = cur_n = peak_m = peak_n = 0
+    samples = []
+    for _, dm, dn in evts:
+        cur_m += dm; cur_n += dn
+        peak_m = max(peak_m, cur_m); peak_n = max(peak_n, cur_n)
+        samples.append(cur_m)
+    avg_m = sum(samples) / len(samples) if samples else 0
+    net = sum(fnum(r, "pnl_usd") or 0 for r in rows)
+    # perda AGREGADA real no dia de pico (vales em strikes diferentes -> não somam): varre o spot e
+    # acha a pior perda do portfólio aberto. Aproxima a régua de Portfolio Margin melhor que a soma.
+    from datetime import timedelta as _td
+    peak_agg = peak_m
+    try:
+        days = sorted({_date.fromisoformat(r["trade_date"]) for r in rows})
+        best_day, best_n = None, 0
+        d0 = days[0]; dN = max(_date.fromisoformat(r["exp_date"]) for r in rows)
+        cur = d0
+        while cur <= dN:
+            op = [r for r in rows if _date.fromisoformat(r["trade_date"]) <= cur <= _date.fromisoformat(r["exp_date"])]
+            if len(op) > best_n: best_n, best_day = len(op), op
+            cur += _td(days=7)
+        if best_day:
+            ks = [(fnum(r,"put_upper"), fnum(r,"put_center"), fnum(r,"put_lower"), fnum(r,"total_credit")) for r in best_day]
+            lo = min(k[2] for k in ks)*0.7; hi = max(k[0] for k in ks)*1.05
+            mn = min(sum(payoff_pts(k[0],k[1],k[2],s)*100 - k[3] for k in ks) for s in [lo+(hi-lo)*i/300 for i in range(301)])
+            peak_agg = -mn
+    except Exception:
+        pass
+    return {"peak_margin": peak_m, "peak_pos": peak_n, "avg_margin": avg_m, "peak_agg": peak_agg,
+            "med_risk": sorted(risks)[len(risks)//2] if risks else 0, "net": net}
 
 def fnum(r, k):
     try: return float(r[k])
@@ -60,7 +111,10 @@ def fill_sensitivity(rows):
             cost_f = cost_mid + fr * (cost_cons - cost_mid)
             pls.append((terminal - cost_f) * 100.0)
         net = sum(pls); wr = 100*sum(1 for x in pls if x > 0)/len(pls) if pls else 0
-        out[fr] = (net, wr)
+        wins = [x for x in pls if x > 0]; losses = [x for x in pls if x <= 0]
+        pf = (sum(wins) / abs(sum(losses))) if losses and sum(losses) != 0 else float("inf")
+        payoff = abs((sum(wins)/len(wins)) / (sum(losses)/len(losses))) if wins and losses else 0
+        out[fr] = (net, wr, pf, payoff)
     return out
 
 def fig_text_page(pdf, title, lines, subtitle=None):
@@ -183,19 +237,21 @@ def build():
         rows = []
         for tag, dte in DTES:
             s = sens[tag]
-            rows.append([f"{dte} DTE",
-                         f"{money(s[0.0][0])}", f"{money(s[0.25][0])}", f"{money(s[0.5][0])}", f"{money(s[1.0][0])}"])
-        fig_table(pdf, "4. The key finding — sensitivity to entry fill (hold to expiry)",
-                  ["Horizon", "Combo mid", "25% of spread", "50% of spread", "Leg-by-leg (worst)"], rows,
-                  subtitle="net P&L over 5 years · realistic combo execution = near 'mid'; far-right = 5 market orders (unrealistic)",
+            def cell(fr):
+                net, wr, pf, po = s[fr]
+                pfs = "inf" if pf == float("inf") else f"{pf:.1f}"
+                return f"{money(net)}  (PF {pfs})"
+            rows.append([f"{dte} DTE", cell(0.0), cell(0.25), cell(0.5), cell(1.0)])
+        fig_table(pdf, "4. Fill-price scenarios — net P&L and Profit Factor (hold to expiry)",
+                  ["Horizon", "Mid (optimistic)", "25% spread (realistic)", "50% spread", "Leg-by-leg (worst, ref.)"], rows,
+                  subtitle="same trades, four entry-fill assumptions · realistic = combo limit order, near 25-50% · 5-year net",
                   hi_col=2,
-                  note="HOW TO READ THIS: the four columns are the SAME trades priced at four entry-fill assumptions. "
-                       "'Combo mid' = you fill the whole butterfly at its net mid (a patient limit order). "
-                       "'Leg-by-leg (worst)' = you cross the full bid/ask on every one of the 5 legs separately "
-                       "(nobody trades a fly this way). The truth for a combo order sits on the LEFT side, near 25%. "
-                       "The spread is real (verified at minute data) and lives almost entirely in the illiquid -3 delta "
-                       "tail. CONCLUSION: PL5 is execution-bound; traded as a combo at a limit, 21-28 DTE is positive, "
-                       "45 DTE marginal, 60 DTE negative (its wing is so wide the valley is too deep).")
+                  note="HOW TO READ: nobody buys at the ask and sells at the bid on every leg — the 'leg-by-leg' column is "
+                       "an unrealistic worst-case REFERENCE only. A butterfly is sent as ONE combo at a net limit, so the "
+                       "real fill sits between MID (optimistic) and ~25-50% of the spread. NOTE how the Profit Factor "
+                       "deflates with worse fills: e.g. 120 DTE goes from PF ~4.9 (mid) toward ~1.7 as the illiquid -3-delta "
+                       "tail spread is paid. The headline mid numbers are the CEILING, not the expectation; the honest read "
+                       "is the 25-50% columns. Short DTEs (21-28) stay positive; long DTEs keep a real but modest edge.")
 
         # ============ 5. EQUITY CURVES ============
         fig, axes = plt.subplots(2, 2, figsize=(11.7, 8.3))
@@ -234,7 +290,7 @@ def build():
                 cells.append(money(v) if v is not None else "-")
             mat_rows.append(cells)
         fig_table(pdf, "6. Exit rule x horizon — the full matrix (net P&L, mid)",
-                  ["Close rule", "21 DTE", "28 DTE", "45 DTE", "60 DTE"], mat_rows,
+                  ["Close rule"] + [f"{dte} DTE" for _, dte in DTES], mat_rows,
                   subtitle="every close rule x every horizon · 5-year net at mid",
                   note="KEY INSIGHT — the horizon ranking FLIPS between holding and exiting early: "
                        "HELD TO EXPIRY, short horizons win (28 DTE best; 60 DTE collapses to +$2k, its valley is deepest "
@@ -243,6 +299,35 @@ def build():
                        "form, and leaving before the final days avoids the valley reforming (60 DTE: +$2k held vs +$117k if "
                        "exited 3 days early). All at mid; realistic combo fill scales every cell down similarly, so the "
                        "relative ranking holds.")
+
+        # ============ 6b. HEATMAP (visual) — DTE x close-rule, net mid ============
+        rule_cols = [("Hold", None)] + [(f"TP{t}", f"pnl_tp{t}") for t in (25, 50, 75)] \
+                    + [(f"Exit {d}", f"pnl_exit{d}") for d in (60, 45, 30, 14, 7, 3)]
+        M = np.full((len(DTES), len(rule_cols)), np.nan)
+        for i, (tag, dte) in enumerate(DTES):
+            rows_ = data[tag]
+            for j, (lbl, col) in enumerate(rule_cols):
+                if col is None:
+                    M[i, j] = sum(fnum(r, "pnl_usd") or 0 for r in rows_) / 1000.0
+                elif any(col in r for r in rows_):
+                    M[i, j] = sum((fnum(r, col) if fnum(r, col) is not None else (fnum(r, "pnl_usd") or 0)) for r in rows_) / 1000.0
+        fig, ax = plt.subplots(figsize=(11.7, 8.3))
+        vlim = np.nanmax(np.abs(M))
+        im = ax.imshow(M, cmap="RdYlGn", vmin=-vlim, vmax=vlim, aspect="auto")
+        ax.set_xticks(range(len(rule_cols))); ax.set_xticklabels([l for l, _ in rule_cols], rotation=30, ha="right")
+        ax.set_yticks(range(len(DTES))); ax.set_yticklabels([f"{dte} DTE" for _, dte in DTES])
+        for i in range(len(DTES)):
+            for j in range(len(rule_cols)):
+                if not np.isnan(M[i, j]):
+                    ax.text(j, i, f"{M[i,j]:.0f}", ha="center", va="center", fontsize=8,
+                            color="black", fontweight="bold")
+        ax.set_title("6b. Net P&L heatmap — horizon x close-rule (US$ thousands, mid)",
+                     fontsize=15, fontweight="bold", color=NAVY, pad=14)
+        fig.text(0.5, 0.04, "Greener = more profit. Mid pricing (ceiling). Long DTEs glow on absolute $ — but see the "
+                 "margin page: that P&L rides $1-2M of capital. Best risk-adjusted cells are the short-DTE TP exits.",
+                 ha="center", fontsize=9.5, color=GREY)
+        plt.colorbar(im, ax=ax, fraction=0.025, pad=0.02, label="net (US$ k)")
+        fig.tight_layout(rect=[0, 0.06, 1, 1]); pdf.savefig(fig); plt.close(fig)
 
         # ============ 7. 2025 CRASH EXAMPLE ============
         rows60 = sorted(data["pl5_d60_std"], key=lambda r: fnum(r, "pnl_usd") or 0)
@@ -262,7 +347,30 @@ def build():
                        "PL5: a directional crash that lands in the valley. The loss is defined, but it is large and, with "
                        "overlapping weekly entries, can cluster. This is real risk, at mid — not an execution artifact.")
 
-        # ============ 8. DATA VERIFICATION ============
+        # ============ 7b. MARGIN / CAPITAL EFFICIENCY (overlapping positions) ============
+        mrows = []
+        for tag, dte in DTES:
+            ma = margin_analysis(data[tag])
+            if not ma:
+                continue
+            roi = (ma["net"] / ma["peak_margin"] * 100) if ma["peak_margin"] else 0
+            mrows.append([f"{dte} DTE", str(ma["peak_pos"]), money(ma["net"]),
+                          f"${ma['peak_margin']:,.0f}", f"${ma['avg_margin']:,.0f}", f"{roi:.0f}%"])
+        fig_table(pdf, "8. Margin & capital efficiency (CZ uses IB Portfolio Margin)",
+                  ["Horizon", "Max concurrent", "Net (mid)", "Reg-T margin (peak)", "Avg margin", "Return / margin"],
+                  mrows,
+                  subtitle="weekly entries stack: a 120 DTE holds ~18 packages at once · margin shown on the Reg-T ruler",
+                  hi_col=5,
+                  note="Margin here = Reg-T (sum of each package's defined max-loss, the valley) — the conservative ruler / "
+                       "ceiling. THE READ: long DTEs post a huge absolute P&L only by tying up far more capital — a 120 DTE "
+                       "needs ~$1.9M peak across ~18 stacked positions and returns only ~21% on it, vs 21-28 DTE at ~52-57%. "
+                       "SHORT DTEs are ~2x more capital-efficient. CZ trades IB PORTFOLIO MARGIN, where the requirement is "
+                       "LOWER than Reg-T (PM stress-tests the book over a short move with time value intact, rather than "
+                       "summing every worst case) — but the exact figure comes from IB's TIMS model and we won't guess it. "
+                       "Crucially, PM trims the dollar amount but NOT the ranking: the efficiency gap (short >> long) holds on "
+                       "any ruler. Size by capital, not by the headline P&L. (All hold-to-expiry, mid; long-DTE win rate ~26-30%.)")
+
+        # ============ 9. DATA VERIFICATION ============
         rows60c = data["pl5_d60_std"]
         vlines = [("Why these numbers are real, not fabricated:", 13, GOLD), ("", 8, "#333"),
                   ("1) Settlement = exact intrinsic at the SPX official close (cash-settled, European) — no spread,", 10.5, "#333"),
@@ -277,27 +385,30 @@ def build():
                    ("4) Entry spread VERIFIED at minute resolution = identical to hourly (1.000x): the tail spread", 10.5, "#333"),
                    ("   is the real market, not a stale-quote artifact (so the worst case is a legitimate bound).", 10.5, "#333"),
                    ("5) Every trade is auditable in the app (date, strikes, DTE, debit, VIX, spot, exits, P&L).", 10.5, "#333")]
-        fig_text_page(pdf, "8. Data verification", vlines, subtitle="methodological rigor")
+        fig_text_page(pdf, "9. Data verification", vlines, subtitle="methodological rigor")
 
-        # ============ 9. VERDICT ============
+        # ============ 10. VERDICT ============
         s21, s28, s45, s60 = sens["pl5_d21_std"], sens["pl5_d28_std"], sens["pl5_d45_std"], sens["pl5_d60_std"]
-        fig_text_page(pdf, "9. Verdict",
+        fig_text_page(pdf, "10. Verdict",
             [("PL5 is NOT a 'hold to expiry' trade — the valley at the end destroys it. And it is NOT a", 12, NAVY),
              ("market-order trade — it must be worked as a combo at a limit price.", 12, NAVY),
-             ("", 9, "#333"),
+             ("", 8, "#333"),
              ("Realistic execution (combo fill, ~25-50% of the leg-by-leg spread), 5-year net P&L:", 12, GOLD),
-             (f"  • 21 DTE:  {money(s21[0.25][0])} (25%)  /  {money(s21[0.5][0])} (50%)   -> positive", 11, GAIN),
-             (f"  • 28 DTE:  {money(s28[0.25][0])} (25%)  /  {money(s28[0.5][0])} (50%)   -> best, positive", 11, GAIN),
-             (f"  • 45 DTE:  {money(s45[0.25][0])} (25%)  /  {money(s45[0.5][0])} (50%)   -> marginal", 11, "#333"),
-             (f"  • 60 DTE:  {money(s60[0.25][0])} (25%)  /  {money(s60[0.5][0])} (50%)   -> negative", 11, LOSS),
-             ("", 9, "#333"),
+             (f"  • 21 DTE:  {money(s21[0.25][0])} / {money(s21[0.5][0])}   ->  positive, best return-on-margin (~57%)", 11, GAIN),
+             (f"  • 28 DTE:  {money(s28[0.25][0])} / {money(s28[0.5][0])}   ->  best net, ~52% on margin", 11, GAIN),
+             (f"  • 45 DTE:  {money(s45[0.25][0])} / {money(s45[0.5][0])}   ->  marginal", 11, "#333"),
+             (f"  • 60 DTE:  {money(s60[0.25][0])} / {money(s60[0.5][0])}   ->  negative", 11, LOSS),
+             ("  • 75-120 DTE (CZ request): huge ABSOLUTE P&L (+$338k to +$465k hold/mid) BUT need $1.1-1.9M", 11, "#333"),
+             ("    margin (12-18 stacked positions) -> only ~21-31% on capital, and low win rate (~26-30%).", 11, "#333"),
+             ("", 8, "#333"),
              ("Honest caveats:", 12, GOLD),
              ("  • Execution is THE decisive factor (5 legs, illiquid -3d tail). Fill discipline = the edge.", 10.5, "#333"),
-             ("  • Real tail risk: a crash into the valley = a large, defined loss; can cluster with overlapping", 10.5, "#333"),
-             ("    weekly entries (the test enters every Friday with no concurrency cap).", 10.5, "#333"),
-             ("", 9, "#333"),
-             ("Suggested next step: forward-test 28 DTE with early exit + a concurrency rule, and — above all —", 11, NAVY),
-             ("measure the REAL combo fill on the tail, which is the single factor that decides this strategy.", 11, NAVY)],
+             ("  • Long DTEs win on headline $ only by tying up far more capital — short DTEs are 2x more", 10.5, "#333"),
+             ("    capital-efficient (see page 8). Size by margin, not by absolute P&L.", 10.5, "#333"),
+             ("  • Real tail risk: a crash into the valley = a large, defined loss; clusters with overlapping entries.", 10.5, "#333"),
+             ("", 8, "#333"),
+             ("Suggested next step: forward-test 28 DTE (best risk-adjusted) with early exit/TP + a concurrency", 11, NAVY),
+             ("cap, and measure the REAL combo fill on the tail — the single factor that decides this strategy.", 11, NAVY)],
             subtitle="honest conclusion")
     try:
         os.replace(tmp, DEST)
