@@ -1718,7 +1718,7 @@ for _rtag, _wlabel, _hz, _wide, _narrow in _RJL_CONFIGS:
 # saída = "sair com D DTE restantes" (record-and-derive; D < dte_entry).
 _PL5_DIR = BACKTESTS_ROOT / "pl5_backtest_app"
 _PL5_EXIT_GRID = [90, 75, 60, 45, 30, 21, 14, 10, 7, 5, 3]   # adaptado p/ DTEs longos
-_PL5_TP = [25, 50, 75, 100]                                   # % de ref_profit (pico do tent)
+_PL5_TP = [25, 50, 75]                                        # % de ref_profit (TP 100% = hold, removido — João)
 _PL5_CONFIGS = [("pl5_d21_std", 21), ("pl5_d28_std", 28), ("pl5_d45_std", 45), ("pl5_d60_std", 60),
                 ("pl5_d75_std", 75), ("pl5_d100_std", 100), ("pl5_d120_std", 120)]   # + longos (CZ)
 for _ptag, _pdte in _PL5_CONFIGS:
@@ -1728,12 +1728,9 @@ for _ptag, _pdte in _PL5_CONFIGS:
     _pl5_rules: dict[str, str | None] = {"Hold to expiration": None}
     for _d in _applic:
         _pl5_rules[f"Exit at {_d} DTE"] = f"pnl_exit{_d}"
-    # TP isolado (% do pico do tent) + regra COMPOSTA TP+saída (só aparecem quando a coluna existir).
+    # TP isolado (% do pico do tent). Compostas TP+ExitDTE REMOVIDAS (João: poluíam) e TP100% removido (= hold).
     for _tp in _PL5_TP:
         _pl5_rules[f"TP {_tp}%"] = f"pnl_tp{_tp}"
-    for _tp in _PL5_TP:
-        for _d in _applic:
-            _pl5_rules[f"TP {_tp}% else Exit {_d} DTE"] = f"pnl_tp{_tp}_exit{_d}"
     BACKTESTS_REGISTRY.append({
         "id": f"pl5-spx-d{_pdte}",
         "name": f"PL5 · {_pdte}DTE",
