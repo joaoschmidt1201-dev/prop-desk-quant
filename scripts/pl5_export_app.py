@@ -35,6 +35,7 @@ TAGS = ["pl5_d21_std", "pl5_d28_std", "pl5_d45_std", "pl5_d60_std",
         "pl5_d75_std", "pl5_d100_std", "pl5_d120_std"]   # + DTEs longos (CZ 2026-06-23)
 EXIT_GRID = [90, 75, 60, 45, 30, 21, 14, 10, 7, 5, 3]   # DTE restantes (mid) — adaptado p/ longos
 TP_LEVELS = [25, 50, 75, 100]                            # % de ref_profit (pico do tent) — colunas tp{L} no log
+DIT_MARKS = [7, 14, 21, 28, 35]                          # MTM em dias-no-trade (colunas d{D} no log)
 
 _cred = json.load(open(HOME / ".lean" / "credentials"))
 _UID = str(_cred.get("user-id") or _cred.get("user_id"))
@@ -130,6 +131,8 @@ def export_tag(tag, bid):
             "em_pct": round(float(r.get("vix") or 0) * math.sqrt((int(r.get("dte") or dte_entry)) / 365.0), 2) if (r.get("vix") or 0) else "",
             "expected_move": round(float(r.get("Se") or 0) * (float(r.get("vix") or 0) / 100.0) * math.sqrt((int(r.get("dte") or dte_entry)) / 365.0), 1) if (r.get("vix") and r.get("Se")) else "",
             "pnl_usd": round(hold, 2),                                     # hold-to-expiry (settle)
+            # risco máx definido (o vale) = ref_loss × 100 -> margem/capital preso por pacote.
+            "max_risk_usd": round(float(r.get("rl") or 0) * 100.0, 2),
             "result": "WIN" if hold > 0 else "LOSS", "exit_method": "expiration",
             "mfe": r.get("mfe"), "mae": r.get("mae"),
         }
@@ -154,8 +157,21 @@ def export_tag(tag, bid):
                 else:
                     row[f"pnl_tp{L}_exit{d}"] = exit_val(d)
         rows.append(row)
-        daily.append({"trade_date": od, "calendar_date": od, "dte_remaining": row["dte_entry"], "pnl_usd": 0.0})
-        daily.append({"trade_date": od, "calendar_date": exp.isoformat(), "dte_remaining": 0, "pnl_usd": round(hold, 2)})
+        # TRAJETÓRIA do P&L (curva real, não reta de 2 pontos): usa o MTM já gravado em cada DIT (d{D})
+        # e em cada DTE-restante (x{N}m). Cada ponto vira (data, pnl). Dedup por data, ordenado.
+        pts = {od: 0.0}                                              # entrada: P&L 0
+        for D in DIT_MARKS:                                          # MTM por dias-no-trade (começo do trade)
+            v = r.get(f"d{D}")
+            if v not in ("", None) and D < dte_real:
+                pts[(o + dt.timedelta(days=D)).isoformat()] = round(float(v), 2)
+        for N in applic:                                            # MTM por DTE-restante (meio/fim do trade)
+            v = r.get(f"x{N}m")
+            if v not in ("", None):
+                pts[(exp - dt.timedelta(days=N)).isoformat()] = round(float(v), 2)
+        pts[exp.isoformat()] = round(hold, 2)                       # settle: P&L final
+        for cd in sorted(pts):
+            dte_rem = (exp - dt.date.fromisoformat(cd)).days
+            daily.append({"trade_date": od, "calendar_date": cd, "dte_remaining": dte_rem, "pnl_usd": pts[cd]})
 
     d = OUT / tag; d.mkdir(parents=True, exist_ok=True)
     with open(d / "trades.csv", "w", newline="", encoding="utf-8") as f:
