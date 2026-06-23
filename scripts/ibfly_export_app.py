@@ -78,6 +78,14 @@ def export(dte, width, tag, bid, sw):
         od = r["open_date"]; hold = f(r["hold_net_mid"]) or 0.0
         def eff(col):
             v = f(r.get(col)); return round(v, 2) if v is not None else round(hold, 2)
+        def composite(tp, exit_n):
+            # regra "TP tp% senão Exit em exit_n DTE" — EXATA via tp_dte:
+            # usa o TP só se foi atingido E o cruzamento ocorreu com >= exit_n DTE restantes
+            # (i.e. ANTES de chegar no ponto de saída); senão fecha no exit (ou hold se nem o exit atingiu).
+            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d"))
+            if tpm is not None and tpd is not None and tpd >= exit_n:
+                return round(tpm, 2)
+            return eff(f"x{exit_n}_m")
         row = {
             "trade_date": od, "exp_date": r["expiry_date"], "underlying": "SPX",
             "dte_entry": int(f(r["dte_real"]) or dte), "width_sigma": width, "structure": "Inverse Butterfly 1-2-1 (calls)",
@@ -94,6 +102,10 @@ def export(dte, width, tag, bid, sw):
         }
         for d in exit_ds:
             row[f"pnl_exit{d}"] = eff(f"x{d}_m")
+        # regra composta "TP X% senão Exit N DTE" (EXATA via tp_dte) — uma coluna por (TP, exit)
+        for tp in (25, 50, 75):
+            for d in exit_ds:
+                row[f"pnl_tp{tp}_exit{d}"] = composite(tp, d)
         rows.append(row)
         daily.append({"trade_date": od, "calendar_date": od, "dte_remaining": row["dte_entry"], "pnl_usd": 0.0})
         daily.append({"trade_date": od, "calendar_date": r["expiry_date"], "dte_remaining": 0, "pnl_usd": round(hold, 2)})

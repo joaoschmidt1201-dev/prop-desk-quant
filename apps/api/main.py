@@ -1766,6 +1766,11 @@ for _idte, _iwidths, _iexits in _IBFLY_CONFIGS:
                                         "TP 25%": "pnl_tp25", "TP 50%": "pnl_tp50", "TP 75%": "pnl_tp75"}
     for _id in _iexits:
         _ib_rules[f"Exit at {_id} DTE"] = f"pnl_exit{_id}"
+    # regra COMPOSTA: TP X% senão sai no exit N DTE (coluna pnl_tp{X}_exit{N}, derivada via tp_dte).
+    # só é oferecida no app se a coluna existir nos trades (dados re-rodados com tp_dte).
+    for _tp in (25, 50, 75):
+        for _id in _iexits:
+            _ib_rules[f"TP {_tp}% else Exit {_id} DTE"] = f"pnl_tp{_tp}_exit{_id}"
     BACKTESTS_REGISTRY.append({
         "id": f"ibfly-spx-d{_idte}",
         "name": f"Inverse Butterfly · {_idte}DTE",
