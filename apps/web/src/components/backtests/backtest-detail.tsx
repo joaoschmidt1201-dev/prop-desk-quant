@@ -74,6 +74,10 @@ type BacktestTrade = {
   put_center?: number | string | null;
   put_upper?: number | string | null;
   put_debit?: number | string | null;
+  call_atm?: number | string | null;
+  call_lo?: number | string | null;
+  call_up?: number | string | null;
+  width_sigma?: number | string | null;
 };
 
 type BacktestDailyRow = {
@@ -731,10 +735,13 @@ function TradesTable({
 }) {
   const isSs42 = detail.meta.kind === "ss42";
   const isPl5 = detail.meta.kind === "pl5";
+  const isIbfly = detail.meta.kind === "ibfly";
   const headers = isSs42
     ? ["Trade", "Exp", "Spot in", "IV%", "Put / Call", "Credit", "Spot out", "P&L", "Result"]
     : isPl5
     ? ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (K1/K2/K3)", "Mid debit", "Spread", "P&L", "Result"]
+    : isIbfly
+    ? ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (Lo/ATM/Up)", "Credit", "P&L", "Result"]
     : ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (P/C)", "Credit", "P&L", "Result"];
   const rows = detail.trades;
   return (
@@ -787,6 +794,8 @@ function TradesTable({
                       <td className="px-4 py-2.5 tabular text-muted-foreground">
                         {isPl5 ? (
                           `${t.put_upper != null ? Number(t.put_upper).toFixed(0) : "—"}/${t.put_center != null ? Number(t.put_center).toFixed(0) : "—"}/${t.put_lower != null ? Number(t.put_lower).toFixed(0) : "—"}`
+                        ) : isIbfly ? (
+                          `${t.call_lo != null ? Number(t.call_lo).toFixed(0) : "—"}/${t.call_atm != null ? Number(t.call_atm).toFixed(0) : "—"}/${t.call_up != null ? Number(t.call_up).toFixed(0) : "—"}`
                         ) : (
                           <>
                             {t.long_put != null ? Number(t.long_put).toFixed(0) : "—"}/{t.short_put != null ? Number(t.short_put).toFixed(0) : "—"}
@@ -1507,6 +1516,38 @@ function buildPayoffSeries(
         : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
     };
   }
+  if (kind === "ibfly") {
+    // short call fly 1-2-1: +2 C (ATM) / -1 Clo (ATM-W) / -1 Cup (ATM+W). Long-vol: VALE no centro, GANHA nas asas.
+    const C = asNum(trade.call_atm), Clo = asNum(trade.call_lo), Cup = asNum(trade.call_up);
+    const cr = asNum(trade.total_credit);
+    if (C == null || Clo == null || Cup == null || cr == null) return null;
+    const settle = asNum(trade.spot_exit);
+    const entrySpot = asNum(trade.spot_entry);
+    const anchor = entrySpot ?? C;
+    const refs = [Clo, C, Cup];
+    if (settle != null) refs.push(settle);
+    if (entrySpot != null) refs.push(entrySpot);
+    let xMin = Math.min(...refs), xMax = Math.max(...refs);
+    const pad = Math.max((xMax - xMin) * 0.10, anchor * 0.006);
+    xMin = Math.max(0, xMin - pad); xMax += pad;
+    const steps = 240;
+    const points = Array.from({ length: steps + 1 }, (_, idx) => {
+      const spot = xMin + ((xMax - xMin) * idx) / steps;
+      const pnl = payoffAtSpot(spot, trade, kind, multiplier);
+      return { spot, pnl, profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0, pctFromEntry: anchor ? ((spot - anchor) / anchor) * 100 : 0 };
+    });
+    const references: PayoffReference[] = [
+      { key: "body", label: "Body (ATM)", value: C, color: "var(--loss)", dash: "4 4" },
+      { key: "wing-lo", label: "Wing (−W)", value: Clo, color: "var(--border)", dash: "2 4" },
+      { key: "wing-up", label: "Wing (+W)", value: Cup, color: "var(--border)", dash: "2 4" },
+    ];
+    if (entrySpot != null) references.unshift({ key: "entry", label: "SPOT IN", value: entrySpot, color: "var(--primary)", dash: "4 4" });
+    return {
+      points, references, domain: [xMin, xMax],
+      marker: settle == null || settle < xMin || settle > xMax ? null
+        : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+    };
+  }
   const spotEntry = asNum(trade.spot_entry);
   const credit = asNum(trade.total_credit);
   const shortPut = asNum(trade.short_put);
@@ -1593,6 +1634,13 @@ function payoffAtSpot(
     const k1 = asNum(trade.put_upper) ?? 0, k2 = asNum(trade.put_center) ?? 0, k3 = asNum(trade.put_lower) ?? 0;
     const bwb = Math.max(0, k1 - spot) - 2 * Math.max(0, k2 - spot) + 2 * Math.max(0, k3 - spot);
     return bwb * SPX_PT - (asNum(trade.total_credit) ?? 0);
+  }
+  if (kind === "ibfly") {
+    // Inverse (short) call fly 1-2-1: +2 C (ATM) / -1 Clo (ATM-W) / -1 Cup (ATM+W). Net credit.
+    // Vale no centro (parado = perde), ganha nas asas (movimento). total_credit em USD.
+    const C = asNum(trade.call_atm) ?? 0, Clo = asNum(trade.call_lo) ?? 0, Cup = asNum(trade.call_up) ?? 0;
+    const terminal = 2 * Math.max(0, spot - C) - Math.max(0, spot - Clo) - Math.max(0, spot - Cup);
+    return terminal * SPX_PT + (asNum(trade.total_credit) ?? 0);
   }
   if (kind === "ic0dte" || kind === "ironfly") {
     // Iron Condor / Iron Fly: long put + short put (credit spread) + short call + long call (credit spread).
