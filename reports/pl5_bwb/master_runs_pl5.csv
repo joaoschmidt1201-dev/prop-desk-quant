@@ -5,3 +5,6 @@ pl5_d28_std,87451bca9b06d01295cba9fa9de9ed4d,"$131,102 / WR 19%",28,5.65,,"{""ta
 pl5_d45_std,47e8f961a32705caef7984f0016dec0b,"$87,811 / WR 20%",42,6.30,,"{""target_dte"": ""45"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d45_std""}"
 pl5_d60_std,9af5d2d00462b2b240afd770fad3cde7,"$1,897 / WR 18%",56,7.50,,"{""target_dte"": ""60"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d60_std""}"
 pl5_d60_minchk,fdcadd55b3e3b4f79d3cfd32c9dde52e,"$36,073 / WR 24%",63,16.20,,"{""target_dte"": ""60"", ""data_res"": ""minute"", ""strike_lo"": ""-200"", ""start_date"": ""2025-11-01"", ""end_date"": ""2026-04-30"", ""run_tag"": ""pl5_d60_minchk""}"
+pl5_d75_std,dc12ca85bcce57ca8c266971de7b199f,"$337,792 / WR 26%",77,8.10,,"{""target_dte"": ""75"", ""strike_lo"": ""-500"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d75_std""}"
+pl5_d100_std,55765e41e6c73fd5dac58efd5ae2e9ac,"$465,179 / WR 30%",98,9.15,,"{""target_dte"": ""100"", ""strike_lo"": ""-500"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d100_std""}"
+pl5_d120_std,8bf6822a5088e33ac7ddcf81ce6054c5,"$410,079 / WR 28%",119,10.90,,"{""target_dte"": ""120"", ""strike_lo"": ""-500"", ""start_date"": ""2021-06-01"", ""end_date"": ""2026-06-01"", ""run_tag"": ""pl5_d120_std""}"
