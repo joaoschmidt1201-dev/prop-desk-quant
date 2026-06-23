@@ -1748,13 +1748,14 @@ for _ptag, _pdte in _PL5_CONFIGS:
 # Cards por DTE (7/28/45 = verificados 100% completos; 1/14 entram após chunked re-run).
 # Cada card: seletor de WIDTH (variants -> 1 CSV por width) + close-rule (hold/TP/DTE-rest). mid.
 _IBFLY_DIR = BACKTESTS_ROOT / "ibfly_backtest_app"
+_IBFLY_W6 = ["0.15", "0.25", "0.40", "0.50", "0.60", "0.75"]
 _IBFLY_CONFIGS = [
-    (1,  ["0.15"], []),                                          # 1DTE: só Hold + TP (sem DTE-restante)
-    (4,  ["0.15", "0.40", "0.60"], [3]),
-    (7,  ["0.15", "0.50", "0.60"], [5, 3]),
-    (14, ["0.15", "0.40", "0.50", "0.60"], [14, 10, 7, 5, 3]),
-    (28, ["0.15", "0.25", "0.40", "0.50", "0.60", "0.75"], [21, 14, 10, 7, 5, 3]),
-    (45, ["0.15", "0.40", "0.50", "0.60"], [30, 21, 14, 10, 7, 5, 3]),
+    (1,  ["0.15", "0.25"], []),                                  # 1DTE: saída = meio-dia (noon), não DTE-restante
+    (4,  _IBFLY_W6, [3]),
+    (7,  _IBFLY_W6, [5, 3]),
+    (14, _IBFLY_W6, [14, 10, 7, 5, 3]),
+    (28, _IBFLY_W6, [21, 14, 10, 7, 5, 3]),
+    (45, _IBFLY_W6, [30, 21, 14, 10, 7, 5, 3]),
 ]
 for _idte, _iwidths, _iexits in _IBFLY_CONFIGS:
     _ivariants = {f"{w}σ": f"d{_idte}_w{w}" for w in _iwidths
@@ -1762,15 +1763,16 @@ for _idte, _iwidths, _iexits in _IBFLY_CONFIGS:
     if not _ivariants:
         continue
     _idefw = "0.50σ" if "0.50σ" in _ivariants else next(iter(_ivariants))
+    # close-rules (decisão CZ/João): SÓ TP sozinhos + TP-composto-com-saída. Sem 'Exit N DTE' isolado.
+    # Hold mantido como baseline universal. 1DTE: saída = 12:00 ET (noon) do expiry; demais: N DTE restante.
     _ib_rules: dict[str, str | None] = {"Hold to Expiration": None,
                                         "TP 25%": "pnl_tp25", "TP 50%": "pnl_tp50", "TP 75%": "pnl_tp75"}
-    for _id in _iexits:
-        _ib_rules[f"Exit at {_id} DTE"] = f"pnl_exit{_id}"
-    # regra COMPOSTA: TP X% senão sai no exit N DTE (coluna pnl_tp{X}_exit{N}, derivada via tp_dte).
-    # só é oferecida no app se a coluna existir nos trades (dados re-rodados com tp_dte).
     for _tp in (25, 50, 75):
-        for _id in _iexits:
-            _ib_rules[f"TP {_tp}% else Exit {_id} DTE"] = f"pnl_tp{_tp}_exit{_id}"
+        if _idte == 1:
+            _ib_rules[f"TP {_tp}% else Exit 12:00 ET"] = f"pnl_tp{_tp}_noon"
+        else:
+            for _id in _iexits:
+                _ib_rules[f"TP {_tp}% else Exit {_id} DTE"] = f"pnl_tp{_tp}_exit{_id}"
     BACKTESTS_REGISTRY.append({
         "id": f"ibfly-spx-d{_idte}",
         "name": f"Inverse Butterfly · {_idte}DTE",

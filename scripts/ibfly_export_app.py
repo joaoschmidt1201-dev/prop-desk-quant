@@ -19,15 +19,10 @@ HOME = Path(os.path.expanduser("~")); CLOUD_ID = 27848355
 SWEEP = REPO / "reports" / "inverse_butterfly" / "sweep_ibfly.json"
 OUT = REPO / "reports" / "ibfly_backtest_app"; OUT.mkdir(parents=True, exist_ok=True)
 
-# (dte_label, width_label, sweep_tag) — só os COMPLETOS (verificado: log == runtime n)
-CONFIGS = [
-    (7,  "0.15", "ibfly_dte7"),  (7,  "0.50", "ibfly_d7_w0.50"), (7,  "0.60", "ibfly_d7_w0.60"),
-    (28, "0.15", "ibfly_dte30"), (28, "0.25", "ibfly_w0.25"),    (28, "0.40", "ibfly_w0.40"),
-    (28, "0.50", "ibfly_w0.50"), (28, "0.60", "ibfly_w0.60"),    (28, "0.75", "ibfly_w0.75"),
-    (45, "0.15", "ibfly_dte45"), (45, "0.40", "ibfly_d45_w0.40"),
-    (45, "0.50", "ibfly_d45_w0.50"), (45, "0.60", "ibfly_d45_w0.60"),
-    (4,  "0.15", "ibfly_dte4_mon"),  (4,  "0.60", "ibfly_dte4_mon_w60"),   # 4DTE segunda; cabem (245/248)
-]
+# SINGLE (n<250): esquema de tags UNIFORME ibre_d{DTE}_w{W} (re-run com tp_dte+tp_hour).
+# 28 e 45 DTE × 6 larguras. Os chunked (1/4/7/14 DTE) saem pelo ibfly_merge_chunks.py.
+_W6 = ["0.15", "0.25", "0.40", "0.50", "0.60", "0.75"]
+CONFIGS = [(d, w, f"ibre_d{d}_w{w}") for d in (28, 45) for w in _W6]
 
 _cred = json.load(open(HOME / ".lean" / "credentials"))
 _UID = str(_cred.get("user-id") or _cred.get("user_id")); _TOK = _cred.get("api-token") or _cred.get("token")
@@ -86,6 +81,14 @@ def export(dte, width, tag, bid, sw):
             if tpm is not None and tpd is not None and tpd >= exit_n:
                 return round(tpm, 2)
             return eff(f"x{exit_n}_m")
+        def composite_noon(tp):
+            # regra "TP tp% senão Exit 12:00 ET (noon do expiry)" — p/ 1DTE. EXATA via tp_dte+tp_hour:
+            # usa o TP só se bateu ANTES do meio-dia do expiry (tp_dte>0, ou tp_dte==0 e tp_hour<12);
+            # senão fecha no snapshot e12 (meio-dia) — ou hold se sem snapshot.
+            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
+            if tpm is not None and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
+                return round(tpm, 2)
+            return eff("e12_m")
         row = {
             "trade_date": od, "exp_date": r["expiry_date"], "underlying": "SPX",
             "dte_entry": int(f(r["dte_real"]) or dte), "width_sigma": width, "structure": "Inverse Butterfly 1-2-1 (calls)",
@@ -106,6 +109,10 @@ def export(dte, width, tag, bid, sw):
         for tp in (25, 50, 75):
             for d in exit_ds:
                 row[f"pnl_tp{tp}_exit{d}"] = composite(tp, d)
+        # 1DTE (sem exits por DTE): regra composta "TP X% senão Exit 12:00 ET (noon)"
+        if not exit_ds and f(r.get("e12_m")) is not None:
+            for tp in (25, 50, 75):
+                row[f"pnl_tp{tp}_noon"] = composite_noon(tp)
         rows.append(row)
         daily.append({"trade_date": od, "calendar_date": od, "dte_remaining": row["dte_entry"], "pnl_usd": 0.0})
         daily.append({"trade_date": od, "calendar_date": r["expiry_date"], "dte_remaining": 0, "pnl_usd": round(hold, 2)})

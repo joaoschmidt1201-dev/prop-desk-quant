@@ -36,35 +36,44 @@ def q_axis(ax):
             out.append(_cell(f"ibfly_w{w}", dte="30", width_sigma=w, **FULL))
     return out
 
-def q_chunk():
-    # Completa as variações TRUNCADAS pelo log free-tier (n>249): re-roda cada uma em 2 metades de
-    # data (split 2023-07-01) -> cada metade <250 trades cabe no log -> o export concatena h1+h2.
-    # Configs faltantes: 7DTE 0.50/0.60; 14DTE 0.15/0.40/0.50/0.60; 4DTE 0.40 (segunda); 1DTE diário.
-    SPLIT = "2023-07-01"
-    A = {"start_date": "2021-01-01", "end_date": SPLIT}
-    B = {"start_date": SPLIT, "end_date": "2026-06-08"}
-    specs = [
-        ("ibfly_d7_w0.50",  dict(dte="7",  width_sigma="0.50", entry_weekday="4")),
-        ("ibfly_d7_w0.60",  dict(dte="7",  width_sigma="0.60", entry_weekday="4")),
-        ("ibfly_d15_w0.15", dict(dte="15", width_sigma="0.15", entry_weekday="4")),
-        ("ibfly_d15_w0.40", dict(dte="15", width_sigma="0.40", entry_weekday="4")),
-        ("ibfly_d15_w0.50", dict(dte="15", width_sigma="0.50", entry_weekday="4")),
-        ("ibfly_d15_w0.60", dict(dte="15", width_sigma="0.60", entry_weekday="4")),
-        ("ibfly_dte4_mon_w40", dict(dte="4", width_sigma="0.40", entry_weekday="0")),
-    ]
+# ───────── RE-RUN COMPLETO (motor c/ tp_dte+tp_hour) — esquema de tags UNIFORME ibre_d{DTE}_w{W} ─────────
+# label DTE do app -> (target_dte do motor, entry_weekday). 14->15, 28->30 (motor mira sexta + |dte-target|).
+_IB_DTE = {1: ("1", "all"), 4: ("4", "0"), 7: ("7", "4"), 14: ("15", "4"), 28: ("30", "4"), 45: ("45", "4")}
+_IB_W6 = ["0.15", "0.25", "0.40", "0.50", "0.60", "0.75"]
+# grid (decisão João): swing 4/7/14/45 + 28 com 6 larguras; 1DTE só 0.15/0.25.
+_IB_GRID = {1: ["0.15", "0.25"], 4: _IB_W6, 7: _IB_W6, 14: _IB_W6, 28: _IB_W6, 45: _IB_W6}
+_SPLIT2 = "2023-07-01"
+_WIN6 = ["2021-01-01", "2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31", "2026-06-08"]
+
+def _ibcell(dte_label, w, suffix="", **dates):
+    mdte, wd = _IB_DTE[dte_label]
+    return _cell(f"ibre_d{dte_label}_w{w}{suffix}", dte=mdte, width_sigma=w, entry_weekday=wd, **dates)
+
+def q_reapp():
+    # SINGLE (n<250): 28 e 45 DTE, 6 larguras. Cabem inteiros no log -> 1 run cada.
     out = []
-    for base, params in specs:
-        out.append(_cell(f"{base}_h1", **{**params, **A}))
-        out.append(_cell(f"{base}_h2", **{**params, **B}))
+    for d in (28, 45):
+        for w in _IB_GRID[d]:
+            out.append(_ibcell(d, w, **FULL))
+    return out
+
+def q_chunk():
+    # CHUNKED em 2 metades (4/7/14 DTE, 6 larguras): n perto/acima de 250 -> metade cabe no log; merge concatena.
+    A = {"start_date": "2021-01-01", "end_date": _SPLIT2}
+    B = {"start_date": _SPLIT2, "end_date": "2026-06-08"}
+    out = []
+    for d in (4, 7, 14):
+        for w in _IB_GRID[d]:
+            out.append(_ibcell(d, w, "_h1", **A))
+            out.append(_ibcell(d, w, "_h2", **B))
     return out
 
 def q_chunk1():
-    # 1DTE diário (n=1239) é grande demais p/ 2 metades — divide em 6 janelas (~1 ano cada).
-    edges = ["2021-01-01", "2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31", "2026-06-08"]
+    # 1DTE diário (n~1239/largura) -> 6 janelas anuais por largura (0.15 e 0.25).
     out = []
-    for i in range(len(edges) - 1):
-        out.append(_cell(f"ibfly_dte1_c{i+1}", dte="1", width_sigma="0.15", entry_weekday="all",
-                         start_date=edges[i], end_date=edges[i+1]))
+    for w in _IB_GRID[1]:
+        for i in range(len(_WIN6) - 1):
+            out.append(_ibcell(1, w, f"_c{i+1}", start_date=_WIN6[i], end_date=_WIN6[i+1]))
     return out
 
 def q_minchk():
@@ -95,29 +104,6 @@ def q_best2():
         for w in ("0.50", "0.60"):
             out.append(_cell(f"ibfly_d{d}_w{w}", dte=d, width_sigma=w, entry_weekday="4", **FULL))
     out.append(_cell("ibfly_dte4_mon_w60", dte="4", width_sigma="0.60", entry_weekday="0", **FULL))
-    return out
-
-def q_reapp():
-    # RE-RUN com motor instrumentado (tp_dte) p/ a regra composta "TP senão Exit N DTE" ser EXATA.
-    # Exatamente os configs single do app (n<250). Os chunked (7-largo/14/4-0.40/1DTE) saem por --chunk/--chunk1.
-    # tags = as MESMAS já usadas, p/ o export ler do mesmo lugar. Prioriza 28/45 DTE (melhores+completos).
-    out = []
-    # 28 DTE — 6 larguras
-    out += [_cell("ibfly_dte30", dte="30", width_sigma="0.15", entry_weekday="4", **FULL),
-            _cell("ibfly_w0.25", dte="30", width_sigma="0.25", entry_weekday="4", **FULL),
-            _cell("ibfly_w0.40", dte="30", width_sigma="0.40", entry_weekday="4", **FULL),
-            _cell("ibfly_w0.50", dte="30", width_sigma="0.50", entry_weekday="4", **FULL),
-            _cell("ibfly_w0.60", dte="30", width_sigma="0.60", entry_weekday="4", **FULL),
-            _cell("ibfly_w0.75", dte="30", width_sigma="0.75", entry_weekday="4", **FULL)]
-    # 45 DTE — 4 larguras
-    out += [_cell("ibfly_dte45",     dte="45", width_sigma="0.15", entry_weekday="4", **FULL),
-            _cell("ibfly_d45_w0.40", dte="45", width_sigma="0.40", entry_weekday="4", **FULL),
-            _cell("ibfly_d45_w0.50", dte="45", width_sigma="0.50", entry_weekday="4", **FULL),
-            _cell("ibfly_d45_w0.60", dte="45", width_sigma="0.60", entry_weekday="4", **FULL)]
-    # 7 DTE 0.15 + 4 DTE 0.15/0.60 (cabem)
-    out += [_cell("ibfly_dte7",         dte="7", width_sigma="0.15", entry_weekday="4", **FULL),
-            _cell("ibfly_dte4_mon",     dte="4", width_sigma="0.15", entry_weekday="0", **FULL),
-            _cell("ibfly_dte4_mon_w60", dte="4", width_sigma="0.60", entry_weekday="0", **FULL)]
     return out
 
 def build_queue(args):

@@ -16,17 +16,13 @@ HOME = Path(os.path.expanduser("~")); CLOUD_ID = 27848355
 SWEEP = REPO / "reports" / "inverse_butterfly" / "sweep_ibfly.json"
 OUT = REPO / "reports" / "ibfly_backtest_app"
 
-# (dte_label, width, [tags dos chunks]) — concatena na ordem temporal
-MERGES = [
-    (7,  "0.50", ["ibfly_d7_w0.50_h1", "ibfly_d7_w0.50_h2"]),
-    (7,  "0.60", ["ibfly_d7_w0.60_h1", "ibfly_d7_w0.60_h2"]),
-    (14, "0.15", ["ibfly_d15_w0.15_h1", "ibfly_d15_w0.15_h2"]),
-    (14, "0.40", ["ibfly_d15_w0.40_h1", "ibfly_d15_w0.40_h2"]),
-    (14, "0.50", ["ibfly_d15_w0.50_h1", "ibfly_d15_w0.50_h2"]),
-    (14, "0.60", ["ibfly_d15_w0.60_h1", "ibfly_d15_w0.60_h2"]),
-    (4,  "0.40", ["ibfly_dte4_mon_w40_h1", "ibfly_dte4_mon_w40_h2"]),
-    (1,  "0.15", [f"ibfly_dte1_c{i}" for i in range(1, 7)]),
-]
+# (dte_label, width, [tags dos chunks]) — esquema UNIFORME ibre_d{DTE}_w{W}_{h1/h2 | c1..c6}.
+# 4/7/14 DTE = 2 metades (h1+h2); 1 DTE = 6 janelas (c1..c6). Concatena na ordem temporal.
+_W6 = ["0.15", "0.25", "0.40", "0.50", "0.60", "0.75"]
+MERGES = (
+    [(d, w, [f"ibre_d{d}_w{w}_h1", f"ibre_d{d}_w{w}_h2"]) for d in (4, 7, 14) for w in _W6]
+    + [(1, w, [f"ibre_d1_w{w}_c{i}" for i in range(1, 7)]) for w in ("0.15", "0.25")]
+)
 
 _cred = json.load(open(HOME / ".lean" / "credentials"))
 _UID = str(_cred.get("user-id") or _cred.get("user_id")); _TOK = _cred.get("api-token") or _cred.get("token")
@@ -89,6 +85,11 @@ def merge(dte, width, tags, sw):
             if tpm is not None and tpd is not None and tpd >= exit_n:
                 return round(tpm, 2)
             return eff(f"x{exit_n}_m")
+        def composite_noon(tp):  # "TP tp% senão Exit 12:00 ET (noon)" — p/ 1DTE; EXATA via tp_dte+tp_hour
+            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
+            if tpm is not None and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
+                return round(tpm, 2)
+            return eff("e12_m")
         row = {
             "trade_date": od, "exp_date": r["expiry_date"], "underlying": "SPX",
             "dte_entry": int(f(r["dte_real"]) or dte), "width_sigma": width, "structure": "Inverse Butterfly 1-2-1 (calls)",
@@ -106,6 +107,9 @@ def merge(dte, width, tags, sw):
         for tp in (25, 50, 75):
             for d in exit_ds:
                 row[f"pnl_tp{tp}_exit{d}"] = composite(tp, d)
+        if not exit_ds and f(r.get("e12_m")) is not None:
+            for tp in (25, 50, 75):
+                row[f"pnl_tp{tp}_noon"] = composite_noon(tp)
         rows.append(row)
         daily.append({"trade_date": od, "calendar_date": od, "dte_remaining": row["dte_entry"], "pnl_usd": 0.0})
         daily.append({"trade_date": od, "calendar_date": r["expiry_date"], "dte_remaining": 0, "pnl_usd": round(hold, 2)})
@@ -122,11 +126,8 @@ def main():
     sw = json.loads(SWEEP.read_text(encoding="utf-8"))
     total = 0
     for dte, width, tags in MERGES:
-        dest = OUT / f"d{dte}_w{width}" / "trades.csv"
-        # só pula se já existe E não é um placeholder truncado (heurística: existe e foi mergeado antes)
-        if dest.exists() and dte not in (1, 14) and width not in ("0.40",):
-            # configs já completos via export normal — não mexe
-            pass
+        # idempotente: se todos os chunks dessa célula estão no sweep, re-mergeia (sobrescreve com dados novos);
+        # se faltam chunks (ainda rodando), o merge() detecta e pula sem apagar o que existe.
         try:
             n = merge(dte, width, tags, sw)
             if n: total += n
