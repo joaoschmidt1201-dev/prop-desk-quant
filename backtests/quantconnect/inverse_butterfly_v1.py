@@ -194,9 +194,9 @@ class InverseButterflyV1(QCAlgorithm):
         cr = tr["credit_mid"]
         for l in self.tp_levels:
             if tr["tp"][l] is None and pnl_mid >= l * cr:
-                # grava o DTE-restante no cruzamento do TP -> permite a regra composta "TP senão exit N DTE"
-                # ser EXATA no pós-proc (só usa o TP se tp_dte >= N, i.e. o TP bateu antes do exit).
-                tr["tp"][l] = (round(pnl_mid, 2), round(pnl_cons, 2), round(S, 2), dte_rem)
+                # grava DTE-restante E HORA no cruzamento do TP -> regra composta "TP senão exit" EXATA:
+                # exit por DTE usa tp_dte>=N; exit por horário (ex. meio-dia do expiry) usa tp_dte/tp_hour.
+                tr["tp"][l] = (round(pnl_mid, 2), round(pnl_cons, 2), round(S, 2), dte_rem, self.time.hour)
         for d in self.dte_exit_grid:
             if tr["dte_val"][d] is None and dte_rem <= d:
                 tr["dte_val"][d] = (round(pnl_mid, 2), round(pnl_cons, 2), round(S, 2))
@@ -249,7 +249,7 @@ class InverseButterflyV1(QCAlgorithm):
         }
         for l in self.tp_levels:
             cx = tr["tp"][l]; t = f"tp{int(l*100)}"
-            row[f"{t}_m"], row[f"{t}_c"], row[f"{t}_s"], row[f"{t}_d"] = (cx if cx else ("", "", "", ""))
+            row[f"{t}_m"], row[f"{t}_c"], row[f"{t}_s"], row[f"{t}_d"], row[f"{t}_h"] = (cx if cx else ("", "", "", "", ""))
         for d in self.dte_exit_grid:
             cx = tr["dte_val"][d]
             row[f"x{d}_m"], row[f"x{d}_c"], row[f"x{d}_s"] = (cx if cx else ("", "", ""))
@@ -307,7 +307,7 @@ class InverseButterflyV1(QCAlgorithm):
                  "atm_iv", "sigma", "W", "S_entry", "S_settle", "C", "Clo", "Cup",
                  "credit_mid", "credit_cons", "mfe", "mae", "terminal", "hold_net_mid", "hold_net_cons",
                  "realized_move", "result"]
-                + [f"tp{int(l*100)}_{x}" for l in self.tp_levels for x in ("m", "c", "s", "d")]
+                + [f"tp{int(l*100)}_{x}" for l in self.tp_levels for x in ("m", "c", "s", "d", "h")]
                 + [f"x{d}_{x}" for d in self.dte_exit_grid for x in ("m", "c", "s")]
                 + [f"e{s}_{x}" for s in self.expiry_snaps for x in ("m", "c", "s")])
         lines = [",".join(cols)]
