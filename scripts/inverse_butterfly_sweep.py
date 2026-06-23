@@ -97,7 +97,31 @@ def q_best2():
     out.append(_cell("ibfly_dte4_mon_w60", dte="4", width_sigma="0.60", entry_weekday="0", **FULL))
     return out
 
+def q_reapp():
+    # RE-RUN com motor instrumentado (tp_dte) p/ a regra composta "TP senão Exit N DTE" ser EXATA.
+    # Exatamente os configs single do app (n<250). Os chunked (7-largo/14/4-0.40/1DTE) saem por --chunk/--chunk1.
+    # tags = as MESMAS já usadas, p/ o export ler do mesmo lugar. Prioriza 28/45 DTE (melhores+completos).
+    out = []
+    # 28 DTE — 6 larguras
+    out += [_cell("ibfly_dte30", dte="30", width_sigma="0.15", entry_weekday="4", **FULL),
+            _cell("ibfly_w0.25", dte="30", width_sigma="0.25", entry_weekday="4", **FULL),
+            _cell("ibfly_w0.40", dte="30", width_sigma="0.40", entry_weekday="4", **FULL),
+            _cell("ibfly_w0.50", dte="30", width_sigma="0.50", entry_weekday="4", **FULL),
+            _cell("ibfly_w0.60", dte="30", width_sigma="0.60", entry_weekday="4", **FULL),
+            _cell("ibfly_w0.75", dte="30", width_sigma="0.75", entry_weekday="4", **FULL)]
+    # 45 DTE — 4 larguras
+    out += [_cell("ibfly_dte45",     dte="45", width_sigma="0.15", entry_weekday="4", **FULL),
+            _cell("ibfly_d45_w0.40", dte="45", width_sigma="0.40", entry_weekday="4", **FULL),
+            _cell("ibfly_d45_w0.50", dte="45", width_sigma="0.50", entry_weekday="4", **FULL),
+            _cell("ibfly_d45_w0.60", dte="45", width_sigma="0.60", entry_weekday="4", **FULL)]
+    # 7 DTE 0.15 + 4 DTE 0.15/0.60 (cabem)
+    out += [_cell("ibfly_dte7",         dte="7", width_sigma="0.15", entry_weekday="4", **FULL),
+            _cell("ibfly_dte4_mon",     dte="4", width_sigma="0.15", entry_weekday="0", **FULL),
+            _cell("ibfly_dte4_mon_w60", dte="4", width_sigma="0.60", entry_weekday="0", **FULL)]
+    return out
+
 def build_queue(args):
+    if "--reapp" in args:  return q_reapp()
     if "--smoke" in args:  return q_smoke()
     if "--minchk" in args: return q_minchk()
     if "--chunk1" in args: return q_chunk1()
@@ -194,10 +218,11 @@ def main():
     args = set(sys.argv[1:]); queue = build_queue(args)
     if "--dry" in args:
         print(f"Fila ({len(queue)}):"); [print(f"  {t:20} {o}") for t, o in queue]; return
+    force = "--force" in args   # re-roda mesmo tags já OK (ex.: motor mudou -> precisa do tp_dte novo)
     push_code(); cid = compile_project(); res = load_results()
     for tag, ov in queue:
         cur = res.get(tag, {})
-        if cur.get("runtime") and not (cur["runtime"] or {}).get("_error"):
+        if not force and cur.get("runtime") and not (cur["runtime"] or {}).get("_error"):
             print(f"[skip] {tag}", flush=True); continue
         do_scenario(tag, {**ov, "run_tag": tag}, res, cid)
     print("\n===== SWEEP IBFLY COMPLETO =====", flush=True)
