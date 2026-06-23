@@ -31,8 +31,10 @@ SWEEP = REPO / "reports" / "pl5_bwb" / "sweep_pl5.json"
 OUT = REPO / "reports" / "pl5_backtest_app"
 OUT.mkdir(parents=True, exist_ok=True)
 
-TAGS = ["pl5_d21_std", "pl5_d28_std", "pl5_d45_std", "pl5_d60_std"]
-EXIT_GRID = [30, 21, 14, 10, 7, 5, 3]   # DTE restantes (mid) — colunas pnl_exitD
+TAGS = ["pl5_d21_std", "pl5_d28_std", "pl5_d45_std", "pl5_d60_std",
+        "pl5_d75_std", "pl5_d100_std", "pl5_d120_std"]   # + DTEs longos (CZ 2026-06-23)
+EXIT_GRID = [90, 75, 60, 45, 30, 21, 14, 10, 7, 5, 3]   # DTE restantes (mid) — adaptado p/ longos
+TP_LEVELS = [25, 50, 75, 100]                            # % de ref_profit (pico do tent) — colunas tp{L} no log
 
 _cred = json.load(open(HOME / ".lean" / "credentials"))
 _UID = str(_cred.get("user-id") or _cred.get("user_id"))
@@ -132,9 +134,25 @@ def export_tag(tag, bid):
             "mfe": r.get("mfe"), "mae": r.get("mae"),
         }
         # colunas de saída antecipada (mid). Fallback p/ hold se o trade não atingiu D DTE.
+        def exit_val(d):
+            v = r.get(f"x{d}m"); return round(float(v), 2) if v not in ("", None) else round(hold, 2)
         for d in applic:
-            v = r.get(f"x{d}m")
-            row[f"pnl_exit{d}"] = round(float(v), 2) if v not in ("", None) else round(hold, 2)
+            row[f"pnl_exit{d}"] = exit_val(d)
+        # TP isolado (mid): sai no TP se atingido; senão segura até o vencimento (fallback hold).
+        dte_real = int(r.get("dte") or dte_entry)
+        def tp_val(L):
+            v = r.get(f"tp{L}"); return round(float(v), 2) if v not in ("", None) else round(hold, 2)
+        for L in TP_LEVELS:
+            row[f"pnl_tp{L}"] = tp_val(L)
+        # regra COMPOSTA "TP L% senão Exit N DTE" — EXATA via dit do TP:
+        # dte_rem no cruzamento do TP = dte_real - tpd{L}; usa o TP só se >= N (bateu ANTES do exit).
+        for L in TP_LEVELS:
+            tpv = r.get(f"tp{L}"); tpd = r.get(f"tpd{L}")
+            for d in applic:
+                if tpv not in ("", None) and tpd not in ("", None) and (dte_real - int(float(tpd))) >= d:
+                    row[f"pnl_tp{L}_exit{d}"] = round(float(tpv), 2)
+                else:
+                    row[f"pnl_tp{L}_exit{d}"] = exit_val(d)
         rows.append(row)
         daily.append({"trade_date": od, "calendar_date": od, "dte_remaining": row["dte_entry"], "pnl_usd": 0.0})
         daily.append({"trade_date": od, "calendar_date": exp.isoformat(), "dte_remaining": 0, "pnl_usd": round(hold, 2)})
