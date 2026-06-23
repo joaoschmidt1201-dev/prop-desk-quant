@@ -81,8 +81,67 @@ def fnum(r, k):
     try: return float(r[k])
     except (TypeError, ValueError, KeyError): return None
 
+def _rule_pnls(rows, col):
+    """(exp_date, pnl) ordenado por realização; col=None -> hold (pnl_usd)."""
+    items = []
+    for r in rows:
+        p = fnum(r, "pnl_usd") if col is None else (fnum(r, col) if fnum(r, col) is not None else fnum(r, "pnl_usd"))
+        e = r.get("exp_date")
+        if p is None or not e: continue
+        items.append((e, p))
+    items.sort()
+    return items
+
+def max_drawdown(rows, col=None):
+    """maxDD ($) da curva de equity acumulada (P&L realizado na ordem de fechamento)."""
+    cum = peak = mdd = 0.0
+    for _, p in _rule_pnls(rows, col):
+        cum += p; peak = max(peak, cum); mdd = min(mdd, cum - peak)
+    return mdd  # <= 0
+
+def maxdd_mtm(daily_rows):
+    """maxDD da curva de equity MTM AGREGADA (marca-a-mercado de todas as posições, da trajetória).
+    Captura o drawdown NÃO-REALIZADO enquanto as posições estão abertas — o risco real (≠ curva de
+    trades fechados, que subestima nos DTEs longos). Amostragem ~17 pts/trade (piso, não contínuo)."""
+    from collections import defaultdict
+    bytrade = defaultdict(list)
+    for r in daily_rows:
+        try: bytrade[r["trade_date"]].append((r["calendar_date"], float(r["pnl_usd"])))
+        except Exception: pass
+    deltas = defaultdict(float)
+    for _, pts in bytrade.items():
+        pts.sort(); prev = 0.0
+        for cd, pnl in pts:
+            deltas[cd] += pnl - prev; prev = pnl
+    cum = peak = mdd = 0.0
+    for cd in sorted(deltas):
+        cum += deltas[cd]; peak = max(peak, cum); mdd = min(mdd, cum - peak)
+    return mdd
+
+def risk_metrics(rows, capital, daily_rows):
+    """Métricas de risco do HOLD. Sharpe sobre retornos MENSAIS realizados normalizados pelo capital
+    empregado (margem média). maxDD = MTM agregado (real). Calmar = net anualizado / |maxDD MTM|."""
+    import numpy as _np
+    items = _rule_pnls(rows, None)
+    if not items or not capital: return None
+    net = sum(p for _, p in items)
+    mdd = maxdd_mtm(daily_rows)
+    from collections import defaultdict
+    mp = defaultdict(float)
+    for e, p in items: mp[e[:7]] += p
+    ser = _np.array(list(mp.values())) / capital
+    n_months = len(ser)
+    sharpe = (ser.mean() / ser.std() * _np.sqrt(12)) if ser.std() > 0 else 0.0
+    years = max(n_months / 12.0, 0.5)
+    calmar = ((net / years) / abs(mdd)) if mdd < 0 else float("inf")
+    return {"net": net, "mdd": mdd, "sharpe": sharpe, "calmar": calmar}
+
 def load(tag):
     return list(csv.DictReader(open(APP / tag / "trades.csv", encoding="utf-8")))
+
+def load_daily(tag):
+    p = APP / tag / "daily.csv"
+    return list(csv.DictReader(open(p, encoding="utf-8"))) if p.exists() else []
 
 def spx_loader():
     p = REPO / "data/cache/spx_daily.parquet"
@@ -146,6 +205,7 @@ def fig_table(pdf, title, headers, rows, subtitle=None, note=None, hi_col=None):
 def build():
     at = spx_loader()
     data = {tag: load(tag) for tag, _ in DTES}
+    daily = {tag: load_daily(tag) for tag, _ in DTES}
     sens = {tag: fill_sensitivity(data[tag]) for tag, _ in DTES}
     money = lambda v: f"${v:+,.0f}"
     DEST.parent.mkdir(parents=True, exist_ok=True)
@@ -328,6 +388,53 @@ def build():
                  ha="center", fontsize=9.5, color=GREY)
         plt.colorbar(im, ax=ax, fraction=0.025, pad=0.02, label="net (US$ k)")
         fig.tight_layout(rect=[0, 0.06, 1, 1]); pdf.savefig(fig); plt.close(fig)
+
+        # ============ 6c. HEATMAP — MAX DRAWDOWN (DTE x close-rule) ============
+        D = np.full((len(DTES), len(rule_cols)), np.nan)
+        for i, (tag, dte) in enumerate(DTES):
+            rows_ = data[tag]
+            for j, (lbl, col) in enumerate(rule_cols):
+                if col is None or any(col in r for r in rows_):
+                    D[i, j] = max_drawdown(rows_, col) / 1000.0   # <= 0
+        fig, ax = plt.subplots(figsize=(11.7, 8.3))
+        dlim = np.nanmin(D)
+        im = ax.imshow(D, cmap="Reds_r", vmin=dlim, vmax=0, aspect="auto")
+        ax.set_xticks(range(len(rule_cols))); ax.set_xticklabels([l for l, _ in rule_cols], rotation=30, ha="right")
+        ax.set_yticks(range(len(DTES))); ax.set_yticklabels([f"{dte} DTE" for _, dte in DTES])
+        for i in range(len(DTES)):
+            for j in range(len(rule_cols)):
+                if not np.isnan(D[i, j]):
+                    ax.text(j, i, f"{D[i,j]:.0f}", ha="center", va="center", fontsize=8, color="black", fontweight="bold")
+        ax.set_title("6c. Drawdown heatmap — horizon x close-rule (closed-trade equity, US$ k, mid)",
+                     fontsize=15, fontweight="bold", color=NAVY, pad=14)
+        fig.text(0.5, 0.04, "Deeper red = bigger peak-to-trough on the CLOSED-TRADE curve — use to COMPARE close-rules within "
+                 "a horizon (TP exits, esp. short DTE, cut it most). The absolute mark-to-market risk (open positions) is on "
+                 "page 6d; this realized view understates the long-DTE risk. Read both heatmaps together (net 6b vs DD here).",
+                 ha="center", fontsize=9.5, color=GREY)
+        plt.colorbar(im, ax=ax, fraction=0.025, pad=0.02, label="max DD (US$ k)")
+        fig.tight_layout(rect=[0, 0.06, 1, 1]); pdf.savefig(fig); plt.close(fig)
+
+        # ============ 6d. RISK METRICS by horizon ============
+        rk_rows = []
+        for tag, dte in DTES:
+            ma = margin_analysis(data[tag])
+            cap = ma["avg_margin"] if ma else None
+            rm = risk_metrics(data[tag], cap, daily[tag])
+            if not rm: continue
+            cal = "inf" if rm["calmar"] == float("inf") else f"{rm['calmar']:.2f}"
+            rk_rows.append([f"{dte} DTE", money(rm["net"]), f"${rm['mdd']:,.0f}",
+                            f"{rm['sharpe']:.2f}", cal])
+        fig_table(pdf, "6d. Risk-adjusted metrics by horizon (hold, mid)",
+                  ["Horizon", "Net", "Max drawdown (MTM)", "Sharpe", "Calmar"], rk_rows,
+                  subtitle="maxDD = aggregate MARK-TO-MARKET drawdown (real, incl. open positions) · Sharpe on monthly returns / avg capital",
+                  hi_col=2,
+                  note="MAX DRAWDOWN here is the aggregate MARK-TO-MARKET drawdown — the worst peak-to-trough of the whole "
+                       "open book, not just closed trades (the closed-trade curve badly understates risk on long DTEs, which "
+                       "sit open for months). It is a HISTORICAL drawdown (what happened in 5y), distinct from the margin page's "
+                       "THEORETICAL worst case ($1-2M). Note it samples ~17 points/trade, so it is a floor — continuous marking "
+                       "would be somewhat deeper. SHARPE is modest because PL5 has a low win rate with fat crash-tail winners "
+                       "(very skewed monthly P&L = high volatility), so Sharpe under-rewards a convex payoff; read it together "
+                       "with Calmar (net/|maxDD|), which is strong for 75-120 DTE. All hold/mid (ceiling); realistic fills lower it.")
 
         # ============ 7. 2025 CRASH EXAMPLE ============
         rows60 = sorted(data["pl5_d60_std"], key=lambda r: fnum(r, "pnl_usd") or 0)
