@@ -71,23 +71,26 @@ def export(dte, width, tag, bid, sw):
     rows, daily = [], []
     for r in recs:
         od = r["open_date"]; hold = f(r["hold_net_mid"]) or 0.0
+        cred = f(r.get("credit_mid")) or 0.0
         def eff(col):
             v = f(r.get(col)); return round(v, 2) if v is not None else round(hold, 2)
+        def tp_target(tp):
+            # ANTI-FANTASMA: uma ordem-limite de TP a tp% do crédito EXECUTA NO ALVO (tp%*crédito),
+            # NÃO no pico do MTM (que vinha de quote horário stale -> ganho > crédito = impossível).
+            return round(tp / 100.0 * cred, 2)
+        def tp_hit(tp):
+            return f(r.get(f"tp{tp}_m")) is not None   # MTM gravado = TP foi atingido em algum momento
         def composite(tp, exit_n):
-            # regra "TP tp% senão Exit em exit_n DTE" — EXATA via tp_dte:
-            # usa o TP só se foi atingido E o cruzamento ocorreu com >= exit_n DTE restantes
-            # (i.e. ANTES de chegar no ponto de saída); senão fecha no exit (ou hold se nem o exit atingiu).
-            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d"))
-            if tpm is not None and tpd is not None and tpd >= exit_n:
-                return round(tpm, 2)
+            # "TP tp% senão Exit exit_n DTE" — EXATA via tp_dte. TP fecha NO ALVO (tp_target), não no MTM.
+            tpd = f(r.get(f"tp{tp}_d"))
+            if tp_hit(tp) and tpd is not None and tpd >= exit_n:
+                return tp_target(tp)
             return eff(f"x{exit_n}_m")
         def composite_noon(tp):
-            # regra "TP tp% senão Exit 12:00 ET (noon do expiry)" — p/ 1DTE. EXATA via tp_dte+tp_hour:
-            # usa o TP só se bateu ANTES do meio-dia do expiry (tp_dte>0, ou tp_dte==0 e tp_hour<12);
-            # senão fecha no snapshot e12 (meio-dia) — ou hold se sem snapshot.
-            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
-            if tpm is not None and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
-                return round(tpm, 2)
+            # "TP tp% senão Exit 12:00 ET (noon)" — p/ 1DTE. TP fecha NO ALVO.
+            tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
+            if tp_hit(tp) and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
+                return tp_target(tp)
             return eff("e12_m")
         row = {
             "trade_date": od, "exp_date": r["expiry_date"], "underlying": "SPX",
@@ -99,7 +102,10 @@ def export(dte, width, tag, bid, sw):
             "iv_atm_pct": round((f(r["atm_iv"]) or 0)*100, 2),
             "expected_move": round(f(r["sigma"]) or 0, 1),
             "pnl_usd": round(hold, 2),
-            "pnl_tp25": eff("tp25_m"), "pnl_tp50": eff("tp50_m"), "pnl_tp75": eff("tp75_m"),
+            # TP isolado: sai NO ALVO (tp%*crédito) se atingido; senão segura até o vencimento (hold).
+            "pnl_tp25": tp_target(25) if tp_hit(25) else round(hold, 2),
+            "pnl_tp50": tp_target(50) if tp_hit(50) else round(hold, 2),
+            "pnl_tp75": tp_target(75) if tp_hit(75) else round(hold, 2),
             "result": "WIN" if hold > 0 else "LOSS", "exit_method": "expiration",
             "mfe": f(r.get("mfe")), "mae": f(r.get("mae")),
         }

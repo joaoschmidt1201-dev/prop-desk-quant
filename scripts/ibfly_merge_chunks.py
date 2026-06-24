@@ -78,17 +78,20 @@ def merge(dte, width, tags, sw):
     rows, daily = [], []
     for i, r in enumerate(recs, 1):
         od = r["open_date"]; hold = f(r["hold_net_mid"]) or 0.0
+        cred = f(r.get("credit_mid")) or 0.0
         def eff(col):
             v = f(r.get(col)); return round(v, 2) if v is not None else round(hold, 2)
-        def composite(tp, exit_n):  # "TP tp% senão Exit exit_n DTE" — EXATA via tp_dte
-            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d"))
-            if tpm is not None and tpd is not None and tpd >= exit_n:
-                return round(tpm, 2)
+        def tp_target(tp): return round(tp / 100.0 * cred, 2)   # ANTI-FANTASMA: TP executa no alvo, não no MTM stale
+        def tp_hit(tp): return f(r.get(f"tp{tp}_m")) is not None
+        def composite(tp, exit_n):  # "TP tp% senão Exit exit_n DTE" — TP fecha NO ALVO
+            tpd = f(r.get(f"tp{tp}_d"))
+            if tp_hit(tp) and tpd is not None and tpd >= exit_n:
+                return tp_target(tp)
             return eff(f"x{exit_n}_m")
-        def composite_noon(tp):  # "TP tp% senão Exit 12:00 ET (noon)" — p/ 1DTE; EXATA via tp_dte+tp_hour
-            tpm = f(r.get(f"tp{tp}_m")); tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
-            if tpm is not None and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
-                return round(tpm, 2)
+        def composite_noon(tp):  # "TP tp% senão Exit 12:00 ET (noon)" — p/ 1DTE
+            tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
+            if tp_hit(tp) and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
+                return tp_target(tp)
             return eff("e12_m")
         row = {
             "trade_date": od, "exp_date": r["expiry_date"], "underlying": "SPX",
@@ -98,7 +101,9 @@ def merge(dte, width, tags, sw):
             "total_credit": round(f(r["credit_mid"]) or 0, 2), "vix_entry": f(r["vix"]),
             "iv_atm_pct": round((f(r["atm_iv"]) or 0)*100, 2), "expected_move": round(f(r["sigma"]) or 0, 1),
             "pnl_usd": round(hold, 2),
-            "pnl_tp25": eff("tp25_m"), "pnl_tp50": eff("tp50_m"), "pnl_tp75": eff("tp75_m"),
+            "pnl_tp25": tp_target(25) if tp_hit(25) else round(hold, 2),
+            "pnl_tp50": tp_target(50) if tp_hit(50) else round(hold, 2),
+            "pnl_tp75": tp_target(75) if tp_hit(75) else round(hold, 2),
             "result": "WIN" if hold > 0 else "LOSS", "exit_method": "expiration",
             "mfe": f(r.get("mfe")), "mae": f(r.get("mae")),
         }
