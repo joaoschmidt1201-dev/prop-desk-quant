@@ -6,8 +6,22 @@ escreve reports/ibfly_backtest_app/d{dte}_w{width}/{trades,daily}.csv — idênt
 Uso: python scripts/ibfly_merge_chunks.py
 """
 from __future__ import annotations
-import json, base64, hashlib, time, os, csv, sys, re
+import json, base64, hashlib, time, os, csv, sys, re, math
 from pathlib import Path
+
+# ── valor teórico BS p/ validar o MTM do TP (anti quote-stale) — espelha ibfly_export_app ──
+TP_VOL_MULT = 3.0
+def _N(x): return 0.5 * (1 + math.erf(x / math.sqrt(2)))
+def _bs_call(S, K, T, sig, r=0.04):
+    if S <= 0 or K <= 0: return 0.0
+    if T <= 0 or sig <= 0: return max(0.0, S - K)
+    d1 = (math.log(S / K) + (r + sig * sig / 2) * T) / (sig * math.sqrt(T)); d2 = d1 - sig * math.sqrt(T)
+    return S * _N(d1) - K * math.exp(-r * T) * _N(d2)
+def _ifly_cap_pnl(spot, dte_rem, vol, C, Clo, Cup, credit):
+    if spot is None or C is None: return None
+    T = (dte_rem or 0) / 365.0; sig = (vol or 0.15) * TP_VOL_MULT
+    val = 2 * _bs_call(spot, C, T, sig) - _bs_call(spot, Clo, T, sig) - _bs_call(spot, Cup, T, sig)
+    return val * 100.0 + (credit or 0.0)
 try: sys.stdout.reconfigure(encoding="utf-8")
 except Exception: pass
 
@@ -79,19 +93,24 @@ def merge(dte, width, tags, sw):
     for i, r in enumerate(recs, 1):
         od = r["open_date"]; hold = f(r["hold_net_mid"]) or 0.0
         cred = f(r.get("credit_mid")) or 0.0
+        C, Clo, Cup, aiv = f(r.get("C")), f(r.get("Clo")), f(r.get("Cup")), f(r.get("atm_iv"))
         def eff(col):
             v = f(r.get(col)); return round(v, 2) if v is not None else round(hold, 2)
-        def tp_target(tp): return round(tp / 100.0 * cred, 2)   # ANTI-FANTASMA: TP executa no alvo, não no MTM stale
         def tp_hit(tp): return f(r.get(f"tp{tp}_m")) is not None
-        def composite(tp, exit_n):  # "TP tp% senão Exit exit_n DTE" — TP fecha NO ALVO
-            tpd = f(r.get(f"tp{tp}_d"))
-            if tp_hit(tp) and tpd is not None and tpd >= exit_n:
-                return tp_target(tp)
+        def tp_value(tp):  # MTM real do cruzamento, validado por teto BS (mantém real, capa anomalia)
+            mtm = f(r.get(f"tp{tp}_m"))
+            if mtm is None: return None
+            cap = _ifly_cap_pnl(f(r.get(f"tp{tp}_s")), f(r.get(f"tp{tp}_d")), aiv, C, Clo, Cup, cred)
+            return round(min(mtm, cap), 2) if cap is not None else round(mtm, 2)
+        def composite(tp, exit_n):
+            tpd = f(r.get(f"tp{tp}_d")); v = tp_value(tp)
+            if v is not None and tpd is not None and tpd >= exit_n:
+                return v
             return eff(f"x{exit_n}_m")
-        def composite_noon(tp):  # "TP tp% senão Exit 12:00 ET (noon)" — p/ 1DTE
-            tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h"))
-            if tp_hit(tp) and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
-                return tp_target(tp)
+        def composite_noon(tp):
+            tpd = f(r.get(f"tp{tp}_d")); tph = f(r.get(f"tp{tp}_h")); v = tp_value(tp)
+            if v is not None and tpd is not None and (tpd > 0 or (tpd == 0 and tph is not None and tph < 12)):
+                return v
             return eff("e12_m")
         row = {
             "trade_date": od, "exp_date": r["expiry_date"], "underlying": "SPX",
@@ -101,9 +120,9 @@ def merge(dte, width, tags, sw):
             "total_credit": round(f(r["credit_mid"]) or 0, 2), "vix_entry": f(r["vix"]),
             "iv_atm_pct": round((f(r["atm_iv"]) or 0)*100, 2), "expected_move": round(f(r["sigma"]) or 0, 1),
             "pnl_usd": round(hold, 2),
-            "pnl_tp25": tp_target(25) if tp_hit(25) else round(hold, 2),
-            "pnl_tp50": tp_target(50) if tp_hit(50) else round(hold, 2),
-            "pnl_tp75": tp_target(75) if tp_hit(75) else round(hold, 2),
+            "pnl_tp25": tp_value(25) if tp_hit(25) else round(hold, 2),
+            "pnl_tp50": tp_value(50) if tp_hit(50) else round(hold, 2),
+            "pnl_tp75": tp_value(75) if tp_hit(75) else round(hold, 2),
             "result": "WIN" if hold > 0 else "LOSS", "exit_method": "expiration",
             "mfe": f(r.get("mfe")), "mae": f(r.get("mae")),
         }
