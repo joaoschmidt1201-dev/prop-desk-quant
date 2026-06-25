@@ -1797,6 +1797,43 @@ for _idte, _iwidths, _iexits in _IBFLY_CONFIGS:
         "close_rules": _ib_rules,
     })
 
+# ───────── SHORT STRANGLE RUT 28/35/42 DTE (pedido CZ 2026-06-24) ─────────
+# Naked short strangle de RUT (sem asas), abre toda sexta, short put 10Δ / short call 8Δ.
+# 5 anos no QC (mid). Reusa kind="ss42" (viewer de strangle: payoff de 2 pernas + delta).
+# 12 close-rules record-and-derive (hold / TP25-50-75 / saída a 14 ou 7 DTE / combos "TP ou DTE"),
+# todas como COLUNAS pré-computadas no trades.csv (pnl_* em USD). total_credit em PONTOS, mult=100.
+_SS_RUT_DIR = BACKTESTS_ROOT / "short_strangle_rut"
+_SS_CLOSE_RULES: dict[str, str | None] = {
+    "Hold to Expiration": None,
+    "TP 25%": "pnl_tp25", "TP 50%": "pnl_tp50", "TP 75%": "pnl_tp75",
+    "Exit at 14 DTE": "pnl_dte14", "Exit at 7 DTE": "pnl_dte7",
+    "TP 25% or 14 DTE": "pnl_tp25_d14", "TP 50% or 14 DTE": "pnl_tp50_d14", "TP 75% or 14 DTE": "pnl_tp75_d14",
+    "TP 25% or 7 DTE": "pnl_tp25_d7", "TP 50% or 7 DTE": "pnl_tp50_d7", "TP 75% or 7 DTE": "pnl_tp75_d7",
+}
+for _ssdte in (28, 35, 42):
+    _sstag = f"SS_RUT_{_ssdte}"
+    if not (_SS_RUT_DIR / _sstag / "trades.csv").exists():
+        continue
+    BACKTESTS_REGISTRY.append({
+        "id": f"ss-strangle-rut-d{_ssdte}",
+        "name": f"Short Strangle RUT · {_ssdte}DTE",
+        "underlying": "RUT",
+        "strategy": f"Short Strangle · RUT · ~{_ssdte} DTE · short put 10Δ / short call 8Δ · enters every Friday",
+        "family": "Short Strangle",
+        "horizon": f"{_ssdte}DTE",
+        "description": (
+            f"Naked short strangle on RUT (~{_ssdte} DTE), opened every Friday: short put at ~10 delta "
+            f"and short call at ~8 delta (no wings). 5-year QuantConnect backtest, priced at MID. "
+            f"Use the close-rule selector: hold to expiration, take-profit at 25/50/75% of credit, "
+            f"time exit at 14 or 7 DTE, or the combos (TP or time exit, whichever comes first). "
+            f"RUT cash-settles at expiration; P&L from the analytic payoff."
+        ),
+        "trades_csv": f"short_strangle_rut/{_sstag}/trades.csv",
+        "daily_csv": f"short_strangle_rut/{_sstag}/daily.csv",
+        "kind": "ss42", "multiplier": 100,
+        "close_rules": _SS_CLOSE_RULES,
+    })
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
