@@ -33,6 +33,10 @@ services:
         sync: false
       - key: GDRIVE_FILE_ID
         value: 1RIXpDUIq1692_6UwoPFYyrKtukYB2UArCTWvI6Y5Xbk
+      # Service Account (recomendado, nao expira). Se setada, o app a usa e ignora o OAuth abaixo.
+      - key: GDRIVE_SA_JSON
+        sync: false
+      # OAuth de usuario (fallback legado, expira ~7 dias em modo Testing):
       - key: GDRIVE_CREDENTIALS_JSON
         sync: false
       - key: GDRIVE_TOKEN_JSON
