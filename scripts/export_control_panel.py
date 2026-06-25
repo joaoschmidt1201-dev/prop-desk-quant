@@ -190,6 +190,8 @@ TRADE_UNDERLYINGS = (
     "XLU",
     "XLV",
     "XLY",
+    "DRAM",
+    "SPCX",
     "BTC",
     "BITCOIN",
 )

@@ -158,6 +158,8 @@ TRADE_UNDERLYINGS = (
     "XBI",
     "TQQQ",
     "SQQQ",
+    "DRAM",
+    "SPCX",
     # nomes que aparecem no book do CZ (atribuir em vez de deixar em branco)
     "NVDA",
     "META",
@@ -554,6 +556,15 @@ def strategy_family(name: str) -> str:
     # Bull Put Spread (Bull Put, BPS, Put Spread, BullPutCreditSpread, PCS, Put Credit, BearPS)
     if has(r"BULL\s*PUT|\bBPS\d*\b|BULLPUTCRE|PUT\s*SPREAD|PUT\s*CREDIT|\bPCS\d*\b|\bBEARPS\b"):
         return "Bull Put Spread"
+    # Nakeds (shorthand do CZ): SS=short strangle, SC=short call, SP=short put. DEPOIS dos
+    # spreads/flies/JL (o "+ SP" do Jade Lizard ja foi tratado). \bXX\d*\b casa SS4/SC4/SP7
+    # sem pegar tickers (SPX/SPY/SPCX) nem "PUT SPREAD".
+    if has(r"\bSS\d*\b|SHORT\s*STRANGLE|\bSTRANGLE\b"):
+        return "Short Strangle"
+    if has(r"\bSC\d*\b|SHORT\s*CALL"):
+        return "Short Call"
+    if has(r"\bSP\d*\b|SHORT\s*PUT"):
+        return "Short Put"
     return "Other"
 
 
