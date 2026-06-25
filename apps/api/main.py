@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import csv
+import math
 import os
 import re
 import statistics
@@ -1124,6 +1125,28 @@ def get_trades(
     return TradesResponse(filter=FilterEcho(months=months, env=env, live=live), trades=trades)
 
 
+def _num(x: Any) -> float:
+    """Numero finito ou 0.0. Trata None/NaN/Inf/strings invalidas -> 0.0. Crucial p/ somas:
+    trades NAKED (short call/put/strangle) tem max_loss = NaN (risco indefinido); `NaN or 0` deixa
+    NaN passar (NaN e truthy) e contamina a soma -> resposta com NaN -> 500 na serializacao JSON."""
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return 0.0
+    return v if math.isfinite(v) else 0.0
+
+
+def _json_safe(obj: Any) -> Any:
+    """Sanitiza NaN/Inf -> None recursivamente (JSON nao aceita esses floats)."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 @app.get("/api/kpis", response_model=KpisResponse)
 def get_kpis(
     month: str | None = Query(None),
@@ -1150,18 +1173,18 @@ def get_kpis(
         is_active = bool(t.get("is_active"))
         if is_active:
             n_active += 1
-            open_pnl += pnl
-            delta_total += trade_delta(t)
-            max_loss_exposed += float(t.get("max_loss") or 0)
-            net_credit_at_risk += float(t.get("net_credit") or 0)
+            open_pnl += _num(pnl)
+            delta_total += _num(trade_delta(t))
+            max_loss_exposed += _num(t.get("max_loss"))      # naked (SC/SP/SS) = NaN -> 0 (risco indefinido, nao soma)
+            net_credit_at_risk += _num(t.get("net_credit"))
             dte = t.get("dte_remaining")
-            nc = t.get("net_credit")
-            if dte and nc and dte > 0:
-                daily_theta += float(nc) / float(dte)
+            nc = _num(t.get("net_credit"))
+            if dte and nc and _num(dte) > 0:
+                daily_theta += nc / _num(dte)
         else:
             n_closed += 1
-            rlzd += pnl
-            closed_pnls.append(pnl)
+            rlzd += _num(pnl)
+            closed_pnls.append(_num(pnl))
 
     wins = [p for p in closed_pnls if p > 0]
     losses = [p for p in closed_pnls if p < 0]
@@ -1179,12 +1202,12 @@ def get_kpis(
     ]
     # Sheet TOTAL row is authoritative for OpenPnL / RLZD / Delta / MaxProfit when filtering by month.
     # net_credit_at_risk and max_loss_exposed stay trade-level (sum of NC / MaxLoss across active trades).
-    max_profit_total = sum(float(t.get("net_credit") or 0) for t in trades if t.get("is_active"))
+    max_profit_total = sum(_num(t.get("net_credit")) for t in trades if t.get("is_active"))
     if selected_summaries:
-        open_pnl = sum(float(s.get("open_pnl") or 0) for s in selected_summaries)
-        rlzd = sum(float(s.get("rlzd") or 0) for s in selected_summaries)
-        delta_total = sum(float(s.get("delta") or 0) for s in selected_summaries)
-        sheet_max_profit = sum(float(s.get("max_profit") or 0) for s in selected_summaries)
+        open_pnl = sum(_num(s.get("open_pnl")) for s in selected_summaries)
+        rlzd = sum(_num(s.get("rlzd")) for s in selected_summaries)
+        delta_total = sum(_num(s.get("delta")) for s in selected_summaries)
+        sheet_max_profit = sum(_num(s.get("max_profit")) for s in selected_summaries)
         if sheet_max_profit:
             max_profit_total = sheet_max_profit
 
@@ -1354,7 +1377,7 @@ def get_analytics(
     if losses:
         insights.append({"label": "Loss concentration", "value": f"{abs(min(losses)) / abs(sum(losses)):.0%}", "detail": "largest loss / total gross losses"})
 
-    return JSONResponse({
+    return JSONResponse(_json_safe({
         "filter": {"months": months, "env": env, "live": live},
         "summary": {
             "total_pnl": round(total_pnl, 2),
@@ -1376,7 +1399,7 @@ def get_analytics(
         "top_winners": [_analytics_trade(t, pnl_for(t)) for t in top_winners],
         "top_losers": [_analytics_trade(t, pnl_for(t)) for t in top_losers],
         "insights": insights,
-    })
+    }))
 
 
 # ─── Backtests ────────────────────────────────────────────────────────────────
