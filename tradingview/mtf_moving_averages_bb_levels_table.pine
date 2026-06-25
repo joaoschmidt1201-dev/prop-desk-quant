@@ -1,0 +1,272 @@
+// This Pine Script(R) code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Copyright BigGuavaTrading
+//@version=6
+
+// 1. STANDARDIZATION: Name [ST]
+indicator("MTF MAs & BB [ST]", overlay=true)
+
+// 2. VERSION CONTROL
+string ver_num  = "v6.0"
+string ver_date = "2026-06-25"
+// v6.0 (CZ): migrated //@version=5 -> 6 for publishing. No logic change — code already
+//            v6-clean (no na-bools, no int-div, ta.*/request.security at global scope,
+//            linewidth>=1, no transp/offset-series). Note: color.red hex shifts slightly in v6.
+// v5.16 (CZ): label background is now a toggle (lbl_bg) — ON = colored highlight tag,
+//             OFF = text only. Plus text color input for the background-on case.
+// v5.14 (CZ): + Hourly (H) timeframe (table column + plots) ; + price labels at the
+//             right edge of every plotted line (to read D/W/H MA levels on 15/5/2m charts).
+// v5.15 (CZ): price labels with NO background (style_none), text in the line's solid color
+//             -> readable on a white chart, no clutter.
+
+// --- DEFAULT COLORS ---
+c_ema9   = #2962ff  // Blue
+c_ema20  = #ff9800  // Orange
+c_sma50  = #4caf50  // Green
+c_sma200 = #f23645  // Red
+c_bb     = #808080  // Gray (Bollinger Bands)
+
+// --- SHARED FORMATTER (used by labels and table) ---
+f_fmt(v) =>
+    na(v) ? "n/a" : str.tostring(v, format.mintick)
+
+// ==========================================
+// GROUP 0: LEVELS TABLE
+// ==========================================
+grp_tbl = "LEVELS TABLE"
+sh_tbl  = input.bool(true, "Show Levels Table", group=grp_tbl)
+pos_tbl = input.string(position.top_right, "Position", options=[position.top_right, position.middle_right, position.bottom_right, position.top_left], group=grp_tbl)
+sz_tbl  = input.string("Tiny", "Text Size", options=["Tiny", "Small", "Normal"], group=grp_tbl)
+txt_tbl = input.color(color.red, "Text Color", group=grp_tbl)
+bg_tbl  = input.color(color.new(color.white, 85), "Background Color", group=grp_tbl)
+
+// ==========================================
+// GROUP 0b: PRICE LABELS (on the line, right edge)
+// ==========================================
+grp_lbl = "PRICE LABELS (on lines)"
+sh_lbl  = input.bool(true, "Show price labels on lines", group=grp_lbl, tooltip="Small price tag at the right end of each plotted MA/BB line. Helps locate D/W/H levels on 15/5/2m charts.")
+lbl_off = input.int(3, "Label offset (bars to the right)", minval=0, maxval=50, group=grp_lbl)
+lbl_sz  = input.string("Tiny", "Label Size", options=["Tiny", "Small", "Normal"], group=grp_lbl)
+lbl_bg  = input.bool(true, "Label background (highlight numbers)", group=grp_lbl, tooltip="On = colored tag behind the price (highlight). Off = text only in the line color, no background.")
+lbl_txt = input.color(color.white, "Label text color (when background ON)", group=grp_lbl)
+lbl_bb  = input.bool(true, "Include Bollinger Bands in labels", group=grp_lbl, tooltip="Off = only the MA lines get a price tag (cleaner). The MAs are the 8 levels CZ tracks.")
+
+f_lbl_size(opt) =>
+    opt == "Tiny" ? size.tiny : opt == "Normal" ? size.normal : size.small
+lblsz = f_lbl_size(lbl_sz)
+
+// Manage one persistent label per call site (each `var` is independent per call location).
+// tag = timeframe letter (D/W/H) so same-colored MAs across TFs stay distinguishable.
+f_price_lbl(show, value, col, tag) =>
+    var label lb = na
+    show_now = sh_lbl and show and not na(value) and barstate.islast
+    // ramos de UM bloco só (sem if/else misturando 'label' e 'void' -> erro de tipo no Pine)
+    // toggle lbl_bg: ON = tag colorida (fundo=cor da linha, texto=lbl_txt) p/ destacar o numero;
+    //               OFF = style_none (so texto na cor da linha) -> nitido em grafico branco, sem poluir
+    sty = lbl_bg ? label.style_label_left : label.style_none
+    bgc = lbl_bg ? col : color.new(color.white, 100)
+    txc = lbl_bg ? lbl_txt : col
+    if show_now and na(lb)
+        lb := label.new(bar_index + lbl_off, value, tag + " " + f_fmt(value), xloc=xloc.bar_index, style=sty, color=bgc, textcolor=txc, size=lblsz)
+    if show_now
+        label.set_xy(lb, bar_index + lbl_off, value)
+        label.set_text(lb, tag + " " + f_fmt(value))
+        label.set_style(lb, sty)
+        label.set_color(lb, bgc)
+        label.set_textcolor(lb, txc)
+        label.set_size(lb, lblsz)
+    if not show_now and not na(lb)
+        label.delete(lb)
+        lb := na
+
+// ==========================================
+// GROUP 1: DAILY MAs & BB (D)
+// ==========================================
+grp_d = "DAILY Settings (D)"
+tf_d  = input.timeframe("D", "Timeframe", group=grp_d, display=display.data_window)
+
+// --- EMA 9 ---
+sh_d9  = input.bool(true, "EMA 9", group=grp_d, inline="d9", display=display.data_window)
+wd_d9  = input.int(1, "Width", minval=1, maxval=4, group=grp_d, inline="d9", display=display.data_window)
+v_d9   = request.security(syminfo.tickerid, tf_d, ta.ema(close, 9), gaps=barmerge.gaps_off)
+plot(sh_d9 ? v_d9 : na, "D EMA 9", color=c_ema9, linewidth=wd_d9, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_d9, v_d9, c_ema9, "D")
+
+// --- EMA 20 ---
+sh_d20 = input.bool(true, "EMA 20", group=grp_d, inline="d20", display=display.data_window)
+wd_d20 = input.int(1, "Width", minval=1, maxval=4, group=grp_d, inline="d20", display=display.data_window)
+v_d20  = request.security(syminfo.tickerid, tf_d, ta.ema(close, 20), gaps=barmerge.gaps_off)
+plot(sh_d20 ? v_d20 : na, "D EMA 20", color=c_ema20, linewidth=wd_d20, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_d20, v_d20, c_ema20, "D")
+
+// --- SMA 50 ---
+sh_d50 = input.bool(true, "SMA 50", group=grp_d, inline="d50", display=display.data_window)
+wd_d50 = input.int(2, "Width", minval=1, maxval=4, group=grp_d, inline="d50", display=display.data_window)
+v_d50  = request.security(syminfo.tickerid, tf_d, ta.sma(close, 50), gaps=barmerge.gaps_off)
+plot(sh_d50 ? v_d50 : na, "D SMA 50", color=c_sma50, linewidth=wd_d50, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_d50, v_d50, c_sma50, "D")
+
+// --- SMA 200 ---
+sh_d200 = input.bool(false, "SMA 200", group=grp_d, inline="d200", display=display.data_window)
+wd_d200 = input.int(2, "Width", minval=1, maxval=4, group=grp_d, inline="d200", display=display.data_window)
+v_d200  = request.security(syminfo.tickerid, tf_d, ta.sma(close, 200), gaps=barmerge.gaps_off)
+plot(sh_d200 ? v_d200 : na, "D SMA 200", color=c_sma200, linewidth=wd_d200, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_d200, v_d200, c_sma200, "D")
+
+// --- BOLLINGER BANDS (D) ---
+sh_d_bb = input.bool(true, "Bollinger Bands 20,2", group=grp_d, inline="dbb", display=display.data_window)
+wd_d_bb = input.int(1, "Width", minval=1, maxval=4, group=grp_d, inline="dbb", display=display.data_window)
+[_, v_d_bb_up, v_d_bb_lw] = request.security(syminfo.tickerid, tf_d, ta.bb(close, 20, 2.0), gaps=barmerge.gaps_off)
+plot(sh_d_bb ? v_d_bb_up : na, "D BBUP", color=c_bb, linewidth=wd_d_bb, style=plot.style_stepline, display=display.pane + display.data_window)
+plot(sh_d_bb ? v_d_bb_lw : na, "D BBLW", color=c_bb, linewidth=wd_d_bb, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_d_bb and lbl_bb, v_d_bb_up, c_bb, "D")
+f_price_lbl(sh_d_bb and lbl_bb, v_d_bb_lw, c_bb, "D")
+
+
+// ==========================================
+// GROUP 2: WEEKLY MAs & BB (W)
+// ==========================================
+grp_w = "WEEKLY Settings (W)"
+tf_w  = input.timeframe("W", "Timeframe", group=grp_w, display=display.data_window)
+
+// Transparency for Weekly
+c_w_ema9   = color.new(c_ema9, 30)
+c_w_ema20  = color.new(c_ema20, 30)
+c_w_sma50  = color.new(c_sma50, 30)
+c_w_sma200 = color.new(c_sma200, 30)
+c_w_bb     = color.new(c_bb, 30)
+
+// --- EMA 9 (W) ---
+sh_w9  = input.bool(true, "EMA 9", group=grp_w, inline="w9", display=display.data_window)
+wd_w9  = input.int(1, "Width", minval=1, maxval=4, group=grp_w, inline="w9", display=display.data_window)
+v_w9   = request.security(syminfo.tickerid, tf_w, ta.ema(close, 9), gaps=barmerge.gaps_off)
+plot(sh_w9 ? v_w9 : na, "W EMA 9", color=c_w_ema9, linewidth=wd_w9, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_w9, v_w9, c_ema9, "W")
+
+// --- EMA 20 (W) ---
+sh_w20 = input.bool(true, "EMA 20", group=grp_w, inline="w20", display=display.data_window)
+wd_w20 = input.int(1, "Width", minval=1, maxval=4, group=grp_w, inline="w20", display=display.data_window)
+v_w20  = request.security(syminfo.tickerid, tf_w, ta.ema(close, 20), gaps=barmerge.gaps_off)
+plot(sh_w20 ? v_w20 : na, "W EMA 20", color=c_w_ema20, linewidth=wd_w20, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_w20, v_w20, c_ema20, "W")
+
+// --- SMA 50 (W) ---
+sh_w50 = input.bool(true, "SMA 50", group=grp_w, inline="w50", display=display.data_window)
+wd_w50 = input.int(2, "Width", minval=1, maxval=4, group=grp_w, inline="w50", display=display.data_window)
+v_w50  = request.security(syminfo.tickerid, tf_w, ta.sma(close, 50), gaps=barmerge.gaps_off)
+plot(sh_w50 ? v_w50 : na, "W SMA 50", color=c_w_sma50, linewidth=wd_w50, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_w50, v_w50, c_sma50, "W")
+
+// --- SMA 200 (W) ---
+sh_w200 = input.bool(false, "SMA 200", group=grp_w, inline="w200", display=display.data_window)
+wd_w200 = input.int(2, "Width", minval=1, maxval=4, group=grp_w, inline="w200", display=display.data_window)
+v_w200  = request.security(syminfo.tickerid, tf_w, ta.sma(close, 200), gaps=barmerge.gaps_off)
+plot(sh_w200 ? v_w200 : na, "W SMA 200", color=c_w_sma200, linewidth=wd_w200, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_w200, v_w200, c_sma200, "W")
+
+// --- BOLLINGER BANDS (W) ---
+sh_w_bb = input.bool(true, "Bollinger Bands 20,2", group=grp_w, inline="wbb", display=display.data_window)
+wd_w_bb = input.int(1, "Width", minval=1, maxval=4, group=grp_w, inline="wbb", display=display.data_window)
+[_, v_w_bb_up, v_w_bb_lw] = request.security(syminfo.tickerid, tf_w, ta.bb(close, 20, 2.0), gaps=barmerge.gaps_off)
+plot(sh_w_bb ? v_w_bb_up : na, "W BBUP", color=c_w_bb, linewidth=wd_w_bb, style=plot.style_stepline, display=display.pane + display.data_window)
+plot(sh_w_bb ? v_w_bb_lw : na, "W BBLW", color=c_w_bb, linewidth=wd_w_bb, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_w_bb and lbl_bb, v_w_bb_up, c_bb, "W")
+f_price_lbl(sh_w_bb and lbl_bb, v_w_bb_lw, c_bb, "W")
+
+
+// ==========================================
+// GROUP 3: HOURLY MAs & BB (H)
+// ==========================================
+grp_h = "HOURLY Settings (H)"
+tf_h  = input.timeframe("60", "Timeframe", group=grp_h, display=display.data_window)
+
+// Transparency for Hourly (more faded than Weekly to separate the three TFs visually)
+c_h_ema9   = color.new(c_ema9, 55)
+c_h_ema20  = color.new(c_ema20, 55)
+c_h_sma50  = color.new(c_sma50, 55)
+c_h_sma200 = color.new(c_sma200, 55)
+c_h_bb     = color.new(c_bb, 55)
+
+// --- EMA 9 (H) ---
+sh_h9  = input.bool(true, "EMA 9", group=grp_h, inline="h9", display=display.data_window)
+wd_h9  = input.int(1, "Width", minval=1, maxval=4, group=grp_h, inline="h9", display=display.data_window)
+v_h9   = request.security(syminfo.tickerid, tf_h, ta.ema(close, 9), gaps=barmerge.gaps_off)
+plot(sh_h9 ? v_h9 : na, "H EMA 9", color=c_h_ema9, linewidth=wd_h9, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_h9, v_h9, c_ema9, "H")
+
+// --- EMA 20 (H) ---
+sh_h20 = input.bool(true, "EMA 20", group=grp_h, inline="h20", display=display.data_window)
+wd_h20 = input.int(1, "Width", minval=1, maxval=4, group=grp_h, inline="h20", display=display.data_window)
+v_h20  = request.security(syminfo.tickerid, tf_h, ta.ema(close, 20), gaps=barmerge.gaps_off)
+plot(sh_h20 ? v_h20 : na, "H EMA 20", color=c_h_ema20, linewidth=wd_h20, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_h20, v_h20, c_ema20, "H")
+
+// --- SMA 50 (H) ---
+sh_h50 = input.bool(true, "SMA 50", group=grp_h, inline="h50", display=display.data_window)
+wd_h50 = input.int(2, "Width", minval=1, maxval=4, group=grp_h, inline="h50", display=display.data_window)
+v_h50  = request.security(syminfo.tickerid, tf_h, ta.sma(close, 50), gaps=barmerge.gaps_off)
+plot(sh_h50 ? v_h50 : na, "H SMA 50", color=c_h_sma50, linewidth=wd_h50, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_h50, v_h50, c_sma50, "H")
+
+// --- SMA 200 (H) ---
+sh_h200 = input.bool(false, "SMA 200", group=grp_h, inline="h200", display=display.data_window)
+wd_h200 = input.int(2, "Width", minval=1, maxval=4, group=grp_h, inline="h200", display=display.data_window)
+v_h200  = request.security(syminfo.tickerid, tf_h, ta.sma(close, 200), gaps=barmerge.gaps_off)
+plot(sh_h200 ? v_h200 : na, "H SMA 200", color=c_h_sma200, linewidth=wd_h200, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_h200, v_h200, c_sma200, "H")
+
+// --- BOLLINGER BANDS (H) ---
+sh_h_bb = input.bool(true, "Bollinger Bands 20,2", group=grp_h, inline="hbb", display=display.data_window)
+wd_h_bb = input.int(1, "Width", minval=1, maxval=4, group=grp_h, inline="hbb", display=display.data_window)
+[_, v_h_bb_up, v_h_bb_lw] = request.security(syminfo.tickerid, tf_h, ta.bb(close, 20, 2.0), gaps=barmerge.gaps_off)
+plot(sh_h_bb ? v_h_bb_up : na, "H BBUP", color=c_h_bb, linewidth=wd_h_bb, style=plot.style_stepline, display=display.pane + display.data_window)
+plot(sh_h_bb ? v_h_bb_lw : na, "H BBLW", color=c_h_bb, linewidth=wd_h_bb, style=plot.style_stepline, display=display.pane + display.data_window)
+f_price_lbl(sh_h_bb and lbl_bb, v_h_bb_up, c_bb, "H")
+f_price_lbl(sh_h_bb and lbl_bb, v_h_bb_lw, c_bb, "H")
+
+
+// ==========================================
+// LEVELS TABLE: compact 3-column view with D, W and H values side by side.
+// ==========================================
+f_tbl_size(opt) =>
+    opt == "Tiny" ? size.tiny : opt == "Normal" ? size.normal : size.small
+
+c_tbl_bg     = bg_tbl
+c_tbl_title  = bg_tbl
+c_tbl_border = color.black
+tbl_size     = f_tbl_size(sz_tbl)
+
+var table levels_tbl = table.new(pos_tbl, 3, 7, bgcolor=c_tbl_bg, frame_color=c_tbl_border, frame_width=1, border_color=color.new(color.black, 100), border_width=0)
+
+if barstate.isfirst
+    table.merge_cells(levels_tbl, 0, 0, 2, 0)
+
+f_title() =>
+    table.cell(levels_tbl, 0, 0, "MTF Levels", text_color=txt_tbl, bgcolor=c_tbl_title, text_size=tbl_size, text_halign=text.align_center)
+
+f_cell(col, row, tf, name, value) =>
+    txt = tf + " " + name + "  " + f_fmt(value)
+    table.cell(levels_tbl, col, row, txt, text_color=txt_tbl, bgcolor=c_tbl_bg, text_size=tbl_size, text_halign=text.align_left)
+
+if barstate.islast
+    if sh_tbl
+        f_title()
+        f_cell(0, 1, "D", "EMA9",  v_d9)
+        f_cell(0, 2, "D", "EMA20", v_d20)
+        f_cell(0, 3, "D", "MA50",  v_d50)
+        f_cell(0, 4, "D", "MA200", v_d200)
+        f_cell(0, 5, "D", "BBUP",  v_d_bb_up)
+        f_cell(0, 6, "D", "BBLW",  v_d_bb_lw)
+        f_cell(1, 1, "W", "EMA9",  v_w9)
+        f_cell(1, 2, "W", "EMA20", v_w20)
+        f_cell(1, 3, "W", "MA50",  v_w50)
+        f_cell(1, 4, "W", "MA200", v_w200)
+        f_cell(1, 5, "W", "BBUP",  v_w_bb_up)
+        f_cell(1, 6, "W", "BBLW",  v_w_bb_lw)
+        f_cell(2, 1, "H", "EMA9",  v_h9)
+        f_cell(2, 2, "H", "EMA20", v_h20)
+        f_cell(2, 3, "H", "MA50",  v_h50)
+        f_cell(2, 4, "H", "MA200", v_h200)
+        f_cell(2, 5, "H", "BBUP",  v_h_bb_up)
+        f_cell(2, 6, "H", "BBLW",  v_h_bb_lw)
+    else
+        table.clear(levels_tbl, 0, 0, 2, 6)
