@@ -36,6 +36,9 @@ REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 CREDENTIALS_DIR  = ROOT / ".credentials"
 GDRIVE_CREDS     = CREDENTIALS_DIR / "gdrive_credentials.json"
 GDRIVE_TOKEN     = CREDENTIALS_DIR / "gdrive_token.json"
+# Service Account (fix permanente: NAO expira como o OAuth de usuario em modo Testing).
+# Se este arquivo existir (ou GDRIVE_SA_JSON na env), usamos a SA e ignoramos o fluxo OAuth.
+GDRIVE_SA        = CREDENTIALS_DIR / "gdrive_service_account.json"
 GDRIVE_SCOPES    = ["https://www.googleapis.com/auth/drive.readonly"]
 NON_INTERACTIVE_ENV_VARS = ("RENDER", "RENDER_SERVICE_ID", "VERCEL", "CI")
 
@@ -228,6 +231,7 @@ def materialize_gdrive_env_files() -> None:
     """Allows cloud deployments to provide OAuth files as secret env vars."""
     _write_json_env_to_file("GDRIVE_CREDENTIALS_JSON", GDRIVE_CREDS)
     _write_json_env_to_file("GDRIVE_TOKEN_JSON", GDRIVE_TOKEN)
+    _write_json_env_to_file("GDRIVE_SA_JSON", GDRIVE_SA)
 
 
 def can_run_browser_oauth() -> bool:
@@ -309,9 +313,9 @@ def download_from_gdrive(file_id: str, output_path: Path) -> bool:
     except Exception as e:
         print(f"[!] Falha ao materializar credenciais Google Drive via env: {e}")
 
-    if not GDRIVE_CREDS.exists():
-        print(f"[!] Credenciais nao encontradas em: {GDRIVE_CREDS}")
-        print("    Baixe o OAuth JSON do GCP e salve nesse caminho.")
+    if not GDRIVE_SA.exists() and not GDRIVE_CREDS.exists():
+        print(f"[!] Sem credenciais: nem Service Account ({GDRIVE_SA}) nem OAuth ({GDRIVE_CREDS}).")
+        print("    Forneca GDRIVE_SA_JSON (recomendado) OU GDRIVE_CREDENTIALS_JSON+GDRIVE_TOKEN_JSON.")
         return False
     try:
         from google.auth.transport.requests import Request
@@ -322,32 +326,39 @@ def download_from_gdrive(file_id: str, output_path: Path) -> bool:
         from googleapiclient.errors import HttpError
 
         creds = None
-        if GDRIVE_TOKEN.exists():
-            creds = Credentials.from_authorized_user_file(str(GDRIVE_TOKEN), GDRIVE_SCOPES)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                except RefreshError as e:
-                    if not can_run_browser_oauth():
-                        print(f"[!] Google Drive token expirado/revogado em ambiente non-interactive: {e}")
-                        print("    Recrie GDRIVE_TOKEN_JSON e atualize o secret no Render.")
-                        return False
-                    print(f"[!] Google Drive token expirado/revogado; abrindo OAuth local: {e}")
+        if GDRIVE_SA.exists():
+            # Service Account (preferida): credencial de servidor, NAO expira em 7 dias, sem navegador.
+            from google.oauth2 import service_account
+            creds = service_account.Credentials.from_service_account_file(
+                str(GDRIVE_SA), scopes=GDRIVE_SCOPES)
+        else:
+            # Fallback: fluxo OAuth de usuario (token expira ~7 dias no modo Testing).
+            if GDRIVE_TOKEN.exists():
+                creds = Credentials.from_authorized_user_file(str(GDRIVE_TOKEN), GDRIVE_SCOPES)
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                    except RefreshError as e:
+                        if not can_run_browser_oauth():
+                            print(f"[!] Google Drive token expirado/revogado em ambiente non-interactive: {e}")
+                            print("    Recrie GDRIVE_TOKEN_JSON (ou migre p/ GDRIVE_SA_JSON) no Render.")
+                            return False
+                        print(f"[!] Google Drive token expirado/revogado; abrindo OAuth local: {e}")
+                        creds = None
+                else:
                     creds = None
-            else:
-                creds = None
 
-            if not creds:
-                if not can_run_browser_oauth():
-                    print("[!] Google Drive token ausente/invalido em ambiente non-interactive.")
-                    print("    Configure GDRIVE_CREDENTIALS_JSON e GDRIVE_TOKEN_JSON no Render.")
-                    return False
-                flow = InstalledAppFlow.from_client_secrets_file(str(GDRIVE_CREDS), GDRIVE_SCOPES)
-                creds = flow.run_local_server(port=0)
+                if not creds:
+                    if not can_run_browser_oauth():
+                        print("[!] Google Drive token ausente/invalido em ambiente non-interactive.")
+                        print("    Configure GDRIVE_SA_JSON (recomendado) ou GDRIVE_CREDENTIALS_JSON+GDRIVE_TOKEN_JSON.")
+                        return False
+                    flow = InstalledAppFlow.from_client_secrets_file(str(GDRIVE_CREDS), GDRIVE_SCOPES)
+                    creds = flow.run_local_server(port=0)
 
-            GDRIVE_TOKEN.parent.mkdir(parents=True, exist_ok=True)
-            GDRIVE_TOKEN.write_text(creds.to_json())
+                GDRIVE_TOKEN.parent.mkdir(parents=True, exist_ok=True)
+                GDRIVE_TOKEN.write_text(creds.to_json())
 
         service = build("drive", "v3", credentials=creds)
         try:

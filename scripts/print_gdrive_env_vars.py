@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CREDENTIALS = ROOT / ".credentials" / "gdrive_credentials.json"
 TOKEN = ROOT / ".credentials" / "gdrive_token.json"
+SERVICE_ACCOUNT = ROOT / ".credentials" / "gdrive_service_account.json"
 
 
 def compact_json(path: Path) -> str:
@@ -22,6 +23,12 @@ def compact_json(path: Path) -> str:
 
 
 def main() -> None:
+    # Caminho preferido: Service Account (nao expira). Se existir, e o unico secret necessario.
+    if SERVICE_ACCOUNT.exists():
+        print(f"GDRIVE_SA_JSON={compact_json(SERVICE_ACCOUNT)}")
+        print("# ^ cole no Render. Com a Service Account, GDRIVE_CREDENTIALS_JSON/GDRIVE_TOKEN_JSON nao sao necessarios.")
+        return
+
     missing = [path for path in (CREDENTIALS, TOKEN) if not path.exists()]
     if missing:
         for path in missing:

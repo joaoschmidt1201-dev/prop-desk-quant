@@ -56,9 +56,17 @@ npx tsc --noEmit --incremental false
 CORS_ORIGINS=https://<nome-do-projeto>.vercel.app
 ANTHROPIC_API_KEY=<opcional para Claude chat>
 OPENAI_API_KEY=<opcional para OpenAI chat>
-GDRIVE_CREDENTIALS_JSON=<json compacto>
-GDRIVE_TOKEN_JSON=<json compacto>
+GDRIVE_SA_JSON=<json compacto da Service Account>   # RECOMENDADO (nao expira)
+# --- alternativa legada (OAuth de usuario, expira ~7 dias no modo Testing): ---
+# GDRIVE_CREDENTIALS_JSON=<json compacto>
+# GDRIVE_TOKEN_JSON=<json compacto>
 ```
+
+> **Recomendado: Service Account** (nao expira, sem navegador, sem verificacao do Google).
+> Crie a SA no GCP, habilite Drive+Sheets API, gere uma chave JSON, **compartilhe a planilha
+> com o e-mail da SA** (Leitor) e ponha o JSON em `GDRIVE_SA_JSON`. Se `GDRIVE_SA_JSON` existir,
+> o app a usa e ignora o OAuth de usuario. O fluxo OAuth (`gdrive_reauth.py` + `GDRIVE_TOKEN_JSON`)
+> fica como fallback — quebra a cada ~7 dias enquanto o app OAuth estiver em modo Testing.
 
 5. Gerar os JSON compactos localmente:
 
