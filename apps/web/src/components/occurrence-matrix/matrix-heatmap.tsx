@@ -28,6 +28,7 @@ import { OccurrenceFilters, type OccurrenceMetricKey } from "./filters";
 import { Leaderboards } from "./leaderboards";
 import { ToleranceSelector } from "./tolerance-selector";
 import { TopSetupsTable } from "./top-setups-table";
+import { TickerFocus } from "./ticker-focus";
 
 type DashboardProps = {
   initialData?: OccurrenceMatrixPayload | null;
@@ -50,6 +51,7 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
   );
   const [selectedMas, setSelectedMas] = useState<string[]>(initialData?.mas ?? []);
   const [tolIdxByTf, setTolIdxByTf] = useState<Record<string, number>>({});
+  const [viewMode, setViewMode] = useState<"global" | "ticker">("global");
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["occurrence-matrix", tolIdxByTf],
@@ -113,6 +115,15 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
       <Header data={data} isFetching={isFetching} onRefresh={() => refetch()} />
       {missingTfs.length > 0 && <SnapshotNotice loaded={data.tfs} missing={missingTfs} />}
+      <div className="mt-4 fade-in">
+        <ViewToggle viewMode={viewMode} onChange={setViewMode} />
+      </div>
+      {viewMode === "ticker" ? (
+        <div className="mt-4 fade-in">
+          <TickerFocus data={data} />
+        </div>
+      ) : (
+      <>
       <KpiBand summary={summary} selectedTf={selectedTf} />
       <div className="mt-6 fade-in">
         <OccurrenceFilters
@@ -164,7 +175,42 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
         <Leaderboards meanReversion={meanReversion} breakout={breakout} minSample={data.min_sample} />
       </div>
       <Legend selectedMetric={selectedMetric} />
+      </>
+      )}
     </main>
+  );
+}
+
+function ViewToggle({
+  viewMode,
+  onChange,
+}: {
+  viewMode: "global" | "ticker";
+  onChange: (mode: "global" | "ticker") => void;
+}) {
+  const options: Array<{ key: "global" | "ticker"; label: string; icon: ReactNode }> = [
+    { key: "global", label: "Global", icon: <Grid3X3 className="h-3.5 w-3.5" /> },
+    { key: "ticker", label: "Single Ticker", icon: <Target className="h-3.5 w-3.5" /> },
+  ];
+  return (
+    <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-card/35 p-1 backdrop-blur-sm">
+      {options.map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          aria-pressed={viewMode === option.key}
+          onClick={() => onChange(option.key)}
+          className={
+            viewMode === option.key
+              ? "inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground shadow-md shadow-primary/25 transition active:scale-95"
+              : "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground active:scale-95"
+          }
+        >
+          {option.icon}
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
