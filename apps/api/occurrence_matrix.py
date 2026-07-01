@@ -145,6 +145,8 @@ def _normalize_tol_grid(snapshot: dict[str, Any], grid_size: int) -> dict[str, l
             "SMA 50": ("SMA 50", "SMA50"),
             "SMA 200": ("SMA 200", "SMA200"),
             "VWAP": ("VWAP",),
+            "BB Upper": ("BB Upper", "BBu", "BB_U", "BBU"),
+            "BB Lower": ("BB Lower", "BBl", "BB_L", "BBL"),
         }
         for ma_name in MA_NAMES:
             row: list[float | None] = []

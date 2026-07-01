@@ -3,14 +3,19 @@
 // State machine PARITY: bit-identical to occurrence_scanner.pine — counts must match
 //@version=5
 
+// === AUTO-GENERATED FROM tradingview/occurrence_matrix.pine ===
+// Ticker group: G4 · baseline tol only
+// DO NOT EDIT MANUALLY. Re-generate with:
+//   python scripts/build_om_slices.py
+// ================================================================
 // max_bars_back=210: caps history retention to ~210 bars per series reference.
 // SMA200 needs the deepest lookback (200 bars); the state machine only uses
 // [1] refs. Default is 1500 — which times 725 state machines × multiple [1]
 // refs each = the "Memory limits exceeded" runtime error. 210 is enough for
 // all indicators here and reduces memory ~7x.
-indicator("Occurrence Matrix [ST]", shorttitle="OM [ST]", overlay=true, max_bars_back=210)
+indicator("Occurrence Matrix [ST] — G4 t25-32", shorttitle="OM G4 t25-32", overlay=true, max_bars_back=210)
 
-string ver_num  = "v14.0"
+string ver_num  = "v14.0-g4"
 string ver_date = "2026-07-01"
 // v14.0: +2 levels Bollinger Bands (BB Upper/Lower, 20,2σ) → 7 levels/ticker;
 //        +3 tickers SMH, EWY, DRAM (Sector/Country ETFs) → 32 tickers.
@@ -44,11 +49,11 @@ winSize       = input.int(2, "Lookahead Candles", minval=2, group=g_main)
 // pasted JSON separately, then merge with `om_paste_snapshot.py --merge`.
 g_slice  = "Memory Saver — Tolerance Slice"
 tolSlice = input.string("All (0-4)", "Run slice", options=["All (0-4)", "A: 0,1", "B: 2,3", "C: 4 only"], group=g_slice, tooltip="Gates which tolerance levels' state machines run on this pass. 'All' runs the full 5×5=25 state machines per ticker (~725 total). 'A: 0,1' runs 10/ticker; 'B: 2,3' runs 10/ticker; 'C: 4' runs 5/ticker. Inactive levels output zeros so the merger can identify them.")
-sliceActive0 = tolSlice == "All (0-4)" or tolSlice == "A: 0,1"
-sliceActive1 = tolSlice == "All (0-4)" or tolSlice == "A: 0,1"
-sliceActive2 = tolSlice == "All (0-4)" or tolSlice == "B: 2,3"
-sliceActive3 = tolSlice == "All (0-4)" or tolSlice == "B: 2,3"
-sliceActive4 = tolSlice == "All (0-4)" or tolSlice == "C: 4 only"
+sliceActive0 = false
+sliceActive1 = false
+sliceActive2 = true
+sliceActive3 = false
+sliceActive4 = false
 
 useSqueezeFilter = input.bool(false, "Filter Low Volatility (Squeeze)?", group=g_filter)
 useDateFilter    = input.bool(true,  "Filter Start Date?", group=g_filter)
@@ -400,47 +405,149 @@ run_full() =>
     // gated wrapper SKIPS the inner state machine when the slice is inactive,
     // so Pine never allocates history buffers for those call sites. This is
     // how 'Memory Saver — A/B/C' fits the run inside Pine's memory budget.
-    [m1T_0, m1B_0, m1K_0, m1F_0] = run_sm_gated(sliceActive0, ma1, sqz, g1_0 > 0 ? g1_0 : 0.0001, dbg_m1 and dbgTolIdx == 0, "EMA9[0]")
-    [m1T_1, m1B_1, m1K_1, m1F_1] = run_sm_gated(sliceActive1, ma1, sqz, g1_1 > 0 ? g1_1 : 0.0001, dbg_m1 and dbgTolIdx == 1, "EMA9[1]")
-    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm_gated(sliceActive2, ma1, sqz, g1_2 > 0 ? g1_2 : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
-    [m1T_3, m1B_3, m1K_3, m1F_3] = run_sm_gated(sliceActive3, ma1, sqz, g1_3 > 0 ? g1_3 : 0.0001, dbg_m1 and dbgTolIdx == 3, "EMA9[3]")
-    [m1T_4, m1B_4, m1K_4, m1F_4] = run_sm_gated(sliceActive4, ma1, sqz, g1_4 > 0 ? g1_4 : 0.0001, dbg_m1 and dbgTolIdx == 4, "EMA9[4]")
+    int m1T_0 = 0
+    int m1B_0 = 0
+    int m1K_0 = 0
+    int m1F_0 = 0
+    int m1T_1 = 0
+    int m1B_1 = 0
+    int m1K_1 = 0
+    int m1F_1 = 0
+    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm(ma1, sqz, g1_2 > 0 ? g1_2 : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
+    int m1T_3 = 0
+    int m1B_3 = 0
+    int m1K_3 = 0
+    int m1F_3 = 0
+    int m1T_4 = 0
+    int m1B_4 = 0
+    int m1K_4 = 0
+    int m1F_4 = 0
 
-    [m2T_0, m2B_0, m2K_0, m2F_0] = run_sm_gated(sliceActive0, ma2, sqz, g2_0 > 0 ? g2_0 : 0.0001, dbg_m2 and dbgTolIdx == 0, "EMA20[0]")
-    [m2T_1, m2B_1, m2K_1, m2F_1] = run_sm_gated(sliceActive1, ma2, sqz, g2_1 > 0 ? g2_1 : 0.0001, dbg_m2 and dbgTolIdx == 1, "EMA20[1]")
-    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm_gated(sliceActive2, ma2, sqz, g2_2 > 0 ? g2_2 : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
-    [m2T_3, m2B_3, m2K_3, m2F_3] = run_sm_gated(sliceActive3, ma2, sqz, g2_3 > 0 ? g2_3 : 0.0001, dbg_m2 and dbgTolIdx == 3, "EMA20[3]")
-    [m2T_4, m2B_4, m2K_4, m2F_4] = run_sm_gated(sliceActive4, ma2, sqz, g2_4 > 0 ? g2_4 : 0.0001, dbg_m2 and dbgTolIdx == 4, "EMA20[4]")
+    int m2T_0 = 0
 
-    [m3T_0, m3B_0, m3K_0, m3F_0] = run_sm_gated(sliceActive0, ma3, sqz, g3_0 > 0 ? g3_0 : 0.0001, dbg_m3 and dbgTolIdx == 0, "SMA50[0]")
-    [m3T_1, m3B_1, m3K_1, m3F_1] = run_sm_gated(sliceActive1, ma3, sqz, g3_1 > 0 ? g3_1 : 0.0001, dbg_m3 and dbgTolIdx == 1, "SMA50[1]")
-    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm_gated(sliceActive2, ma3, sqz, g3_2 > 0 ? g3_2 : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
-    [m3T_3, m3B_3, m3K_3, m3F_3] = run_sm_gated(sliceActive3, ma3, sqz, g3_3 > 0 ? g3_3 : 0.0001, dbg_m3 and dbgTolIdx == 3, "SMA50[3]")
-    [m3T_4, m3B_4, m3K_4, m3F_4] = run_sm_gated(sliceActive4, ma3, sqz, g3_4 > 0 ? g3_4 : 0.0001, dbg_m3 and dbgTolIdx == 4, "SMA50[4]")
+    int m2B_0 = 0
 
-    [m4T_0, m4B_0, m4K_0, m4F_0] = run_sm_gated(sliceActive0, ma4, sqz, g4_0 > 0 ? g4_0 : 0.0001, dbg_m4 and dbgTolIdx == 0, "SMA200[0]")
-    [m4T_1, m4B_1, m4K_1, m4F_1] = run_sm_gated(sliceActive1, ma4, sqz, g4_1 > 0 ? g4_1 : 0.0001, dbg_m4 and dbgTolIdx == 1, "SMA200[1]")
-    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm_gated(sliceActive2, ma4, sqz, g4_2 > 0 ? g4_2 : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
-    [m4T_3, m4B_3, m4K_3, m4F_3] = run_sm_gated(sliceActive3, ma4, sqz, g4_3 > 0 ? g4_3 : 0.0001, dbg_m4 and dbgTolIdx == 3, "SMA200[3]")
-    [m4T_4, m4B_4, m4K_4, m4F_4] = run_sm_gated(sliceActive4, ma4, sqz, g4_4 > 0 ? g4_4 : 0.0001, dbg_m4 and dbgTolIdx == 4, "SMA200[4]")
+    int m2K_0 = 0
 
-    [m5T_0, m5B_0, m5K_0, m5F_0] = run_sm_gated(sliceActive0, ma5, sqz, g5_0 > 0 ? g5_0 : 0.0001, dbg_m5 and dbgTolIdx == 0, "VWAP[0]")
-    [m5T_1, m5B_1, m5K_1, m5F_1] = run_sm_gated(sliceActive1, ma5, sqz, g5_1 > 0 ? g5_1 : 0.0001, dbg_m5 and dbgTolIdx == 1, "VWAP[1]")
-    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm_gated(sliceActive2, ma5, sqz, g5_2 > 0 ? g5_2 : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
-    [m5T_3, m5B_3, m5K_3, m5F_3] = run_sm_gated(sliceActive3, ma5, sqz, g5_3 > 0 ? g5_3 : 0.0001, dbg_m5 and dbgTolIdx == 3, "VWAP[3]")
-    [m5T_4, m5B_4, m5K_4, m5F_4] = run_sm_gated(sliceActive4, ma5, sqz, g5_4 > 0 ? g5_4 : 0.0001, dbg_m5 and dbgTolIdx == 4, "VWAP[4]")
+    int m2F_0 = 0
+    int m2T_1 = 0
+    int m2B_1 = 0
+    int m2K_1 = 0
+    int m2F_1 = 0
+    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm(ma2, sqz, g2_2 > 0 ? g2_2 : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
+    int m2T_3 = 0
+    int m2B_3 = 0
+    int m2K_3 = 0
+    int m2F_3 = 0
+    int m2T_4 = 0
+    int m2B_4 = 0
+    int m2K_4 = 0
+    int m2F_4 = 0
 
-    [m6T_0, m6B_0, m6K_0, m6F_0] = run_sm_gated(sliceActive0, ma6, sqz, g6_0 > 0 ? g6_0 : 0.0001, dbg_m6 and dbgTolIdx == 0, "BBu[0]")
-    [m6T_1, m6B_1, m6K_1, m6F_1] = run_sm_gated(sliceActive1, ma6, sqz, g6_1 > 0 ? g6_1 : 0.0001, dbg_m6 and dbgTolIdx == 1, "BBu[1]")
-    [m6T_2, m6B_2, m6K_2, m6F_2] = run_sm_gated(sliceActive2, ma6, sqz, g6_2 > 0 ? g6_2 : 0.0001, dbg_m6 and dbgTolIdx == 2, "BBu[2]")
-    [m6T_3, m6B_3, m6K_3, m6F_3] = run_sm_gated(sliceActive3, ma6, sqz, g6_3 > 0 ? g6_3 : 0.0001, dbg_m6 and dbgTolIdx == 3, "BBu[3]")
-    [m6T_4, m6B_4, m6K_4, m6F_4] = run_sm_gated(sliceActive4, ma6, sqz, g6_4 > 0 ? g6_4 : 0.0001, dbg_m6 and dbgTolIdx == 4, "BBu[4]")
+    int m3T_0 = 0
 
-    [m7T_0, m7B_0, m7K_0, m7F_0] = run_sm_gated(sliceActive0, ma7, sqz, g7_0 > 0 ? g7_0 : 0.0001, dbg_m7 and dbgTolIdx == 0, "BBl[0]")
-    [m7T_1, m7B_1, m7K_1, m7F_1] = run_sm_gated(sliceActive1, ma7, sqz, g7_1 > 0 ? g7_1 : 0.0001, dbg_m7 and dbgTolIdx == 1, "BBl[1]")
-    [m7T_2, m7B_2, m7K_2, m7F_2] = run_sm_gated(sliceActive2, ma7, sqz, g7_2 > 0 ? g7_2 : 0.0001, dbg_m7 and dbgTolIdx == 2, "BBl[2]")
-    [m7T_3, m7B_3, m7K_3, m7F_3] = run_sm_gated(sliceActive3, ma7, sqz, g7_3 > 0 ? g7_3 : 0.0001, dbg_m7 and dbgTolIdx == 3, "BBl[3]")
-    [m7T_4, m7B_4, m7K_4, m7F_4] = run_sm_gated(sliceActive4, ma7, sqz, g7_4 > 0 ? g7_4 : 0.0001, dbg_m7 and dbgTolIdx == 4, "BBl[4]")
+    int m3B_0 = 0
+
+    int m3K_0 = 0
+
+    int m3F_0 = 0
+    int m3T_1 = 0
+    int m3B_1 = 0
+    int m3K_1 = 0
+    int m3F_1 = 0
+    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm(ma3, sqz, g3_2 > 0 ? g3_2 : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
+    int m3T_3 = 0
+    int m3B_3 = 0
+    int m3K_3 = 0
+    int m3F_3 = 0
+    int m3T_4 = 0
+    int m3B_4 = 0
+    int m3K_4 = 0
+    int m3F_4 = 0
+
+    int m4T_0 = 0
+
+    int m4B_0 = 0
+
+    int m4K_0 = 0
+
+    int m4F_0 = 0
+    int m4T_1 = 0
+    int m4B_1 = 0
+    int m4K_1 = 0
+    int m4F_1 = 0
+    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm(ma4, sqz, g4_2 > 0 ? g4_2 : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
+    int m4T_3 = 0
+    int m4B_3 = 0
+    int m4K_3 = 0
+    int m4F_3 = 0
+    int m4T_4 = 0
+    int m4B_4 = 0
+    int m4K_4 = 0
+    int m4F_4 = 0
+
+    int m5T_0 = 0
+
+    int m5B_0 = 0
+
+    int m5K_0 = 0
+
+    int m5F_0 = 0
+    int m5T_1 = 0
+    int m5B_1 = 0
+    int m5K_1 = 0
+    int m5F_1 = 0
+    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm(ma5, sqz, g5_2 > 0 ? g5_2 : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
+    int m5T_3 = 0
+    int m5B_3 = 0
+    int m5K_3 = 0
+    int m5F_3 = 0
+    int m5T_4 = 0
+    int m5B_4 = 0
+    int m5K_4 = 0
+    int m5F_4 = 0
+
+    int m6T_0 = 0
+
+    int m6B_0 = 0
+
+    int m6K_0 = 0
+
+    int m6F_0 = 0
+    int m6T_1 = 0
+    int m6B_1 = 0
+    int m6K_1 = 0
+    int m6F_1 = 0
+    [m6T_2, m6B_2, m6K_2, m6F_2] = run_sm(ma6, sqz, g6_2 > 0 ? g6_2 : 0.0001, dbg_m6 and dbgTolIdx == 2, "BBu[2]")
+    int m6T_3 = 0
+    int m6B_3 = 0
+    int m6K_3 = 0
+    int m6F_3 = 0
+    int m6T_4 = 0
+    int m6B_4 = 0
+    int m6K_4 = 0
+    int m6F_4 = 0
+
+    int m7T_0 = 0
+
+    int m7B_0 = 0
+
+    int m7K_0 = 0
+
+    int m7F_0 = 0
+    int m7T_1 = 0
+    int m7B_1 = 0
+    int m7K_1 = 0
+    int m7F_1 = 0
+    [m7T_2, m7B_2, m7K_2, m7F_2] = run_sm(ma7, sqz, g7_2 > 0 ? g7_2 : 0.0001, dbg_m7 and dbgTolIdx == 2, "BBl[2]")
+    int m7T_3 = 0
+    int m7B_3 = 0
+    int m7K_3 = 0
+    int m7F_3 = 0
+    int m7T_4 = 0
+    int m7B_4 = 0
+    int m7K_4 = 0
+    int m7F_4 = 0
 
     // Mask: tol == 0 → zero out the 4 counts for that (MA, tol) cell.
     string s = ""
@@ -489,30 +596,30 @@ run_full() =>
 // ==========================================
 // 5. RUN PER TICKER (29 calls — within Pine's 40-security limit)
 // ==========================================
-a01 = request.security(t01, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a02 = request.security(t02, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a03 = request.security(t03, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a04 = request.security(t04, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a05 = request.security(t05, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a06 = request.security(t06, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a07 = request.security(t07, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a08 = request.security(t08, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a09 = request.security(t09, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a10 = request.security(t10, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a11 = request.security(t11, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a12 = request.security(t12, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a13 = request.security(t13, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a14 = request.security(t14, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a15 = request.security(t15, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a16 = request.security(t16, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a17 = request.security(t17, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a18 = request.security(t18, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a19 = request.security(t19, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a20 = request.security(t20, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a21 = request.security(t21, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a22 = request.security(t22, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a23 = request.security(t23, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
-a24 = request.security(t24, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+string a01 = na
+string a02 = na
+string a03 = na
+string a04 = na
+string a05 = na
+string a06 = na
+string a07 = na
+string a08 = na
+string a09 = na
+string a10 = na
+string a11 = na
+string a12 = na
+string a13 = na
+string a14 = na
+string a15 = na
+string a16 = na
+string a17 = na
+string a18 = na
+string a19 = na
+string a20 = na
+string a21 = na
+string a22 = na
+string a23 = na
+string a24 = na
 a25 = request.security(t25, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 a26 = request.security(t26, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 a27 = request.security(t27, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
@@ -523,83 +630,41 @@ a31 = request.security(t31, timeframe.period, run_full(), lookahead=barmerge.loo
 a32 = request.security(t32, timeframe.period, run_full(), lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
 
 // ==========================================
-// 5b. DIRECT FALLBACK FOR CHART TICKER (mutable copies for override)
+// 5b. NO DIRECT FALLBACK (slice file — chart-ticker parity disabled to save memory)
 // ==========================================
-// request.security has documented quirks (var state propagation, history init) that
-// can cause ~1-2 phantom events vs the chart base. To guarantee parity with OS [ST]
-// for the ticker the user is auditing on the chart, we recompute that ticker's
-// payload directly (no request.security) and override the aNN string for it.
-string d_str = run_full()
-string chartId = syminfo.tickerid
+aa01 = a01
+aa02 = a02
+aa03 = a03
+aa04 = a04
+aa05 = a05
+aa06 = a06
+aa07 = a07
+aa08 = a08
+aa09 = a09
+aa10 = a10
+aa11 = a11
+aa12 = a12
+aa13 = a13
+aa14 = a14
+aa15 = a15
+aa16 = a16
+aa17 = a17
+aa18 = a18
+aa19 = a19
+aa20 = a20
+aa21 = a21
+aa22 = a22
+aa23 = a23
+aa24 = a24
+aa25 = a25
+aa26 = a26
+aa27 = a27
+aa28 = a28
+aa29 = a29
+aa30 = a30
+aa31 = a31
+aa32 = a32
 
-var string aa01 = na
-var string aa02 = na
-var string aa03 = na
-var string aa04 = na
-var string aa05 = na
-var string aa06 = na
-var string aa07 = na
-var string aa08 = na
-var string aa09 = na
-var string aa10 = na
-var string aa11 = na
-var string aa12 = na
-var string aa13 = na
-var string aa14 = na
-var string aa15 = na
-var string aa16 = na
-var string aa17 = na
-var string aa18 = na
-var string aa19 = na
-var string aa20 = na
-var string aa21 = na
-var string aa22 = na
-var string aa23 = na
-var string aa24 = na
-var string aa25 = na
-var string aa26 = na
-var string aa27 = na
-var string aa28 = na
-var string aa29 = na
-var string aa30 = na
-var string aa31 = na
-var string aa32 = na
-
-aa01 := str.contains(chartId, t01) ? d_str : a01
-aa02 := str.contains(chartId, t02) ? d_str : a02
-aa03 := str.contains(chartId, t03) ? d_str : a03
-aa04 := str.contains(chartId, t04) ? d_str : a04
-aa05 := str.contains(chartId, t05) ? d_str : a05
-aa06 := str.contains(chartId, t06) ? d_str : a06
-aa07 := str.contains(chartId, t07) ? d_str : a07
-aa08 := str.contains(chartId, t08) ? d_str : a08
-aa09 := str.contains(chartId, t09) ? d_str : a09
-aa10 := str.contains(chartId, t10) ? d_str : a10
-aa11 := str.contains(chartId, t11) ? d_str : a11
-aa12 := str.contains(chartId, t12) ? d_str : a12
-aa13 := str.contains(chartId, t13) ? d_str : a13
-aa14 := str.contains(chartId, t14) ? d_str : a14
-aa15 := str.contains(chartId, t15) ? d_str : a15
-aa16 := str.contains(chartId, t16) ? d_str : a16
-aa17 := str.contains(chartId, t17) ? d_str : a17
-aa18 := str.contains(chartId, t18) ? d_str : a18
-aa19 := str.contains(chartId, t19) ? d_str : a19
-aa20 := str.contains(chartId, t20) ? d_str : a20
-aa21 := str.contains(chartId, t21) ? d_str : a21
-aa22 := str.contains(chartId, t22) ? d_str : a22
-aa23 := str.contains(chartId, t23) ? d_str : a23
-aa24 := str.contains(chartId, t24) ? d_str : a24
-aa25 := str.contains(chartId, t25) ? d_str : a25
-aa26 := str.contains(chartId, t26) ? d_str : a26
-aa27 := str.contains(chartId, t27) ? d_str : a27
-aa28 := str.contains(chartId, t28) ? d_str : a28
-aa29 := str.contains(chartId, t29) ? d_str : a29
-aa30 := str.contains(chartId, t30) ? d_str : a30
-aa31 := str.contains(chartId, t31) ? d_str : a31
-aa32 := str.contains(chartId, t32) ? d_str : a32
-
-if barstate.islast and dbgEnable
-    log.info("CHART-ID = '" + chartId + "' | syminfo.ticker = '" + syminfo.ticker + "'")
 
 // ==========================================
 // 6. TABLE RENDERING (parses CSV strings on the last bar, shows displayTolIdx slice)
@@ -727,30 +792,6 @@ if barstate.islast
     table.cell(tbl, 6, 0, "BB Up"                           + tol_label_6, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
     table.cell(tbl, 7, 0, "BB Lw"                           + tol_label_7, text_color=color.new(color.white, 0), bgcolor=color.new(color.gray, 30), text_size=sz)
 
-    render_row_from_csv( 1, n01, aa01, di, sz)
-    render_row_from_csv( 2, n02, aa02, di, sz)
-    render_row_from_csv( 3, n03, aa03, di, sz)
-    render_row_from_csv( 4, n04, aa04, di, sz)
-    render_row_from_csv( 5, n05, aa05, di, sz)
-    render_row_from_csv( 6, n06, aa06, di, sz)
-    render_row_from_csv( 7, n07, aa07, di, sz)
-    render_row_from_csv( 8, n08, aa08, di, sz)
-    render_row_from_csv( 9, n09, aa09, di, sz)
-    render_row_from_csv(10, n10, aa10, di, sz)
-    render_row_from_csv(11, n11, aa11, di, sz)
-    render_row_from_csv(12, n12, aa12, di, sz)
-    render_row_from_csv(13, n13, aa13, di, sz)
-    render_row_from_csv(14, n14, aa14, di, sz)
-    render_row_from_csv(15, n15, aa15, di, sz)
-    render_row_from_csv(16, n16, aa16, di, sz)
-    render_row_from_csv(17, n17, aa17, di, sz)
-    render_row_from_csv(18, n18, aa18, di, sz)
-    render_row_from_csv(19, n19, aa19, di, sz)
-    render_row_from_csv(20, n20, aa20, di, sz)
-    render_row_from_csv(21, n21, aa21, di, sz)
-    render_row_from_csv(22, n22, aa22, di, sz)
-    render_row_from_csv(23, n23, aa23, di, sz)
-    render_row_from_csv(24, n24, aa24, di, sz)
     render_row_from_csv(25, n25, aa25, di, sz)
     render_row_from_csv(26, n26, aa26, di, sz)
     render_row_from_csv(27, n27, aa27, di, sz)
@@ -793,36 +834,12 @@ if must_log
 
     string tol_grid_json = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + ",\"BBu\":" + fmt_grid(eg6_0, eg6_1, eg6_2, eg6_3, eg6_4) + ",\"BBl\":" + fmt_grid(eg7_0, eg7_1, eg7_2, eg7_3, eg7_4) + "}"
 
-    string slice_json = "[" + (sliceActive0 ? "0" : "") + (sliceActive1 ? (sliceActive0 ? ",1" : "1") : "") + (sliceActive2 ? ",2" : "") + (sliceActive3 ? ",3" : "") + (sliceActive4 ? ",4" : "") + "]"
+    string slice_json = "[2]"
     string head = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\",\"bb_u\",\"bb_l\"],\"tol_grid\":" + tol_grid_json + ",\"tol_idx_slots\":" + slice_json + ",\"schema\":\"v14\",\"data\":{"
 
     log.info("--- OM SNAPSHOT BEGIN ---")
     log.info(head)
-    log.info(fmt_row(n01, aa01, false))
-    log.info(fmt_row(n02, aa02, true))
-    log.info(fmt_row(n03, aa03, true))
-    log.info(fmt_row(n04, aa04, true))
-    log.info(fmt_row(n05, aa05, true))
-    log.info(fmt_row(n06, aa06, true))
-    log.info(fmt_row(n07, aa07, true))
-    log.info(fmt_row(n08, aa08, true))
-    log.info(fmt_row(n09, aa09, true))
-    log.info(fmt_row(n10, aa10, true))
-    log.info(fmt_row(n11, aa11, true))
-    log.info(fmt_row(n12, aa12, true))
-    log.info(fmt_row(n13, aa13, true))
-    log.info(fmt_row(n14, aa14, true))
-    log.info(fmt_row(n15, aa15, true))
-    log.info(fmt_row(n16, aa16, true))
-    log.info(fmt_row(n17, aa17, true))
-    log.info(fmt_row(n18, aa18, true))
-    log.info(fmt_row(n19, aa19, true))
-    log.info(fmt_row(n20, aa20, true))
-    log.info(fmt_row(n21, aa21, true))
-    log.info(fmt_row(n22, aa22, true))
-    log.info(fmt_row(n23, aa23, true))
-    log.info(fmt_row(n24, aa24, true))
-    log.info(fmt_row(n25, aa25, true))
+    log.info(fmt_row(n25, aa25, false))
     log.info(fmt_row(n26, aa26, true))
     log.info(fmt_row(n27, aa27, true))
     log.info(fmt_row(n28, aa28, true))
@@ -844,35 +861,12 @@ if must_alert
     [eg6_0, eg6_1, eg6_2, eg6_3, eg6_4] = get_tol_grid(5)
     [eg7_0, eg7_1, eg7_2, eg7_3, eg7_4] = get_tol_grid(6)
     string tol_grid_json_a = "{\"EMA9\":"   + fmt_grid(eg1_0, eg1_1, eg1_2, eg1_3, eg1_4) + ",\"EMA20\":" + fmt_grid(eg2_0, eg2_1, eg2_2, eg2_3, eg2_4) + ",\"SMA50\":" + fmt_grid(eg3_0, eg3_1, eg3_2, eg3_3, eg3_4) + ",\"SMA200\":" + fmt_grid(eg4_0, eg4_1, eg4_2, eg4_3, eg4_4) + ",\"VWAP\":" + fmt_grid(eg5_0, eg5_1, eg5_2, eg5_3, eg5_4) + ",\"BBu\":" + fmt_grid(eg6_0, eg6_1, eg6_2, eg6_3, eg6_4) + ",\"BBl\":" + fmt_grid(eg7_0, eg7_1, eg7_2, eg7_3, eg7_4) + "}"
-    string slice_json_a = "[" + (sliceActive0 ? "0" : "") + (sliceActive1 ? (sliceActive0 ? ",1" : "1") : "") + (sliceActive2 ? ",2" : "") + (sliceActive3 ? ",3" : "") + (sliceActive4 ? ",4" : "") + "]"
+    string slice_json_a = "[2]"
     string head_a = "{\"d\":\"" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + "\",\"tf\":\"" + timeframe.period + "\",\"ma\":[" + str.tostring(ema_fast_p) + "," + str.tostring(ema_slow_p) + "," + str.tostring(sma_mid_p) + "," + str.tostring(sma_long_p) + ",\"vwap\",\"bb_u\",\"bb_l\"],\"tol_grid\":" + tol_grid_json_a + ",\"tol_idx_slots\":" + slice_json_a + ",\"schema\":\"v14\",\"data\":{"
     alert("--- OM SNAPSHOT BEGIN ---", alert.freq_once_per_bar_close)
     alert(head_a, alert.freq_once_per_bar_close)
     alert(fmt_row(n01, aa01, false), alert.freq_once_per_bar_close)
-    alert(fmt_row(n02, aa02, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n03, aa03, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n04, aa04, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n05, aa05, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n06, aa06, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n07, aa07, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n08, aa08, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n09, aa09, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n10, aa10, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n11, aa11, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n12, aa12, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n13, aa13, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n14, aa14, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n15, aa15, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n16, aa16, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n17, aa17, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n18, aa18, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n19, aa19, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n20, aa20, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n21, aa21, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n22, aa22, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n23, aa23, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n24, aa24, true),  alert.freq_once_per_bar_close)
-    alert(fmt_row(n25, aa25, true),  alert.freq_once_per_bar_close)
+    alert(fmt_row(n25, aa25, false),  alert.freq_once_per_bar_close)
     alert(fmt_row(n26, aa26, true),  alert.freq_once_per_bar_close)
     alert(fmt_row(n27, aa27, true),  alert.freq_once_per_bar_close)
     alert(fmt_row(n28, aa28, true),  alert.freq_once_per_bar_close)

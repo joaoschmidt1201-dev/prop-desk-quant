@@ -15,8 +15,12 @@ CATEGORIES = [
     ("FX", ["EURUSD", "EURCHF", "GBPUSD"]),
     ("Commodities/ETFs", ["GLD", "SLV", "USO", "EWZ"]),
     ("QQQ Top 10", ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "AVGO", "GOOG", "META", "TSLA", "BRK.B"]),
+    ("Sector / Country ETFs", ["SMH", "EWY", "DRAM"]),
 ]
-MA_NAMES = ["EMA 9", "EMA 20", "SMA 50", "SMA 200", "VWAP"]
+# Levels evaluated per (ticker, TF). This is the single source of truth for the
+# number of "levels": count_block, the snapshot stride, validation, the API and
+# the frontend all derive from len(MA_NAMES). BB Upper/Lower were added in v14.
+MA_NAMES = ["EMA 9", "EMA 20", "SMA 50", "SMA 200", "VWAP", "BB Upper", "BB Lower"]
 MIN_SAMPLE = 20
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,7 +92,14 @@ def load_snapshot(path: Path, expected_tf: str) -> dict:
     if snapshot_tf != expected_tf:
         raise ValueError(f"Snapshot {path} has tf={snapshot_tf!r}; expected {expected_tf!r}.")
 
-    if ma_values != [9, 20, 50, 200, "vwap"]:
+    # v14 adds Bollinger bands (bb_u/bb_l) after VWAP. Legacy 5-level snapshots
+    # (pre-v14) are still accepted here, but validate_snapshot_data() rejects them
+    # by length once MA_NAMES has 7 entries — regenerate/archive them (see v14 note).
+    valid_ma_schemas = (
+        [9, 20, 50, 200, "vwap"],
+        [9, 20, 50, 200, "vwap", "bb_u", "bb_l"],
+    )
+    if ma_values not in valid_ma_schemas:
         raise ValueError(f"Snapshot {path} has unexpected MA schema: {ma_values!r}")
 
     if not isinstance(data, dict):
@@ -276,10 +287,9 @@ def best_parts(values: list[int]) -> tuple[str, int] | None:
 
 
 def render_summary_table(snapshot: dict, category_tickers: list[str]) -> list[str]:
-    lines = [
-        "| Ticker | EMA 9 | EMA 20 | SMA 50 | SMA 200 | VWAP | Best |",
-        "|--------|-------|--------|--------|---------|------|------|",
-    ]
+    header = "| Ticker | " + " | ".join(MA_NAMES) + " | Best |"
+    sep = "|" + "|".join(["--------"] * (len(MA_NAMES) + 2)) + "|"
+    lines = [header, sep]
 
     data = snapshot["data"]
     for ticker in category_tickers:
@@ -291,10 +301,9 @@ def render_summary_table(snapshot: dict, category_tickers: list[str]) -> list[st
 
 
 def render_detail_table(snapshot: dict, category_tickers: list[str]) -> list[str]:
-    lines = [
-        "| Ticker | EMA 9 | EMA 20 | SMA 50 | SMA 200 | VWAP |",
-        "|--------|-------|--------|--------|---------|------|",
-    ]
+    header = "| Ticker | " + " | ".join(MA_NAMES) + " |"
+    sep = "|" + "|".join(["--------"] * (len(MA_NAMES) + 1)) + "|"
+    lines = [header, sep]
 
     data = snapshot["data"]
     for ticker in category_tickers:

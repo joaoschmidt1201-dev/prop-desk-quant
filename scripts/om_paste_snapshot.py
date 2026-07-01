@@ -31,6 +31,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import re
 import sys
@@ -62,6 +64,24 @@ TF_ALIASES = {
 
 def strip_timestamp(line: str) -> str:
     return TIMESTAMP_PREFIX_RE.sub("", line).rstrip()
+
+
+def maybe_extract_csv(raw_text: str) -> str:
+    """If the input is a TradingView Pine Logs CSV export (header `Date,Message`),
+    return just the Message column, one entry per line, so assemble() can find the
+    BEGIN/END block. Otherwise return the text unchanged (plain paste)."""
+    stripped = raw_text.lstrip()
+    first_line = stripped.splitlines()[0] if stripped else ""
+    if first_line.strip().lower().lstrip("﻿") not in ("date,message", "message,date"):
+        return raw_text
+    reader = csv.reader(io.StringIO(raw_text))
+    rows = list(reader)
+    if not rows:
+        return raw_text
+    header = [h.strip().lower().lstrip("﻿") for h in rows[0]]
+    msg_idx = header.index("message") if "message" in header else 1
+    messages = [row[msg_idx] for row in rows[1:] if len(row) > msg_idx]
+    return "\n".join(messages)
 
 
 def assemble(raw_text: str) -> str:
@@ -116,10 +136,25 @@ def parse_args() -> argparse.Namespace:
             "the union must equal [0,1,2,3,4] with no overlaps."
         ),
     )
+    parser.add_argument(
+        "--merge-tickers",
+        dest="merge_ticker_inputs",
+        nargs="+",
+        help=(
+            "Merge disjoint TICKER-GROUP snapshots (v14 g1/g2 baseline files). Unions "
+            "their ticker sets and collapses to the 28-int baseline block (grid_size 1)."
+        ),
+    )
     return parser.parse_args()
 
 
-STRIDE = 20  # 5 MAs × 4 metrics per tolerance level
+# Ints per tolerance level = (number of levels) × 4 metrics (T,B,Bk,F).
+# Derived from MA_NAMES so it tracks v14 (7 levels → 28) automatically.
+try:
+    from occurrence_matrix_report import MA_NAMES as _MA_NAMES  # same scripts/ dir
+    STRIDE = len(_MA_NAMES) * 4
+except Exception:  # pragma: no cover - fallback if run oddly
+    STRIDE = 28
 
 
 def merge_slices(paths: list[str]) -> dict:
@@ -180,6 +215,56 @@ def merge_slices(paths: list[str]) -> dict:
     return out
 
 
+BASELINE_IDX = 2  # tol index that reproduces the CZ baseline table
+
+
+def merge_ticker_groups(paths: list[str]) -> dict:
+    """Combine disjoint TICKER-GROUP snapshots (v14 g1/g2) into ONE baseline
+    snapshot. Each group ran only the baseline tolerance; we union their ticker
+    sets and collapse every ticker to the 28-int baseline block (grid_size 1)."""
+    groups = [json.loads(Path(p).read_text(encoding="utf-8")) for p in paths]
+    base = groups[0]
+
+    # Header agreement (date/tf/ma).
+    for g, p in zip(groups[1:], paths[1:]):
+        for k in ("d", "tf", "ma"):
+            if g.get(k) != base.get(k):
+                raise ValueError(f"{p}: {k}={g.get(k)!r} disagrees with {paths[0]}: {k}={base.get(k)!r}.")
+
+    # Union tickers, rejecting overlaps.
+    owner: dict[str, str] = {}
+    merged_full: dict[str, list[int]] = {}
+    for g, p in zip(groups, paths):
+        for ticker, arr in g.get("data", {}).items():
+            if ticker in owner:
+                raise ValueError(f"ticker {ticker} appears in both {owner[ticker]} and {p}.")
+            owner[ticker] = p
+            merged_full[ticker] = arr
+
+    # Collapse each ticker to the baseline block (28 ints).
+    lo = BASELINE_IDX * STRIDE
+    hi = lo + STRIDE
+    collapsed: dict[str, list[int]] = {}
+    for ticker, arr in merged_full.items():
+        if len(arr) < hi:
+            raise ValueError(f"ticker {ticker} has {len(arr)} ints; expected ≥ {hi} to read the baseline block.")
+        collapsed[ticker] = arr[lo:hi]
+
+    # Collapse tol_grid to a single baseline value per level.
+    tol_grid = base.get("tol_grid")
+    if isinstance(tol_grid, dict):
+        tol_grid = {
+            k: ([v[BASELINE_IDX]] if isinstance(v, list) and len(v) > BASELINE_IDX else v)
+            for k, v in tol_grid.items()
+        }
+
+    out = {**base, "data": collapsed}
+    if isinstance(tol_grid, dict):
+        out["tol_grid"] = tol_grid
+    out.pop("tol_idx_slots", None)  # single-tol snapshot → no slot metadata
+    return out
+
+
 def main() -> int:
     args = parse_args()
 
@@ -197,7 +282,13 @@ def main() -> int:
         )
         return 2
 
-    if args.merge_inputs:
+    if args.merge_ticker_inputs:
+        try:
+            payload = merge_ticker_groups(args.merge_ticker_inputs)
+        except (ValueError, OSError, json.JSONDecodeError) as exc:
+            print(f"ERROR: ticker merge failed: {exc}", file=sys.stderr)
+            return 1
+    elif args.merge_inputs:
         try:
             payload = merge_slices(args.merge_inputs)
         except (ValueError, OSError, json.JSONDecodeError) as exc:
@@ -212,6 +303,7 @@ def main() -> int:
             print("ERROR: input is empty (pipe a paste in via stdin or use --file)", file=sys.stderr)
             return 2
 
+        raw_text = maybe_extract_csv(raw_text)
         try:
             payload_str = assemble(raw_text)
         except ValueError as exc:
@@ -238,10 +330,11 @@ def main() -> int:
     sample = next(iter(data.values()), []) if isinstance(data, dict) else []
     n_values = len(sample) if isinstance(sample, list) else 0
     schema = payload.get("schema", "(none)")
+    grid = "full-grid" if n_values == 5 * STRIDE else "single-tol" if n_values == STRIDE else "???"
     print(
         f"Parsed OK · schema={schema} · tf={snap_tf!r} · d={payload.get('d')!r} · "
         f"tickers={n_tickers} · ints/ticker={n_values} "
-        f"({'v13' if n_values == 100 else 'v12.x' if n_values == 20 else '???'})"
+        f"(stride={STRIDE}, {grid})"
     )
 
     if args.dry_run:
