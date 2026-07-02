@@ -365,7 +365,7 @@ function KpiBlock({
 
 type SortState = { col: number | "ticker"; dir: "asc" | "desc" };
 type RankedSlot = { tf: string; ma: string; metric: OccurrenceMetric };
-const MAX_COLS = 15;
+const MAX_COLS = 10;
 
 // The single wide table CZ asked for: each row = a ticker, columns = that ticker's
 // best (TF·level) occurrences ranked by Bounce% (best → worst, left → right). Click a
@@ -540,24 +540,28 @@ function RankedCell({ slot, selectedMetric }: { slot: RankedSlot | null; selecte
       title={tooltip}
     >
       <div className="text-[9px] font-semibold uppercase tracking-wider text-white/80">
-        {tf}·{shortMa(ma)}
+        {tfLabel(tf)} {maLabel(ma)}
       </div>
       <div className="text-[15px] font-bold leading-none tabular">{formatMetric(metric, selectedMetric)}</div>
     </td>
   );
 }
 
-function shortMa(ma: string): string {
+function maLabel(ma: string): string {
   const map: Record<string, string> = {
-    "EMA 9": "E9",
-    "EMA 20": "E20",
-    "SMA 50": "S50",
-    "SMA 200": "S200",
-    VWAP: "VW",
-    "BB Upper": "BBu",
-    "BB Lower": "BBl",
+    "EMA 9": "EMA9",
+    "EMA 20": "EMA20",
+    "SMA 50": "SMA50",
+    "SMA 200": "SMA200",
+    VWAP: "VWAP",
+    "BB Upper": "BBUP",
+    "BB Lower": "BBLW",
   };
   return map[ma] ?? ma;
+}
+
+function tfLabel(tf: string): string {
+  return tf === "1h" ? "H" : tf;
 }
 
 function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategories: string[]): string[] {
