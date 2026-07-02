@@ -9,17 +9,15 @@ import {
   Database,
   Flame,
   Grid3X3,
-  Layers,
   RefreshCw,
   ShieldAlert,
   Sparkles,
   Target,
   Zap,
 } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   api,
-  type OccurrenceCategory,
   type OccurrenceLeaderboardEntry,
   type OccurrenceMatrixPayload,
   type OccurrenceMetric,
@@ -28,7 +26,6 @@ import { OccurrenceFilters, type OccurrenceMetricKey } from "./filters";
 import { Leaderboards } from "./leaderboards";
 import { ToleranceSelector } from "./tolerance-selector";
 import { TopSetupsTable } from "./top-setups-table";
-import { TickerFocus } from "./ticker-focus";
 
 type DashboardProps = {
   initialData?: OccurrenceMatrixPayload | null;
@@ -44,14 +41,14 @@ type Summary = {
 };
 
 export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
-  const [selectedTf, setSelectedTf] = useState(initialData?.tfs[0] ?? "W");
+  const [selectedTfs, setSelectedTfs] = useState<string[]>(() => defaultTfs(initialData?.tfs ?? []));
   const [selectedMetric, setSelectedMetric] = useState<OccurrenceMetricKey>("bounce_pct");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(
     initialData?.categories.map((c) => c.name) ?? [],
   );
   const [selectedMas, setSelectedMas] = useState<string[]>(initialData?.mas ?? []);
   const [tolIdxByTf, setTolIdxByTf] = useState<Record<string, number>>({});
-  const [viewMode, setViewMode] = useState<"global" | "ticker">("global");
+  const [sort, setSort] = useState<SortState>({ col: 0, dir: "desc" });
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["occurrence-matrix", tolIdxByTf],
@@ -62,10 +59,13 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
 
   useEffect(() => {
     if (!data) return;
-    if (!data.tfs.includes(selectedTf) && data.tfs.length > 0) {
-      setSelectedTf(data.tfs[0]);
+    const valid = selectedTfs.filter((tf) => data.tfs.includes(tf));
+    if (valid.length === 0 && data.tfs.length > 0) {
+      setSelectedTfs(defaultTfs(data.tfs));
+    } else if (valid.length !== selectedTfs.length) {
+      setSelectedTfs(valid);
     }
-  }, [data, selectedTf]);
+  }, [data, selectedTfs]);
 
   useEffect(() => {
     if (!data) return;
@@ -85,12 +85,21 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
   if (isError || !data) return <OccurrenceError />;
 
   const visibleMas = selectedMas.filter((ma) => data.mas.includes(ma));
+  const visibleTfs = selectedTfs.filter((tf) => data.tfs.includes(tf));
   const categoryTickers = getCategoryTickers(data, selectedCategories);
-  const visibleCategories = getVisibleCategories(data, selectedCategories);
   const missingTfs = data.expected_tfs.filter((tf) => !data.tfs.includes(tf));
-  const meanReversion = collectSetups(data, selectedTf, categoryTickers, visibleMas, "bounce_pct");
-  const breakout = collectSetups(data, selectedTf, categoryTickers, visibleMas, "break_pct");
-  const summary = summarize(data, selectedTf, categoryTickers, visibleMas, meanReversion);
+  const meanReversion = collectSetups(data, visibleTfs, categoryTickers, visibleMas, "bounce_pct");
+  const breakout = collectSetups(data, visibleTfs, categoryTickers, visibleMas, "break_pct");
+  const summary = summarize(data, visibleTfs, categoryTickers, visibleMas, meanReversion);
+
+  function toggleTf(tf: string) {
+    setSelectedTfs((current) => {
+      if (current.includes(tf)) {
+        return current.length <= 1 ? current : current.filter((item) => item !== tf);
+      }
+      return (data?.tfs ?? []).filter((item) => current.includes(item) || item === tf);
+    });
+  }
 
   function toggleMa(ma: string) {
     setSelectedMas((current) => {
@@ -115,22 +124,14 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
     <main className="mx-auto w-full max-w-[1600px] flex-1 px-6 py-8 lg:px-8">
       <Header data={data} isFetching={isFetching} onRefresh={() => refetch()} />
       {missingTfs.length > 0 && <SnapshotNotice loaded={data.tfs} missing={missingTfs} />}
-      <div className="mt-4 fade-in">
-        <ViewToggle viewMode={viewMode} onChange={setViewMode} />
-      </div>
-      {viewMode === "ticker" ? (
-        <div className="mt-4 fade-in">
-          <TickerFocus data={data} />
-        </div>
-      ) : (
-      <>
-      <KpiBand summary={summary} selectedTf={selectedTf} />
+      <KpiBand summary={summary} selectedTfs={visibleTfs} />
       <div className="mt-6 fade-in">
         <OccurrenceFilters
           tfs={data.tfs}
           expectedTfs={data.expected_tfs}
-          selectedTf={selectedTf}
-          onTfChange={setSelectedTf}
+          selectedTfs={selectedTfs}
+          onTfToggle={toggleTf}
+          onAllTfs={() => setSelectedTfs([...data.tfs])}
           selectedMetric={selectedMetric}
           onMetricChange={setSelectedMetric}
           categories={data.categories}
@@ -153,12 +154,15 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
         />
       </div>
       <div className="mt-6 fade-in">
-        <Heatmap
+        <RankedTable
           data={data}
-          selectedTf={selectedTf}
-          categories={visibleCategories}
+          tickers={categoryTickers}
+          tfs={visibleTfs}
           mas={visibleMas}
           selectedMetric={selectedMetric}
+          minSample={data.min_sample}
+          sort={sort}
+          onSort={setSort}
         />
       </div>
       <div className="mt-6 fade-in">
@@ -175,43 +179,15 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
         <Leaderboards meanReversion={meanReversion} breakout={breakout} minSample={data.min_sample} />
       </div>
       <Legend selectedMetric={selectedMetric} />
-      </>
-      )}
     </main>
   );
 }
 
-function ViewToggle({
-  viewMode,
-  onChange,
-}: {
-  viewMode: "global" | "ticker";
-  onChange: (mode: "global" | "ticker") => void;
-}) {
-  const options: Array<{ key: "global" | "ticker"; label: string; icon: ReactNode }> = [
-    { key: "global", label: "Global", icon: <Grid3X3 className="h-3.5 w-3.5" /> },
-    { key: "ticker", label: "Single Ticker", icon: <Target className="h-3.5 w-3.5" /> },
-  ];
-  return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-card/35 p-1 backdrop-blur-sm">
-      {options.map((option) => (
-        <button
-          key={option.key}
-          type="button"
-          aria-pressed={viewMode === option.key}
-          onClick={() => onChange(option.key)}
-          className={
-            viewMode === option.key
-              ? "inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground shadow-md shadow-primary/25 transition active:scale-95"
-              : "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground active:scale-95"
-          }
-        >
-          {option.icon}
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
+const PRIORITY_TFS = ["W", "D", "1h"];
+
+function defaultTfs(tfs: string[]): string[] {
+  const preferred = tfs.filter((tf) => PRIORITY_TFS.includes(tf));
+  return preferred.length > 0 ? preferred : [...tfs];
 }
 
 function Header({
@@ -303,30 +279,31 @@ type KpiTone = "gain" | "loss" | "warning" | "neutral";
 
 function KpiBand({
   summary,
-  selectedTf,
+  selectedTfs,
 }: {
   summary: Summary;
-  selectedTf: string;
+  selectedTfs: string[];
 }) {
+  const tfLabel = selectedTfs.length > 0 ? selectedTfs.join("·") : "—";
   return (
     <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <KpiBlock
         icon={<Target className="h-4 w-4" />}
-        label={`Avg Bounce% · ${selectedTf}`}
+        label={`Avg Bounce% · ${tfLabel}`}
         value={formatPct(summary.avgBounce)}
         sub="Mean-reversion strength"
         tone="gain"
       />
       <KpiBlock
         icon={<Zap className="h-4 w-4" />}
-        label={`Avg Break% · ${selectedTf}`}
+        label={`Avg Break% · ${tfLabel}`}
         value={formatPct(summary.avgBreak)}
         sub="Trend continuation"
         tone="loss"
       />
       <KpiBlock
         icon={<AlertCircle className="h-4 w-4" />}
-        label={`Avg False% · ${selectedTf}`}
+        label={`Avg False% · ${tfLabel}`}
         value={formatPct(summary.avgFalse)}
         sub="Whipsaw rate"
         tone="warning"
@@ -386,20 +363,80 @@ function KpiBlock({
   );
 }
 
-function Heatmap({
+type SortState = { col: number | "ticker"; dir: "asc" | "desc" };
+type RankedSlot = { tf: string; ma: string; metric: OccurrenceMetric };
+const MAX_COLS = 15;
+
+// The single wide table CZ asked for: each row = a ticker, columns = that ticker's
+// best (TF·level) occurrences ranked by Bounce% (best → worst, left → right). Click a
+// column header to sort all tickers by that rank position. "Hit color" is the lens
+// (cell color + displayed value); the ranking is always by Bounce%.
+function RankedTable({
   data,
-  selectedTf,
-  categories,
+  tickers,
+  tfs,
   mas,
   selectedMetric,
+  minSample,
+  sort,
+  onSort,
 }: {
   data: OccurrenceMatrixPayload;
-  selectedTf: string;
-  categories: OccurrenceCategory[];
+  tickers: string[];
+  tfs: string[];
   mas: string[];
   selectedMetric: OccurrenceMetricKey;
+  minSample: number;
+  sort: SortState;
+  onSort: (s: SortState) => void;
 }) {
-  const tickerCount = categories.reduce((sum, category) => sum + category.tickers.length, 0);
+  const ranked = new Map<string, RankedSlot[]>();
+  let maxLen = 0;
+  for (const ticker of tickers) {
+    const tickerData = data.data[ticker];
+    const slots: RankedSlot[] = [];
+    if (tickerData) {
+      for (const tf of tfs) {
+        const tfData = tickerData[tf];
+        if (!tfData) continue;
+        for (const ma of mas) {
+          const metric = tfData[ma];
+          if (!metric || metric.T < minSample) continue;
+          slots.push({ tf, ma, metric });
+        }
+      }
+    }
+    slots.sort((a, b) => {
+      const av = a.metric.bounce_pct ?? -1;
+      const bv = b.metric.bounce_pct ?? -1;
+      if (bv !== av) return bv - av;
+      if (b.metric.T !== a.metric.T) return b.metric.T - a.metric.T;
+      if (a.tf !== b.tf) return a.tf < b.tf ? -1 : 1;
+      return a.ma < b.ma ? -1 : 1;
+    });
+    ranked.set(ticker, slots);
+    if (slots.length > maxLen) maxLen = slots.length;
+  }
+  const colCount = Math.min(MAX_COLS, Math.max(1, maxLen));
+  const cols = Array.from({ length: colCount }, (_, i) => i);
+
+  const sortedTickers = [...tickers].sort((t1, t2) => {
+    if (sort.col === "ticker") {
+      const cmp = t1 < t2 ? -1 : t1 > t2 ? 1 : 0;
+      return sort.dir === "asc" ? cmp : -cmp;
+    }
+    const s1 = ranked.get(t1)?.[sort.col]?.metric.bounce_pct ?? null;
+    const s2 = ranked.get(t2)?.[sort.col]?.metric.bounce_pct ?? null;
+    if (s1 == null && s2 == null) return t1 < t2 ? -1 : 1;
+    if (s1 == null) return 1; // empty cells always last
+    if (s2 == null) return -1;
+    if (s1 === s2) return t1 < t2 ? -1 : 1;
+    return sort.dir === "asc" ? s1 - s2 : s2 - s1;
+  });
+
+  function toggleSort(col: number | "ticker") {
+    onSort(sort.col === col ? { col, dir: sort.dir === "desc" ? "asc" : "desc" } : { col, dir: "desc" });
+  }
 
   return (
     <section className="overflow-hidden rounded-xl border border-border/60 bg-card/35 shadow-xl shadow-black/10 backdrop-blur-sm">
@@ -409,208 +446,118 @@ function Heatmap({
             <Flame className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">Heatmap</h2>
+            <h2 className="text-sm font-semibold tracking-tight">Best Levels by Ticker</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Each cell shows the selected metric, with B/Bk/F sub-bars. Column headers display the (TF, MA) tolerance.
+              Each row ranks a ticker&apos;s strongest levels by Bounce%, best → worst. Click a column to sort every ticker by that rank.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 rounded-md border border-border/40 bg-background/30 px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-[var(--warning)]" />
-          <span className="font-semibold text-foreground/85">{selectedTf}</span>
-          <Separator />
+          <span className="font-semibold text-foreground/85">{tfs.join("·") || "—"}</span>
+          <span className="text-border/60">·</span>
           <span>{metricLabel(selectedMetric)}</span>
-          <Separator />
-          <span>{mas.length} MAs</span>
-          <Separator />
-          <span>{tickerCount} tickers</span>
+          <span className="text-border/60">·</span>
+          <span>{sortedTickers.length} tickers</span>
         </div>
       </div>
-      <div className="space-y-5 p-4">
-        {categories.map((category) => (
-          <CategoryHeatmap
-            key={category.name}
-            data={data}
-            selectedTf={selectedTf}
-            category={category}
-            mas={mas}
-            selectedMetric={selectedMetric}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Separator() {
-  return <span className="text-border/60">·</span>;
-}
-
-function CategoryHeatmap({
-  data,
-  selectedTf,
-  category,
-  mas,
-  selectedMetric,
-}: {
-  data: OccurrenceMatrixPayload;
-  selectedTf: string;
-  category: OccurrenceCategory;
-  mas: string[];
-  selectedMetric: OccurrenceMetricKey;
-}) {
-  return (
-    <div className="overflow-hidden rounded-lg border border-border/40 bg-background/15">
-      <div className="flex items-center justify-between gap-3 border-b border-border/35 bg-card/20 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <Layers className="h-3.5 w-3.5 text-muted-foreground/75" />
-          <h3 className="text-sm font-semibold">{displayCategoryName(category.name)}</h3>
-        </div>
-        <span className="rounded-md border border-border/40 bg-background/25 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          {category.tickers.length} tickers
-        </span>
-      </div>
-      <div className="overflow-auto">
-        <table className="w-full min-w-[920px] border-collapse text-sm">
+      <div className="overflow-auto p-4">
+        <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border/40 bg-background/35">
-              <th className="sticky left-0 z-10 w-[110px] bg-background/95 px-3 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
+              <th
+                onClick={() => toggleSort("ticker")}
+                className="sticky left-0 z-10 w-[92px] cursor-pointer bg-background/95 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm transition hover:text-foreground"
+              >
                 Ticker
+                <SortArrow sort={sort} col="ticker" />
               </th>
-              {mas.map((ma) => (
-                <th key={ma} className="min-w-[152px] px-2 py-3 text-center">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/85">{ma}</div>
-                  <div className="mt-1 inline-block rounded-full bg-background/35 px-2 py-0.5 text-[9.5px] font-medium normal-case tracking-normal text-[var(--warning)]">
-                    {toleranceLabel(data, selectedTf, ma)}
-                  </div>
+              {cols.map((c) => (
+                <th
+                  key={c}
+                  onClick={() => toggleSort(c)}
+                  className={
+                    "min-w-[100px] cursor-pointer px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.16em] transition hover:text-foreground " +
+                    (sort.col === c ? "text-foreground" : "text-muted-foreground")
+                  }
+                >
+                  #{c + 1}
+                  <SortArrow sort={sort} col={c} />
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {category.tickers.map((ticker, rowIdx) => (
-              <tr
-                key={ticker}
-                className="group/row border-b border-border/30 last:border-b-0 transition hover:bg-primary/[0.04]"
-              >
-                <td className="sticky left-0 z-10 bg-background/95 px-3 py-2 text-sm font-semibold text-foreground backdrop-blur-sm transition group-hover/row:text-primary">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-normal text-muted-foreground/60 tabular">{String(rowIdx + 1).padStart(2, "0")}</span>
-                    <span>{ticker}</span>
-                  </div>
-                </td>
-                {mas.map((ma) => (
-                  <HeatCell
-                    key={`${ticker}-${ma}`}
-                    metric={data.data[ticker]?.[selectedTf]?.[ma] ?? null}
-                    selectedMetric={selectedMetric}
-                  />
-                ))}
-              </tr>
-            ))}
+            {sortedTickers.map((ticker) => {
+              const slots = ranked.get(ticker) ?? [];
+              return (
+                <tr key={ticker} className="group/row border-b border-border/30 last:border-b-0 transition hover:bg-primary/[0.04]">
+                  <td className="sticky left-0 z-10 bg-background/95 px-3 py-1.5 text-sm font-semibold text-foreground backdrop-blur-sm transition group-hover/row:text-primary">
+                    {ticker}
+                  </td>
+                  {cols.map((c) => (
+                    <RankedCell key={c} slot={slots[c] ?? null} selectedMetric={selectedMetric} />
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }
 
-function HeatCell({
-  metric,
-  selectedMetric,
-}: {
-  metric: OccurrenceMetric | null;
-  selectedMetric: OccurrenceMetricKey;
-}) {
-  if (!metric || metric.T === 0) {
+function SortArrow({ sort, col }: { sort: SortState; col: number | "ticker" }) {
+  if (sort.col !== col) return null;
+  return <span className="ml-0.5 text-[9px] text-primary">{sort.dir === "desc" ? "▼" : "▲"}</span>;
+}
+
+function RankedCell({ slot, selectedMetric }: { slot: RankedSlot | null; selectedMetric: OccurrenceMetricKey }) {
+  if (!slot) {
     return (
       <td
-        className="h-[92px] min-w-[152px] border-l border-border/20 px-2 py-2 text-center"
-        style={{ backgroundColor: "oklch(0.22 0.018 250 / 0.45)" }}
+        className="h-[46px] min-w-[100px] border-l border-border/20 px-1.5 text-center"
+        style={{ backgroundColor: "oklch(0.22 0.018 250 / 0.4)" }}
       >
-        <span className="text-[11px] font-medium text-muted-foreground/55">—</span>
+        <span className="text-[11px] font-medium text-muted-foreground/45">—</span>
       </td>
     );
   }
-
-  const style = heatStyle(metric, selectedMetric);
-
+  const { tf, ma, metric } = slot;
+  const bg = heatBands(metricValue(metric, selectedMetric) ?? 0, selectedMetric);
   const tooltip = [
+    `${tf} · ${ma}`,
     `Total events: ${metric.T}`,
     `Bounce: ${metric.B} (${formatPct(metric.bounce_pct)})`,
     `Break:  ${metric.Bk} (${formatPct(metric.break_pct)})`,
     `False:  ${metric.F} (${formatPct(metric.false_pct)})`,
-    `Tolerance: ${metric.tolerance_pct == null ? "n/a" : `±${metric.tolerance_pct}%`}`,
-    metric.low_sample ? "[low sample]" : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const cellStyle: CSSProperties = metric.low_sample
-    ? { ...style, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.25)" }
-    : style;
-
+  ].join("\n");
   return (
     <td
-      className="group/cell relative h-[92px] min-w-[152px] cursor-help border-l border-border/20 px-2 py-2 text-center text-white transition-all duration-150 hover:z-10 hover:scale-[1.03] hover:shadow-xl hover:shadow-black/40"
-      style={cellStyle}
+      className="h-[46px] min-w-[100px] cursor-help border-l border-border/20 px-1.5 text-center text-white transition hover:brightness-110"
+      style={{ backgroundColor: bg }}
       title={tooltip}
     >
-      <div className="text-[9.5px] font-semibold uppercase tracking-[0.18em] text-white/80">
-        {metricLabel(selectedMetric)}
+      <div className="text-[9px] font-semibold uppercase tracking-wider text-white/80">
+        {tf}·{shortMa(ma)}
       </div>
-      <div className="mt-0.5 text-[20px] font-bold leading-tight tabular text-white">
-        {formatMetric(metric, selectedMetric)}
-      </div>
-      <SubMetrics metric={metric} selectedMetric={selectedMetric} />
+      <div className="text-[15px] font-bold leading-none tabular">{formatMetric(metric, selectedMetric)}</div>
     </td>
   );
 }
 
-function SubMetrics({ metric, selectedMetric }: { metric: OccurrenceMetric; selectedMetric: OccurrenceMetricKey }) {
-  return (
-    <div className="mt-2 grid grid-cols-4 gap-[3px] text-[9.5px] font-semibold tabular">
-      <SubMetric label="B" value={metric.bounce_pct} suffix="%" active={selectedMetric === "bounce_pct"} tone="gain" />
-      <SubMetric label="Bk" value={metric.break_pct} suffix="%" active={selectedMetric === "break_pct"} tone="loss" />
-      <SubMetric label="F" value={metric.false_pct} suffix="%" active={selectedMetric === "false_pct"} tone="warning" />
-      <SubMetric label="n" value={metric.T} suffix="" active={selectedMetric === "T"} tone="neutral" />
-    </div>
-  );
-}
-
-function SubMetric({
-  label,
-  value,
-  suffix,
-  active,
-  tone,
-}: {
-  label: string;
-  value: number | null;
-  suffix: string;
-  active: boolean;
-  tone: "gain" | "loss" | "warning" | "neutral";
-}) {
-  const dot =
-    tone === "gain"
-      ? "oklch(0.78 0.18 145)"
-      : tone === "loss"
-        ? "oklch(0.72 0.22 25)"
-        : tone === "warning"
-          ? "oklch(0.85 0.16 90)"
-          : "oklch(0.75 0.02 250)";
-
-  return (
-    <span
-      className={`flex items-center justify-center gap-0.5 rounded-[3px] px-1 py-[3px] ${active ? "bg-white/25 ring-1 ring-white/40" : "bg-black/35"}`}
-    >
-      <span className="h-1 w-1 rounded-full" style={{ backgroundColor: dot }} />
-      <span className="text-white/90">{label}</span>
-      <span className="font-bold text-white">
-        {value == null ? "—" : `${value}${suffix}`}
-      </span>
-    </span>
-  );
+function shortMa(ma: string): string {
+  const map: Record<string, string> = {
+    "EMA 9": "E9",
+    "EMA 20": "E20",
+    "SMA 50": "S50",
+    "SMA 200": "S200",
+    VWAP: "VW",
+    "BB Upper": "BBu",
+    "BB Lower": "BBl",
+  };
+  return map[ma] ?? ma;
 }
 
 function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategories: string[]): string[] {
@@ -625,53 +572,29 @@ function getCategoryTickers(data: OccurrenceMatrixPayload, selectedCategories: s
   return tickers;
 }
 
-function getVisibleCategories(data: OccurrenceMatrixPayload, selectedCategories: string[]): OccurrenceCategory[] {
-  if (selectedCategories.length === 0 || selectedCategories.length === data.categories.length) {
-    return data.categories;
-  }
-  const set = new Set(selectedCategories);
-  return data.categories.filter((category) => set.has(category.name));
-}
-
-function displayCategoryName(name: string): string {
-  const labels: Record<string, string> = {
-    "Indices/Futures": "Major Indices / Futures",
-    FX: "Forex",
-    "QQQ Top 10": "Stocks",
-    "Commodities/ETFs": "Commodities / ETFs",
-  };
-  return labels[name] ?? name;
-}
-
-function toleranceLabel(data: OccurrenceMatrixPayload, tf: string, ma: string): string {
-  const maIndex = data.mas.indexOf(ma);
-  const tolerance = maIndex >= 0 ? data.tolerances[tf]?.[maIndex] : null;
-  if (tolerance == null) return "tol n/a";
-  if (tolerance === 0) return "skip";
-  return `±${tolerance}%`;
-}
-
 function collectSetups(
   data: OccurrenceMatrixPayload,
-  tf: string,
+  tfs: string[],
   tickers: string[],
   mas: string[],
   primary: "bounce_pct" | "break_pct",
 ): OccurrenceLeaderboardEntry[] {
   const rows: OccurrenceLeaderboardEntry[] = [];
   for (const ticker of tickers) {
-    for (const ma of mas) {
-      const metric = data.data[ticker]?.[tf]?.[ma];
-      if (!metric || metric.T < data.min_sample) continue;
-      rows.push({
-        ticker,
-        tf,
-        ma,
-        total: metric.T,
-        bounce_pct: metric.bounce_pct,
-        break_pct: metric.break_pct,
-        false_pct: metric.false_pct,
-      });
+    for (const tf of tfs) {
+      for (const ma of mas) {
+        const metric = data.data[ticker]?.[tf]?.[ma];
+        if (!metric || metric.T < data.min_sample) continue;
+        rows.push({
+          ticker,
+          tf,
+          ma,
+          total: metric.T,
+          bounce_pct: metric.bounce_pct,
+          break_pct: metric.break_pct,
+          false_pct: metric.false_pct,
+        });
+      }
     }
   }
   return rows
@@ -686,7 +609,7 @@ function collectSetups(
 
 function summarize(
   data: OccurrenceMatrixPayload,
-  tf: string,
+  tfs: string[],
   tickers: string[],
   mas: string[],
   meanReversion: OccurrenceLeaderboardEntry[],
@@ -698,19 +621,21 @@ function summarize(
   let lowSampleCells = 0;
 
   for (const ticker of tickers) {
-    for (const ma of mas) {
-      const metric = data.data[ticker]?.[tf]?.[ma];
-      if (!metric) continue;
-      events += metric.T;
-      if (metric.T > 0 && metric.T < data.min_sample) lowSampleCells += 1;
-      if (metric.T >= data.min_sample && metric.bounce_pct != null) {
-        bounceValues.push(metric.bounce_pct);
-      }
-      if (metric.T >= data.min_sample && metric.break_pct != null) {
-        breakValues.push(metric.break_pct);
-      }
-      if (metric.T >= data.min_sample && metric.false_pct != null) {
-        falseValues.push(metric.false_pct);
+    for (const tf of tfs) {
+      for (const ma of mas) {
+        const metric = data.data[ticker]?.[tf]?.[ma];
+        if (!metric) continue;
+        events += metric.T;
+        if (metric.T > 0 && metric.T < data.min_sample) lowSampleCells += 1;
+        if (metric.T >= data.min_sample && metric.bounce_pct != null) {
+          bounceValues.push(metric.bounce_pct);
+        }
+        if (metric.T >= data.min_sample && metric.break_pct != null) {
+          breakValues.push(metric.break_pct);
+        }
+        if (metric.T >= data.min_sample && metric.false_pct != null) {
+          falseValues.push(metric.false_pct);
+        }
       }
     }
   }
@@ -727,19 +652,6 @@ function summarize(
 
 function averagePct(values: number[]): number | null {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
-}
-
-function heatStyle(metric: OccurrenceMetric | null, selectedMetric: OccurrenceMetricKey): CSSProperties {
-  const value = metric ? metricValue(metric, selectedMetric) : null;
-  if (!metric || metric.T === 0 || value == null) {
-    return { backgroundColor: "oklch(0.22 0.018 250 / 0.45)" };
-  }
-
-  const bg = heatBands(value, selectedMetric);
-
-  // Keep cells fully opaque so the text stays sharp. Low-sample cells are
-  // flagged via a dashed ring in HeatCell instead of reducing opacity.
-  return { backgroundColor: bg };
 }
 
 // Minimal 3-tone palette: red (< 30%), neutral gray (30-54%), green (>= 55%).

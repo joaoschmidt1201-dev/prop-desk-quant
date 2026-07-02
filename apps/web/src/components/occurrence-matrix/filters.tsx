@@ -16,8 +16,9 @@ const METRIC_OPTIONS: Array<{ key: OccurrenceMetricKey; label: string }> = [
 type FiltersProps = {
   tfs: string[];
   expectedTfs: string[];
-  selectedTf: string;
-  onTfChange: (tf: string) => void;
+  selectedTfs: string[];
+  onTfToggle: (tf: string) => void;
+  onAllTfs: () => void;
   selectedMetric: OccurrenceMetricKey;
   onMetricChange: (metric: OccurrenceMetricKey) => void;
   categories: OccurrenceCategory[];
@@ -33,8 +34,9 @@ type FiltersProps = {
 export function OccurrenceFilters({
   tfs,
   expectedTfs,
-  selectedTf,
-  onTfChange,
+  selectedTfs,
+  onTfToggle,
+  onAllTfs,
   selectedMetric,
   onMetricChange,
   categories,
@@ -56,16 +58,25 @@ export function OccurrenceFilters({
       </div>
       <div className="grid gap-4 p-4 xl:grid-cols-[0.8fr_1fr_1.5fr_1.4fr]">
         <ChipGroup icon={<Clock className="h-3 w-3" />} label="Timeframe">
+          <button
+            type="button"
+            aria-pressed={selectedTfs.length === tfs.length}
+            onClick={onAllTfs}
+            className={chipClass(selectedTfs.length === tfs.length)}
+          >
+            All
+          </button>
           {expectedTfs.map((tf) => {
             const loaded = tfs.includes(tf);
+            const active = selectedTfs.includes(tf);
             return (
               <button
                 key={tf}
                 type="button"
                 disabled={!loaded}
-                aria-pressed={selectedTf === tf}
-                onClick={() => onTfChange(tf)}
-                className={chipClass(selectedTf === tf, !loaded)}
+                aria-pressed={active}
+                onClick={() => onTfToggle(tf)}
+                className={chipClass(active, !loaded)}
                 title={loaded ? `${tf} loaded` : `${tf} snapshot not loaded`}
               >
                 {tf}
