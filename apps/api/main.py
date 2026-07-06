@@ -172,6 +172,7 @@ TRADE_UNDERLYINGS = (
     "JPM",
     "QCOM",
     "BRK",
+    "ARM",
 )
 UNDERLYING_ALIASES = {
     "SPXW": "SPX",
@@ -661,20 +662,120 @@ def trade_pnl_event_date(trade: dict[str, Any]) -> str:
     return "Unknown"
 
 
-def trade_dte_bucket(trade: dict[str, Any]) -> str:
-    if trade.get("dte_bucket"):
-        return str(trade["dte_bucket"])
-    dte = trade.get("visual_dte_open") or trade.get("dte_open")
+# DTE embutido no nome do trade — a fonte confiável (CZ nomeia as estratégias com o
+# DTE colado na estrutura: "BPS7"=bull put spread 7DTE, "IC4", "BearCS8", "PL5 SPY 30D").
+_NAME_DTE_SUFFIX_RE = re.compile(r"(\d{1,2})\s*DTE\b", re.IGNORECASE)   # "7 DTE", "21DTE"
+_NAME_DTE_D_RE = re.compile(r"\b(\d{1,2})\s*D\b")                       # "30D"
+_TRADE_ID_PREFIX_RE = re.compile(r"^\s*T\d+\s+")                        # remove "T58 " (id do trade)
+
+
+def _first_num_after_ticker(s: str) -> int | None:
+    """1º número após o TICKER do desk no nome. O DTE fica colado à estrutura logo
+    depois do ticker ("RUT BAT42"→42), enquanto ids de sequência ("FOR01", "TC 01")
+    ficam ANTES do ticker — por isso ancorar no ticker evita pegar o id."""
+    earliest_end = None
+    for tk in TRADE_UNDERLYINGS:
+        m = re.search(r"\b" + re.escape(tk) + r"\b", s)
+        if m and (earliest_end is None or m.start() < earliest_end[0]):
+            earliest_end = (m.start(), m.end())
+    if earliest_end is None:
+        return None
+    m = re.search(r"(\d{1,2})", s[earliest_end[1]:])
+    return int(m.group(1)) if m else None
+
+
+def dte_from_name(name: str | None) -> int | None:
+    """Extrai o DTE do NOME do trade (fonte confiável do CZ). Prioridade:
+    1) calendário "X/YDTE" ou keyword+"X/Y" → front leg;
+    2) "NN DTE"; 3) "NND" (ex.: 30D);
+    4) 1º número após o ticker ("T58 SMH BPS3"→3, "FOR01 RUT FULL BAT42"→42,
+       "T78 RUT SP7 ... hedge LP5"→7);
+    5) fallback: remove o id "T58 " e pega o 1º número ("T22 42 IC"→42)."""
+    if not name:
+        return None
+    s = str(name).strip()
+    m = _CALENDAR_DTE_RE.search(s)                          # "21/28DTE" → front leg
+    if m:
+        return int(m.group(1))
+    if _CALENDAR_KEYWORD_RE.search(s):                      # "TC"/"TripleCalendar" + "7/10"
+        m = _CALENDAR_BARE_RE.search(s)
+        if m:
+            return int(m.group(1))
+    m = _NAME_DTE_SUFFIX_RE.search(s)                       # "7 DTE"
+    if m:
+        return int(m.group(1))
+    m = _NAME_DTE_D_RE.search(s)                            # "30D"
+    if m:
+        return int(m.group(1))
+    n = _first_num_after_ticker(s)                          # ancorado no ticker
+    if n is not None:
+        return n
+    body = _TRADE_ID_PREFIX_RE.sub("", s)                   # sem ticker: remove "T58 "
+    m = re.search(r"(\d{1,2})", body)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+# Famílias de DTE (definidas pelo CZ). Limites inteiros não-sobrepostos; nas bordas
+# ambíguas do spec (21, 28, 35) o valor pertence à família INFERIOR. Topo (≥36) cai
+# em "35-40DTE" p/ não perder trades ~40-42 DTE.
+def dte_bucket_from_int(dte: int | None) -> str:
     if dte is None:
         return "Unknown"
-    dte = int(dte)
-    if dte <= 10:
-        return "7 DTE"
-    if dte <= 24:
-        return "14/21 DTE"
-    if dte <= 32:
-        return "28 DTE"
-    return "35/42 DTE"
+    d = int(dte)
+    if d <= 2:
+        return "1DTE"
+    if d <= 6:
+        return "4DTE"
+    if d <= 13:
+        return "7-13DTE"
+    if d <= 21:
+        return "14-21DTE"
+    if d <= 28:
+        return "21/28DTE"
+    if d <= 35:
+        return "28/35DTE"
+    return "35-40DTE"
+
+
+# Ordem canônica das famílias (p/ exibição estável no gráfico "DTE bucket edge").
+DTE_BUCKET_ORDER = ["1DTE", "4DTE", "7-13DTE", "14-21DTE", "21/28DTE", "28/35DTE", "35-40DTE", "Unknown"]
+
+
+def dte_from_dates(trade: dict[str, Any]) -> int | None:
+    """DTE a partir das datas do trade quando o nome não traz DTE: preferir
+    (expiração − abertura) = DTE real na entrada; senão (fechamento − abertura)
+    como proxy (útil p/ trades levados ao vencimento)."""
+    open_d = parse_iso_date(trade.get("open_date") or trade.get("visual_open_date"))
+    if open_d is None:
+        return None
+    exp_d = parse_iso_date(trade.get("exp_date") or trade.get("visual_exp_date"))
+    if exp_d is not None:
+        d = (exp_d - open_d).days
+        if d >= 0:
+            return d
+    close_d = parse_iso_date(trade.get("inferred_close_date") or trade.get("visual_last_pnl_date"))
+    if close_d is not None:
+        d = (close_d - open_d).days
+        if d >= 0:
+            return d
+    return None
+
+
+def trade_dte_bucket(trade: dict[str, Any]) -> str:
+    """DTE bucket a partir do NOME (fonte confiável do CZ); cai no dte_open e,
+    por fim, nas DATAS (expiração/fechamento − abertura) quando o nome não traz DTE."""
+    dte = dte_from_name(trade.get("name"))
+    if dte is None:
+        raw = trade.get("visual_dte_open") or trade.get("dte_open")
+        try:
+            dte = int(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            dte = None
+    if dte is None:
+        dte = dte_from_dates(trade)
+    return dte_bucket_from_int(dte)
 
 
 # ─── Pydantic models ──────────────────────────────────────────────────────────
@@ -1318,6 +1419,8 @@ def get_analytics(
     by_strategy = aggregate(lambda t: strategy_family(str(t.get("name", ""))))
     by_underlying = aggregate(lambda t: t.get("underlying") or "Unknown")
     by_dte_bucket = aggregate(trade_dte_bucket)
+    by_dte_bucket.sort(key=lambda r: DTE_BUCKET_ORDER.index(r["key"])
+                       if r["key"] in DTE_BUCKET_ORDER else len(DTE_BUCKET_ORDER))
     by_weekday = aggregate(trade_open_weekday)
     by_day = []
     daily_groups: dict[str, dict[str, Any]] = {}
