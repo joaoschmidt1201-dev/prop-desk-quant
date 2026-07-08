@@ -368,9 +368,9 @@ type RankedSlot = { tf: string; ma: string; metric: OccurrenceMetric };
 const MAX_COLS = 10;
 
 // The single wide table CZ asked for: each row = a ticker, columns = that ticker's
-// best (TF·level) occurrences ranked by Bounce% (best → worst, left → right). Click a
-// column header to sort all tickers by that rank position. "Hit color" is the lens
-// (cell color + displayed value); the ranking is always by Bounce%.
+// best (TF·level) occurrences ranked by the SELECTED metric (best → worst, left → right).
+// Click a column header to sort all tickers by that rank position. The heat metric is the
+// lens (cell color + displayed value) AND drives the column ranking.
 function RankedTable({
   data,
   tickers,
@@ -407,8 +407,10 @@ function RankedTable({
       }
     }
     slots.sort((a, b) => {
-      const av = a.metric.bounce_pct ?? -1;
-      const bv = b.metric.bounce_pct ?? -1;
+      // Rank by the SELECTED heat metric so the leftmost column is always the highest value
+      // of whatever the user is looking at (Bounce%, Break%, Bounce+False%, ...).
+      const av = metricValue(a.metric, selectedMetric) ?? -1;
+      const bv = metricValue(b.metric, selectedMetric) ?? -1;
       if (bv !== av) return bv - av;
       if (b.metric.T !== a.metric.T) return b.metric.T - a.metric.T;
       if (a.tf !== b.tf) return a.tf < b.tf ? -1 : 1;
@@ -425,8 +427,10 @@ function RankedTable({
       const cmp = t1 < t2 ? -1 : t1 > t2 ? 1 : 0;
       return sort.dir === "asc" ? cmp : -cmp;
     }
-    const s1 = ranked.get(t1)?.[sort.col]?.metric.bounce_pct ?? null;
-    const s2 = ranked.get(t2)?.[sort.col]?.metric.bounce_pct ?? null;
+    const m1 = ranked.get(t1)?.[sort.col]?.metric;
+    const m2 = ranked.get(t2)?.[sort.col]?.metric;
+    const s1 = m1 ? metricValue(m1, selectedMetric) : null;
+    const s2 = m2 ? metricValue(m2, selectedMetric) : null;
     if (s1 == null && s2 == null) return t1 < t2 ? -1 : 1;
     if (s1 == null) return 1; // empty cells always last
     if (s2 == null) return -1;
@@ -448,7 +452,7 @@ function RankedTable({
           <div>
             <h2 className="text-sm font-semibold tracking-tight">Best Levels by Ticker</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Each row ranks a ticker&apos;s strongest levels by Bounce%, best → worst. Click a column to sort every ticker by that rank.
+              Each row ranks a ticker&apos;s strongest levels by {metricLabel(selectedMetric)}, best → worst. Click a column to sort every ticker by that rank.
             </p>
           </div>
         </div>
