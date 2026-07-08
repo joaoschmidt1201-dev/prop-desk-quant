@@ -4,12 +4,13 @@ import { Clock, FolderTree, Palette, SlidersHorizontal, TrendingUp } from "lucid
 import type { ReactNode } from "react";
 import type { OccurrenceCategory } from "@/lib/api";
 
-export type OccurrenceMetricKey = "bounce_pct" | "break_pct" | "false_pct" | "T";
+export type OccurrenceMetricKey = "bounce_pct" | "break_pct" | "false_pct" | "bouncefalse_pct" | "T";
 
 const METRIC_OPTIONS: Array<{ key: OccurrenceMetricKey; label: string }> = [
   { key: "bounce_pct", label: "Bounce%" },
   { key: "break_pct", label: "Break%" },
   { key: "false_pct", label: "False%" },
+  { key: "bouncefalse_pct", label: "Bounce+False%" },
   { key: "T", label: "Events" },
 ];
 

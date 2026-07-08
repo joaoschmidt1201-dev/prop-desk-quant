@@ -178,8 +178,8 @@ def transform_metadata(text: str, title_suffix: str, ver_suffix: str) -> str:
         1,
     )
     out = re.sub(
-        r'string ver_num\s*=\s*"v1[34][.\d]+"',
-        f'string ver_num  = "v14.0-{ver_suffix}"',
+        r'string ver_num\s*=\s*"v\d[\w.\-]+"',
+        f'string ver_num  = "v15.0-BAND-{ver_suffix}"',
         out,
         count=1,
     )

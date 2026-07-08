@@ -532,6 +532,7 @@ function RankedCell({ slot, selectedMetric }: { slot: RankedSlot | null; selecte
     `Bounce: ${metric.B} (${formatPct(metric.bounce_pct)})`,
     `Break:  ${metric.Bk} (${formatPct(metric.break_pct)})`,
     `False:  ${metric.F} (${formatPct(metric.false_pct)})`,
+    `Bounce+False: ${metric.B + metric.F} (${formatPct(metricValue(metric, "bouncefalse_pct"))})`,
   ].join("\n");
   return (
     <td
@@ -693,6 +694,11 @@ function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
 
 function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
   if (selectedMetric === "T") return metric.T;
+  // Bounce+False = the MA "held or faked" (did not decisively break). Derived from counts so it
+  // stays consistent with the rounded component pcts. High = mean-reversion friendly (like bounce).
+  if (selectedMetric === "bouncefalse_pct") {
+    return metric.T > 0 ? Math.round(((metric.B + metric.F) / metric.T) * 100) : null;
+  }
   return metric[selectedMetric];
 }
 
@@ -706,6 +712,7 @@ function metricLabel(selectedMetric: OccurrenceMetricKey): string {
   if (selectedMetric === "bounce_pct") return "Bounce%";
   if (selectedMetric === "break_pct") return "Break%";
   if (selectedMetric === "false_pct") return "False%";
+  if (selectedMetric === "bouncefalse_pct") return "Bounce+False%";
   return "Events";
 }
 

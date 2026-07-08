@@ -15,8 +15,15 @@
 // all indicators here and reduces memory ~7x.
 indicator("Occurrence Matrix [ST] — G4 t25-32", shorttitle="OM G4 t25-32", overlay=true, max_bars_back=210)
 
-string ver_num  = "v14.0-g4"
-string ver_date = "2026-07-01"
+string ver_num  = "v15.0-BAND-g4"
+string ver_date = "2026-07-08"
+// v15.0-BAND: classification is now BAND-ZONE v2 (band = k*ATR, absolute; approved by CZ). run_sm was
+//        the old far-edge+timer machine with a percent band; it is replaced by the "fat MA" model
+//        (reach the band = bounce; pass the far edge = false/break), counting a bounce per rejection
+//        (re-armed) — validated in scripts/occurrence_band_sm.py + test_occurrence_band.py (26/26).
+//        Band source = kBand*ta.atr(bandN) per security. get_tol_grid() is kept ONLY to mask skipped
+//        cells (its % value is no longer the band). CSV/snapshot schema, slicer, parser, API and the
+//        dashboard are UNCHANGED (same 140-int layout; app still reads the baseline block).
 // v14.0: +2 levels Bollinger Bands (BB Upper/Lower, 20,2σ) → 7 levels/ticker;
 //        +3 tickers SMH, EWY, DRAM (Sector/Country ETFs) → 32 tickers.
 //        Snapshot schema v14: ma=[9,20,50,200,"vwap","bb_u","bb_l"], 140 ints/ticker
@@ -42,7 +49,14 @@ g_etf    = "Tickers — Sector/Country ETFs"
 // See get_tol_grid() for the full table. displayTolIdx controls which level the
 // in-Pine table renders; the JSON snapshot always exports all 5 levels.
 displayTolIdx = input.int(2, "Display tolerance level (0..4, baseline=2)", minval=0, maxval=4, group=g_main, tooltip="Which of the 5 tolerance levels to render in the in-chart table. The JSON snapshot exports the active slice (see Memory Saver). Dashboard picks the level from the merged snapshot.")
-winSize       = input.int(2, "Lookahead Candles", minval=2, group=g_main)
+winSize       = input.int(2, "Lookahead Candles (legacy, unused by v15 band-zone)", minval=2, group=g_main)
+
+// v15 BAND-ZONE: the tolerance band is now k*ATR (absolute), the SAME width for every MA/ticker/TF.
+// This replaces the old per-(TF,MA) percent grid as the band SOURCE; get_tol_grid() is kept only to
+// mask skipped cells (its value is no longer used as the band). Classification = BAND-ZONE v2.
+g_band = "Tolerance Band (ATR)"
+kBand  = input.float(0.2, "k  (band = k * ATR)", step=0.05, group=g_band, tooltip="Band half-width in ATR units. Calibrated desk value = 0.2 (approved by CZ). Reaching the band = a bounce; passing the far edge = false/break.")
+bandN  = input.int(100, "Band Window (ATR length)", minval=2, group=g_band)
 
 // Memory Saver — when 'All (0-4)' blows Pine's 'Memory limits exceeded',
 // run the indicator 3x picking each slice in turn (A, B, C). Save each
@@ -253,89 +267,106 @@ get_tol_baseline(int ma_idx) =>
 // ==========================================
 // 3. STATE MACHINE — paridade exata com Occurrence Scanner v10.3
 // ==========================================
-run_sm(float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
-    var int  cT       = 0
-    var int  cB       = 0
-    var int  cBk      = 0
-    var int  cF       = 0
-    var bool in_event = false
-    var int  timer    = 0
-    var bool ts       = false
-    var int  tr_idx   = 0
-    var int  tr_time  = 0
-    var int  cv       = 0
-    var bool vio      = false
-    var bool ew       = false
+// BAND-ZONE v2 (desk spec, validated in scripts/test_occurrence_band.py, 26/26). The band is a "fat MA"
+// (band_abs = k*ATR, absolute). BREAK = 2 consecutive closes beyond the FAR edge (side flips, chains);
+// FALSE = 1 close beyond the far edge that returns; BOUNCE = an APPROACH (opened on a fresh touch) that
+// rejects the band without crossing the far edge — fired on return to the origin region, or back to the
+// origin side of the LINE after crossing it (dip & recover). One per approach; re-armed on return to origin
+// (a false no longer poisons later bounces). No lookahead/winSize. `band_abs` = absolute band (was % before).
+run_sm(float ma_val, bool sqz_on, float band_abs, bool dbg, string lbl) =>
+    var int  cT   = 0
+    var int  cB   = 0
+    var int  cBk  = 0
+    var int  cF   = 0
+    var int  side             = 0
+    var int  opp_run          = 0
+    var int  opp_idx          = 0
+    var bool in_appr          = false
+    var int  appr_idx         = 0
+    var bool appr_crossed_far = false
+    var bool appr_below_line  = false
+    var bool need_origin      = false
+    var bool prev_touched     = false
 
-    upper_buf = ma_val * (1 + approx_pct / 100)
-    lower_buf = ma_val * (1 - approx_pct / 100)
-
-    bool touched = (low <= upper_buf and high >= lower_buf)
-    bool crossed = ta.crossover(close, ma_val) or ta.crossunder(close, ma_val)
+    float upper = ma_val + band_abs
+    float lower = ma_val - band_abs
+    bool touched = (low <= upper and high >= lower)
     bool ok_date = not useDateFilter or time >= startDate
     bool ok_vol  = not useSqueezeFilter or not sqz_on
+    bool active  = not na(ma_val) and not na(band_abs) and ok_date and ok_vol
 
-    if (touched or crossed) and not in_event and ok_date and ok_vol
-        in_event := true
-        timer    := 0
-        ts       := close[1] > ma_val[1]
-        tr_idx   := bar_index
-        tr_time  := time
-        vio      := false
-        ew       := false
-        bool out_strict = ts ? close < lower_buf : close > upper_buf
-        cv := out_strict ? 1 : 0
-        if cv == 1
-            vio := true
-
-    if in_event
-        if useSqueezeFilter and sqz_on
-            in_event := false
-            cv := 0
-            ew := false
+    if active
+        if side == 0
+            if close > upper
+                side := 1
+            else if close < lower
+                side := -1
         else
-            if bar_index > tr_idx
-                timer += 1
+            bool far       = side > 0 ? close < lower  : close > upper
+            bool far_line  = side > 0 ? close < ma_val : close > ma_val
+            bool at_origin = side > 0 ? close > upper  : close < lower
 
-            bool ps = ts ? close < lower_buf : close > upper_buf
-            bool pr = ts ? close < ma_val    : close > ma_val
+            bool broke = false
+            if far
+                if opp_run == 0
+                    opp_idx := bar_index
+                opp_run += 1
+                if opp_run >= 2
+                    cBk := cBk + 1
+                    cT  := cT + 1
+                    broke := true
+                    if dbg
+                        log.info(lbl + " | BREAK  | " + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " total=" + str.tostring(cT))
+                    side := -side
+                    opp_run := 0
+            else
+                if opp_run == 1
+                    cF := cF + 1
+                    cT := cT + 1
+                    if dbg
+                        log.info(lbl + " | FALSE  | " + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " total=" + str.tostring(cT))
+                opp_run := 0
 
-            if bar_index > tr_idx
-                if cv == 0
-                    if ps
-                        cv  := cv + 1
-                        vio := true
-                else
-                    if pr
-                        cv := cv + 1
-                    else
-                        cv := 0
-
-            if cv >= 2
-                cBk := cBk + 1
-                cT  := cT  + 1
-                if dbg
-                    log.info(lbl + " | BREAK  | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
-                in_event := false
-                cv := 0
-                ew := false
-            else if timer >= winSize
-                if cv == 1 and not ew
-                    ew := true
-                else
-                    if not vio
+            if broke
+                in_appr          := false
+                appr_crossed_far := false
+                appr_below_line  := false
+                need_origin      := true
+            else
+                if at_origin
+                    need_origin := false
+                    if in_appr and not appr_crossed_far
                         cB := cB + 1
                         cT := cT + 1
                         if dbg
-                            log.info(lbl + " | BOUNCE | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
-                    else
-                        cF := cF + 1
-                        cT := cT + 1
-                        if dbg
-                            log.info(lbl + " | FALSE  | trigger=" + str.format_time(tr_time, "yyyy-MM-dd", syminfo.timezone) + " end=" + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " bar=" + str.tostring(bar_index) + " support=" + str.tostring(ts) + " total=" + str.tostring(cT))
-                    in_event := false
-                    cv := 0
-                    ew := false
+                            log.info(lbl + " | BOUNCE | " + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " total=" + str.tostring(cT))
+                    in_appr          := false
+                    appr_crossed_far := false
+                    appr_below_line  := false
+
+                bool fresh = touched and not prev_touched
+                if touched and not need_origin
+                    if fresh and not in_appr
+                        in_appr          := true
+                        appr_idx         := bar_index
+                        appr_crossed_far := far
+                        appr_below_line  := far_line
+                    else if in_appr
+                        if far
+                            appr_crossed_far := true
+                        if far_line
+                            appr_below_line := true
+
+                if in_appr and not appr_crossed_far and appr_below_line and not far_line and not at_origin
+                    cB := cB + 1
+                    cT := cT + 1
+                    if dbg
+                        log.info(lbl + " | BOUNCE | " + str.format_time(time, "yyyy-MM-dd", syminfo.timezone) + " total=" + str.tostring(cT))
+                    in_appr         := false
+                    appr_below_line := false
+                    need_origin     := true
+
+        prev_touched := touched
 
     [cT, cB, cBk, cF]
 
@@ -347,13 +378,13 @@ fmt4(int t, int b, int k, int f) =>
 // var-bearing state machine is never invoked — Pine never allocates the
 // history buffers for its [1] references on this call site, slashing memory.
 // Returns zeros so the CSV output cleanly marks the slot as "not in this pass".
-run_sm_gated(bool active, float ma_val, bool sqz_on, float approx_pct, bool dbg, string lbl) =>
+run_sm_gated(bool active, float ma_val, bool sqz_on, float band_abs, bool dbg, string lbl) =>
     int t = 0
     int b = 0
     int k = 0
     int f = 0
     if active
-        [_t, _b, _k, _f] = run_sm(ma_val, sqz_on, approx_pct, dbg, lbl)
+        [_t, _b, _k, _f] = run_sm(ma_val, sqz_on, band_abs, dbg, lbl)
         t := _t
         b := _b
         k := _k
@@ -384,6 +415,11 @@ run_full() =>
     ma6 = ub   // Bollinger Upper (20, 2σ) — reuses ub from the squeeze calc above
     ma7 = lb   // Bollinger Lower (20, 2σ)
 
+    // v15 BAND-ZONE: single ATR band (0.2*ATR by default), the SAME width for every level. ATR is
+    // computed in THIS security context, so the band auto-scales per ticker/TF. get_tol_grid below is
+    // kept ONLY to mask skipped cells (VWAP on D/W etc.): where its value is 0, the cell is zeroed.
+    float atrB = kBand * ta.atr(bandN)
+
     [g1_0, g1_1, g1_2, g1_3, g1_4] = get_tol_grid(0)
     [g2_0, g2_1, g2_2, g2_3, g2_4] = get_tol_grid(1)
     [g3_0, g3_1, g3_2, g3_3, g3_4] = get_tol_grid(2)
@@ -413,7 +449,7 @@ run_full() =>
     int m1B_1 = 0
     int m1K_1 = 0
     int m1F_1 = 0
-    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm(ma1, sqz, g1_2 > 0 ? g1_2 : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
+    [m1T_2, m1B_2, m1K_2, m1F_2] = run_sm(ma1, sqz, g1_2 > 0 ? atrB : 0.0001, dbg_m1 and dbgTolIdx == 2, "EMA9[2]")
     int m1T_3 = 0
     int m1B_3 = 0
     int m1K_3 = 0
@@ -434,7 +470,7 @@ run_full() =>
     int m2B_1 = 0
     int m2K_1 = 0
     int m2F_1 = 0
-    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm(ma2, sqz, g2_2 > 0 ? g2_2 : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
+    [m2T_2, m2B_2, m2K_2, m2F_2] = run_sm(ma2, sqz, g2_2 > 0 ? atrB : 0.0001, dbg_m2 and dbgTolIdx == 2, "EMA20[2]")
     int m2T_3 = 0
     int m2B_3 = 0
     int m2K_3 = 0
@@ -455,7 +491,7 @@ run_full() =>
     int m3B_1 = 0
     int m3K_1 = 0
     int m3F_1 = 0
-    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm(ma3, sqz, g3_2 > 0 ? g3_2 : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
+    [m3T_2, m3B_2, m3K_2, m3F_2] = run_sm(ma3, sqz, g3_2 > 0 ? atrB : 0.0001, dbg_m3 and dbgTolIdx == 2, "SMA50[2]")
     int m3T_3 = 0
     int m3B_3 = 0
     int m3K_3 = 0
@@ -476,7 +512,7 @@ run_full() =>
     int m4B_1 = 0
     int m4K_1 = 0
     int m4F_1 = 0
-    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm(ma4, sqz, g4_2 > 0 ? g4_2 : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
+    [m4T_2, m4B_2, m4K_2, m4F_2] = run_sm(ma4, sqz, g4_2 > 0 ? atrB : 0.0001, dbg_m4 and dbgTolIdx == 2, "SMA200[2]")
     int m4T_3 = 0
     int m4B_3 = 0
     int m4K_3 = 0
@@ -497,7 +533,7 @@ run_full() =>
     int m5B_1 = 0
     int m5K_1 = 0
     int m5F_1 = 0
-    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm(ma5, sqz, g5_2 > 0 ? g5_2 : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
+    [m5T_2, m5B_2, m5K_2, m5F_2] = run_sm(ma5, sqz, g5_2 > 0 ? atrB : 0.0001, dbg_m5 and dbgTolIdx == 2, "VWAP[2]")
     int m5T_3 = 0
     int m5B_3 = 0
     int m5K_3 = 0
@@ -518,7 +554,7 @@ run_full() =>
     int m6B_1 = 0
     int m6K_1 = 0
     int m6F_1 = 0
-    [m6T_2, m6B_2, m6K_2, m6F_2] = run_sm(ma6, sqz, g6_2 > 0 ? g6_2 : 0.0001, dbg_m6 and dbgTolIdx == 2, "BBu[2]")
+    [m6T_2, m6B_2, m6K_2, m6F_2] = run_sm(ma6, sqz, g6_2 > 0 ? atrB : 0.0001, dbg_m6 and dbgTolIdx == 2, "BBu[2]")
     int m6T_3 = 0
     int m6B_3 = 0
     int m6K_3 = 0
@@ -539,7 +575,7 @@ run_full() =>
     int m7B_1 = 0
     int m7K_1 = 0
     int m7F_1 = 0
-    [m7T_2, m7B_2, m7K_2, m7F_2] = run_sm(ma7, sqz, g7_2 > 0 ? g7_2 : 0.0001, dbg_m7 and dbgTolIdx == 2, "BBl[2]")
+    [m7T_2, m7B_2, m7K_2, m7F_2] = run_sm(ma7, sqz, g7_2 > 0 ? atrB : 0.0001, dbg_m7 and dbgTolIdx == 2, "BBl[2]")
     int m7T_3 = 0
     int m7B_3 = 0
     int m7K_3 = 0
@@ -904,7 +940,10 @@ if dbgEnable
     _dlkc = _dbk - _dark * 1.5
     bool dbg_sqz = (_dub < _dukc) and (_dlb > _dlkc)
 
-    [d_t, d_b, d_k, d_f] = run_sm(dbg_ma, dbg_sqz, dbg_tol > 0 ? dbg_tol : 0.0001, true, "DIRECT-" + dbgMA + "[" + str.tostring(dbgTolIdx) + "]")
+    // v15: DIRECT parity uses the SAME band source as run_full (k*ATR, absolute). dbg_tol is kept only
+    // as the skip flag (0 = cell skipped, e.g. VWAP on D/W).
+    float dbg_band = kBand * ta.atr(bandN)
+    [d_t, d_b, d_k, d_f] = run_sm(dbg_ma, dbg_sqz, dbg_tol > 0 ? dbg_band : 0.0001, true, "DIRECT-" + dbgMA + "[" + str.tostring(dbgTolIdx) + "]")
 
     if barstate.islast
-        log.info("=== DIRECT-CHART | " + syminfo.ticker + " " + timeframe.period + " " + dbgMA + " tol_idx=" + str.tostring(dbgTolIdx) + " tol=" + str.tostring(dbg_tol) + "% | Total=" + str.tostring(d_t) + " Bounce=" + str.tostring(d_b) + " Break=" + str.tostring(d_k) + " False=" + str.tostring(d_f) + " ===")
+        log.info("=== DIRECT-CHART | " + syminfo.ticker + " " + timeframe.period + " " + dbgMA + " band=" + str.tostring(dbg_band, "#.####") + " (k*ATR) | Total=" + str.tostring(d_t) + " Bounce=" + str.tostring(d_b) + " Break=" + str.tostring(d_k) + " False=" + str.tostring(d_f) + " ===")
