@@ -29,6 +29,12 @@ export function fmtMoney(v: number | null | undefined, precise = false): string 
   return precise ? usdPrecise.format(v) : usd.format(v);
 }
 
+/** Signed money, for values where the sign carries meaning (net credit + / net debit −). */
+export function fmtSignedMoney(v: number | null | undefined): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  return v > 0 ? `+${usd.format(v)}` : usd.format(v);
+}
+
 export function fmtPct(v: number | null | undefined): string {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
   return pct.format(v);
@@ -59,13 +65,28 @@ export function beDistClass(v: number | null | undefined): string {
   return "text-muted-foreground";
 }
 
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parse an API date string into a Date.
+ *
+ * `new Date("2026-07-31")` is UTC midnight per the ECMAScript spec, so rendering it in a
+ * negative-offset timezone (BRT is UTC-3) shows the *previous* day. Trade dates from the
+ * sheet are calendar dates with no time, so build them from local components instead.
+ * Full timestamps (spot_asof, with an offset) keep the normal timezone conversion.
+ */
+export function parseApiDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const m = DATE_ONLY_RE.exec(iso.trim());
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return iso;
-  }
+  const d = parseApiDate(iso);
+  if (!d) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function fmtRelativeAge(seconds: number | null | undefined): string {

@@ -54,12 +54,20 @@ Trades do filtro. `month` aceita CSV (`APR26,MAR26`) para filtros multi-mês.
       "status": "active",
       "pnl": -14805.0,
       "max_loss": -25000.0,
-      "net_credit": 12000.0,
+      "max_profit": 12000.0,
+      "net_credit": -40.0,
+      "contracts": 2,
+      "strategy": "RJL",
       "delta": -8.4
     }
   ]
 }
 ```
+
+`max_profit` é o número que o CZ anota na planilha (célula MxProf). `net_credit` é o crédito(+) /
+débito(−) real, anotado à direita do MxProf, e é `null` nos trades anteriores a 2026-07-09.
+`contracts` vem da célula acima do MxProf e também é `null` no histórico. `strategy` é a família
+que `strategy_family()` leu do nome do trade.
 
 ### `GET /api/kpis?month=APR26&env=CZ_Live`
 KPIs computados sobre o filtro ativo. Mesma lógica do dashboard atual mas restrita ao período.
@@ -67,7 +75,7 @@ KPIs computados sobre o filtro ativo. Mesma lógica do dashboard atual mas restr
 {
   "filter": {"months": ["APR26"], "env": "CZ_Live"},
   "pnl": {"open": -33954.51, "rlzd": 0, "delta": -8.4, "max_profit": 18000},
-  "risk": {"max_loss_exposed": -75000, "net_credit_at_risk": 60000, "est_daily_theta": 230},
+  "risk": {"max_loss_exposed": -75000, "max_profit_at_risk": 60000, "est_daily_theta": 230},
   "performance": {"win_rate": 0.42, "profit_factor": 1.18, "expectancy": 145},
   "trade_intel": {"best_trade": 4500, "worst_trade": -14805, "avg_dte": 35, "n_active": 6, "n_closed": 12}
 }

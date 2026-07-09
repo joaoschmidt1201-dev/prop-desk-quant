@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, BarChart3, FlaskConical, Grid3X3, LineChart, Radar, Sparkles } from "lucide-react";
+import { Activity, BarChart3, FlaskConical, Grid3X3, LineChart, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { api } from "@/lib/api";
 import { fmtRelativeAge } from "@/lib/format";
@@ -28,12 +28,9 @@ const NAV: NavItem[] = [
     icon: <FlaskConical className="h-4 w-4" />,
     match: (p) => p.startsWith("/backtests"),
   },
-  {
-    href: "/forwardtests",
-    label: "Forwardtests",
-    icon: <Radar className="h-4 w-4" />,
-    match: (p) => p.startsWith("/forwardtests"),
-  },
+  // Forwardtests: fora do menu desde 2026-07-09 — o desk parou de usar o ForwardTest Lab.
+  // As rotas /forwardtests e a API continuam de pé; para trazer de volta, restaure este item
+  // (href "/forwardtests", label "Forwardtests", ícone <Radar />).
   {
     href: "/occurrence-matrix",
     label: "Occurrence Matrix",

@@ -268,7 +268,7 @@ function OpenTradesTable({
               <th className="px-4 py-2 text-left font-medium">Trade</th>
               <th className="px-4 py-2 text-left font-medium">Sym</th>
               <th className="px-4 py-2 text-right font-medium">DTE</th>
-              <th className="px-4 py-2 text-right font-medium">{isDebit ? "Net debit" : "Net credit"}</th>
+              <th className="px-4 py-2 text-right font-medium">{isDebit ? "Net debit" : "Max profit"}</th>
               <th className="px-4 py-2 text-right font-medium">Max loss</th>
               <th className="px-4 py-2 text-right font-medium">Delta</th>
               <th className="px-4 py-2 text-right font-medium">P&L</th>
@@ -301,7 +301,7 @@ function OpenTradesTable({
                   <td className="px-4 py-2.5 font-medium">{t.name}</td>
                   <td className="px-4 py-2.5 text-muted-foreground">{t.underlying}</td>
                   <td className="px-4 py-2.5 text-right tabular">{fmtNum(t.dte_remaining)}</td>
-                  <td className="px-4 py-2.5 text-right tabular">{fmtMoney(t.net_credit)}</td>
+                  <td className="px-4 py-2.5 text-right tabular">{fmtMoney(t.max_profit)}</td>
                   <td className="px-4 py-2.5 text-right tabular text-muted-foreground">{fmtMoney(t.max_loss)}</td>
                   <td className={`px-4 py-2.5 text-right tabular ${delta == null ? "" : pnlClass(delta)}`}>{fmtNum(delta)}</td>
                   <td className={`px-4 py-2.5 text-right font-semibold tabular ${pnlClass(pnl)}`}>{fmtMoney(pnl)}</td>
@@ -350,7 +350,7 @@ function ClosedTradesTable({
               <th className="px-4 py-2 text-left font-medium">Open</th>
               <th className="px-4 py-2 text-left font-medium">Close</th>
               <th className="px-4 py-2 text-right font-medium">Days held</th>
-              <th className="px-4 py-2 text-right font-medium">{isDebit ? "Net debit" : "Net credit"}</th>
+              <th className="px-4 py-2 text-right font-medium">{isDebit ? "Net debit" : "Max profit"}</th>
               <th className="px-4 py-2 text-right font-medium">P&L</th>
               <th className="px-4 py-2 text-right font-medium">Result</th>
             </tr>
@@ -380,7 +380,7 @@ function ClosedTradesTable({
                   <td className="px-4 py-2.5 text-muted-foreground tabular">{fmtDate(asString(t.open_date) ?? asString(t.visual_open_date))}</td>
                   <td className="px-4 py-2.5 text-muted-foreground tabular">{fmtDate(asString(t.inferred_close_date))}</td>
                   <td className="px-4 py-2.5 text-right tabular text-muted-foreground">{fmtNum(t.days_held)}</td>
-                  <td className="px-4 py-2.5 text-right tabular">{fmtMoney(t.net_credit)}</td>
+                  <td className="px-4 py-2.5 text-right tabular">{fmtMoney(t.max_profit)}</td>
                   <td className={`px-4 py-2.5 text-right font-semibold tabular ${pnlClass(pnl)}`}>{fmtMoney(pnl)}</td>
                   <td className="px-4 py-2.5 text-right">
                     <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${
@@ -412,7 +412,7 @@ function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; is
   const pnl = currentTradePnl(trade);
   const milestones = trade.milestones;
   const maxProfit = numOr(milestones?.max_profit_usd);
-  const netDebit = numOr(milestones?.net_debit_usd) ?? (isDebit ? numOr(trade.net_credit) : null);
+  const netDebit = numOr(milestones?.net_debit_usd) ?? (isDebit ? numOr(trade.max_profit) : null);
   const pctOfMaxProfit = pnl != null && maxProfit != null && maxProfit > 0 ? pnl / maxProfit : null;
   const delta = numOr(trade.delta_current ?? trade.delta);
   const dteRemaining = numOr(trade.dte_remaining);
@@ -482,7 +482,10 @@ function TradeInspector({ trade, isDebit }: { trade: ForwardtestTrade | null; is
       {strikeRows.length > 0 && (
         <StrikeStructureCard
           rows={strikeRows}
-          netCredit={isDebit ? null : numOr(trade.net_credit)}
+          // The card wants a net credit in points (it multiplies by `multiplier`). Forward trades
+          // only carry a max profit in USD, so any value here would be off by 100x. TradeSetupCard
+          // above already shows it in dollars.
+          netCredit={null}
           multiplier={100}
           rightLabel="Type"
         />
@@ -655,14 +658,14 @@ function TradeSetupCard({ trade, isDebit }: { trade: ForwardtestTrade; isDebit: 
     "quantity",
     "contratos",
   ]);
-  const netCreditValue = numOr(trade.net_credit);
+  const maxProfitValue = numOr(trade.max_profit);
   const maxLossValue = numOr(trade.max_loss);
   const rawRows: Array<SetupRow | null> = [
     contracts ? { label: "Contracts", value: contracts, tone: null } : null,
-    netCreditValue != null
+    maxProfitValue != null
       ? {
-          label: isDebit ? "Net debit" : "Net credit",
-          value: fmtMoney(netCreditValue),
+          label: isDebit ? "Net debit" : "Max profit",
+          value: fmtMoney(maxProfitValue),
           tone: null,
         }
       : null,

@@ -34,7 +34,16 @@ export type Trade = {
   dte_open: number | null;
   dte_open_raw: string | null;
   dte_remaining: number | null;
+  /** Max profit from the sheet's MxProf cell. Until 2026-07-09 this lived (mislabelled) in net_credit. */
+  max_profit: number | null;
+  /** Real net credit (+) / net debit (−), hand-entered next to MxProf. Null for pre-2026-07-09 trades. */
   net_credit: number | null;
+  /** Contract count, hand-entered above MxProf. Null for pre-2026-07-09 trades. */
+  contracts: number | null;
+  /** Strategy family the backend parsed out of the trade name (e.g. "1-1-1", "Short Put"). */
+  strategy?: string | null;
+  /** DTE structure parsed from the name: "45/85" for multi-expiration, "7" for single. */
+  structure?: string | null;
   max_loss: number | null;
   delta: number | null;
   pnl?: number;
@@ -54,7 +63,7 @@ export type Trade = {
 export type Kpis = {
   filter: Filter;
   pnl: { open: number; rlzd: number; delta: number; max_profit: number };
-  risk: { max_loss_exposed: number; net_credit_at_risk: number; est_daily_theta: number };
+  risk: { max_loss_exposed: number; max_profit_at_risk: number; est_daily_theta: number };
   performance: {
     win_rate: number | null;
     profit_factor: number | null;

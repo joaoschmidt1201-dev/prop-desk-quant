@@ -47,9 +47,9 @@ export function KpiGrid({ filter }: Props) {
       <SectionLabel>Risk</SectionLabel>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         <Stat label="Max Loss Exposed" value={fmtMoney(risk.max_loss_exposed)} tone={risk.max_loss_exposed} />
-        <Stat label="Net Credit @ Risk" value={fmtMoney(risk.net_credit_at_risk)} />
+        <Stat label="Max Profit @ Risk" value={fmtMoney(risk.max_profit_at_risk)} hint="active trades" />
         <Stat label="Max Profit (sheet)" value={fmtMoney(pnl.max_profit)} />
-        <Stat label="Daily Theta" value={fmtMoney(risk.est_daily_theta)} hint="estimated" />
+        <Stat label="Daily Theta" value={fmtMoney(risk.est_daily_theta)} hint="estimated · from max profit" />
       </div>
 
       <SectionLabel>Performance</SectionLabel>

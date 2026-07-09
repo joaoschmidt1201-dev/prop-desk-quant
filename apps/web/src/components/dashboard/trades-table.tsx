@@ -3,7 +3,16 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Filter, type Trade } from "@/lib/api";
-import { beDistClass, fmtDate, fmtMoney, fmtNum, fmtSignedPct, pnlClass } from "@/lib/format";
+import {
+  beDistClass,
+  fmtDate,
+  fmtMoney,
+  fmtNum,
+  fmtSignedMoney,
+  fmtSignedPct,
+  parseApiDate,
+  pnlClass,
+} from "@/lib/format";
 import { DASHBOARD_REFETCH_INTERVAL_MS } from "@/lib/refresh";
 
 type Props = { filter: Filter };
@@ -36,8 +45,17 @@ function numericValue(value: unknown): number | null {
 
 function dateValue(value: unknown): number | null {
   if (!value) return null;
-  const parsed = Date.parse(String(value));
-  return Number.isFinite(parsed) ? parsed : null;
+  const parsed = parseApiDate(String(value));
+  return parsed ? parsed.getTime() : null;
+}
+
+/** Muted second line under the trade name: how the backend read the name. */
+function strategyLabel(t: Trade): string | null {
+  const strategy = typeof t.strategy === "string" ? t.strategy : null;
+  if (!strategy || strategy === "Other") return null;
+  const structure = typeof t.structure === "string" ? t.structure : null;
+  // Only show the structure when it adds something the DTE column doesn't (a leg pair).
+  return structure?.includes("/") ? `${strategy} · ${structure}` : strategy;
 }
 
 function compareText(a: unknown, b: unknown): number {
@@ -161,12 +179,15 @@ export function TradesTable({ filter }: Props) {
               <th className="px-6 py-3 text-left font-medium">Trade</th>
               <th className="px-3 py-3 text-left font-medium">Sym</th>
               <th className="px-3 py-3 text-left font-medium">Status</th>
+              <th className="px-3 py-3 text-right font-medium" title="Contracts">#</th>
+              <th className="px-3 py-3 text-right font-medium">Open</th>
               <th className="px-3 py-3 text-right font-medium">DTE</th>
-              <th className="px-3 py-3 text-right font-medium">NC</th>
+              <th className="px-3 py-3 text-right font-medium" title="Net credit (+) / net debit (−)">NC</th>
+              <th className="px-3 py-3 text-right font-medium" title="Max profit">MxProf</th>
               <th className="px-3 py-3 text-right font-medium">Max Loss</th>
               <th className="px-3 py-3 text-right font-medium">Delta</th>
               <th className="px-3 py-3 text-right font-medium">Spot</th>
-              <th className="px-3 py-3 text-right font-medium">BE Δ%</th>
+              <th className="px-3 py-3 text-right font-medium">BE Dist %</th>
               <th className="px-3 py-3 text-right font-medium">P&L</th>
               <th className="px-6 py-3 text-right font-medium">Exp</th>
             </tr>
@@ -175,6 +196,8 @@ export function TradesTable({ filter }: Props) {
             {trades.map((t: Trade) => {
               const pnl = tradePnl(t);
               const beDist = numericValue(t.dist_to_be_pct);
+              const netCredit = numericValue(t.net_credit);
+              const subtitle = strategyLabel(t);
               const stale = t.spot_source === "open";
               const beTitle = [
                 t.dist_to_lw_be_pct != null ? `Lower BE: ${fmtSignedPct(t.dist_to_lw_be_pct)}` : null,
@@ -185,7 +208,12 @@ export function TradesTable({ filter }: Props) {
                 .join(" · ");
               return (
                 <tr key={t.name} className="border-t border-border/20 transition hover:bg-card/40">
-                  <td className="px-6 py-3 font-medium tracking-tight">{t.name}</td>
+                  <td className="px-6 py-3 font-medium tracking-tight">
+                    <div>{t.name}</div>
+                    {subtitle && (
+                      <div className="mt-0.5 text-[10px] font-normal text-muted-foreground/70">{subtitle}</div>
+                    )}
+                  </td>
                   <td className="px-3 py-3 text-muted-foreground tabular">{t.underlying}</td>
                   <td className="px-3 py-3">
                     <span
@@ -197,8 +225,18 @@ export function TradesTable({ filter }: Props) {
                       {t.is_active ? "Active" : "Closed"}
                     </span>
                   </td>
+                  <td className="px-3 py-3 text-right tabular text-muted-foreground">{t.contracts ?? "—"}</td>
+                  <td className="px-3 py-3 text-right tabular text-[11px] text-muted-foreground">
+                    {fmtDate(t.open_date ?? (t.visual_open_date as string | null | undefined))}
+                  </td>
                   <td className="px-3 py-3 text-right tabular text-muted-foreground">{t.dte_remaining ?? "--"}</td>
-                  <td className="px-3 py-3 text-right tabular text-muted-foreground">{fmtMoney(t.net_credit)}</td>
+                  <td
+                    className={`px-3 py-3 text-right tabular ${netCredit == null ? "text-muted-foreground" : pnlClass(netCredit)}`}
+                    title={netCredit == null ? "Not recorded on the sheet yet" : netCredit >= 0 ? "Net credit" : "Net debit"}
+                  >
+                    {fmtSignedMoney(netCredit)}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular text-muted-foreground">{fmtMoney(t.max_profit)}</td>
                   <td className="px-3 py-3 text-right tabular text-muted-foreground">{fmtMoney(t.max_loss)}</td>
                   <td className="px-3 py-3 text-right tabular text-muted-foreground">
                     {t.delta != null ? Number(t.delta).toFixed(1) : "--"}
@@ -223,7 +261,7 @@ export function TradesTable({ filter }: Props) {
             })}
             {trades.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={14} className="px-6 py-12 text-center text-sm text-muted-foreground">
                   No trades match the current filter.
                 </td>
               </tr>

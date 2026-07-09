@@ -116,6 +116,9 @@ MONTH_NUM = {
     "NOV": 11,
     "DEC": 12,
 }
+# Mantida IDENTICA a scripts/export_control_panel.py:TRADE_UNDERLYINGS (tests/test_trade_parsing.py
+# trava a paridade). A ordem importa: _infer_underlying_from_name devolve o PRIMEIRO simbolo da
+# tupla que casa, nao o mais a esquerda do nome — tickers ambiguos e curtos (BE) ficam no fim.
 TRADE_UNDERLYINGS = (
     "SPX",
     "SPXW",
@@ -173,6 +176,9 @@ TRADE_UNDERLYINGS = (
     "QCOM",
     "BRK",
     "ARM",
+    # "BE" (Bloom Energy) e curto e colide com anotacoes de breakeven — deixar por ULTIMO
+    # para que qualquer nome com outro ticker resolva no outro ticker primeiro.
+    "BE",
 )
 UNDERLYING_ALIASES = {
     "SPXW": "SPX",
@@ -308,6 +314,7 @@ def load_snapshot(force: bool = False) -> dict[str, Any]:
         with SNAPSHOT_PATH.open(encoding="utf-8") as f:
             _snapshot_cache["data"] = json.load(f)
         _normalize_snapshot_underlyings(_snapshot_cache["data"])
+        _migrate_legacy_trade_fields(_snapshot_cache["data"])
         _snapshot_cache["loaded_at"] = time.time()
         _snapshot_cache["mtime"] = mtime
     return _snapshot_cache["data"]
@@ -381,6 +388,21 @@ def _normalize_snapshot_underlyings(snap: dict[str, Any]) -> None:
         inferred = _infer_underlying_from_name(trade.get("name"))
         if inferred:
             trade["underlying"] = inferred
+
+
+def _migrate_legacy_trade_fields(snap: dict[str, Any]) -> None:
+    """Snapshot pre-2026-07-09 nao tem `max_profit`: o max profit morava no campo `net_credit`.
+    Sem migrar, o Render serviria o snapshot commitado (ate o 1o tick do scheduler) e a coluna NC
+    do app mostraria o max profit — exatamente a mentira que o CZ reclamou.
+
+    Detecta pela AUSENCIA da chave, nao pelo valor: no snapshot novo `max_profit` sempre existe
+    (pode ser None) e `net_credit` so e preenchido quando o CZ anota a celula da planilha.
+    """
+    for trade in snap.get("trades") or []:
+        if "max_profit" not in trade:
+            trade["max_profit"] = trade.get("net_credit")
+            trade["net_credit"] = None
+        trade.setdefault("contracts", None)
 
 
 # ─── Filter helpers ───────────────────────────────────────────────────────────
@@ -504,6 +526,15 @@ def trade_delta(trade: dict[str, Any]) -> float:
     return 0.0
 
 
+def trade_max_profit(trade: dict[str, Any]) -> Any:
+    """Max profit do trade. Ate 2026-07-09 esse numero morava no campo `net_credit` (nome errado:
+    a coluna I do db_cria sempre foi MxProfit). O fallback cobre snapshots antigos servidos entre
+    o deploy da API e o primeiro export novo — depois disso `max_profit` sempre existe, e
+    `net_credit` passa a ser o credito(+)/debito(-) real anotado pelo CZ."""
+    v = trade.get("max_profit")
+    return v if v is not None else trade.get("net_credit")
+
+
 def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
     summaries: dict[str, dict[str, Any]] = {}
     for env_name, env_summaries in (snap.get("sheet_summaries") or {}).items():
@@ -512,6 +543,17 @@ def sheet_summary_lookup(snap: dict[str, Any]) -> dict[str, dict[str, Any]]:
             if isinstance(sheet, str):
                 summaries[sheet] = {**summary, "env": env_name}
     return summaries
+
+
+# Estruturas em razão de pernas ("1-1-1", "1-2-1", "1-1-2"). Os digitos NAO sao DTE nem strike;
+# se deixados no nome envenenam _first_num_after_ticker ("SPY 1-1-1 45/85" -> DTE 1).
+_RATIO_111_PATTERN = r"\b1\s*-\s*1\s*-\s*1\b"
+_RATIO_STRUCTURE_RE = re.compile(r"\b\d(?:\s*-\s*\d){2,}\b")
+
+
+def strip_ratio_structure(s: str) -> str:
+    """Remove o token de razão de pernas para as varreduras numéricas do nome."""
+    return _RATIO_STRUCTURE_RE.sub(" ", s)
 
 
 def strategy_family(name: str) -> str:
@@ -524,6 +566,10 @@ def strategy_family(name: str) -> str:
         return "Other"
     def has(p: str) -> bool:
         return re.search(p, n) is not None
+    # 1-1-1 (ex.: "260607-3 SPY 1-1-1 45/85"): estrutura propria do CZ, os numeros depois do
+    # ticker sao os VENCIMENTOS, nao o DTE. Primeiro na ordem — nao colide com nenhuma outra.
+    if has(_RATIO_111_PATTERN):
+        return "1-1-1"
     if has(r"\bPL5\b"):                       # broken-wing put fly nomeado do desk (ex.: "T70 PL5 SPY 30D")
         return "PL5"
     if has(r"TRIPLE\s*CAL|TRIPLECALENDAR|TRIP\s*CAL|\bTC\d*\b"):
@@ -543,8 +589,8 @@ def strategy_family(name: str) -> str:
     # Call Fly (inclui HALF BAT / HALF-CALL / CALL-HALF / Bull Fly) — ANTES de Batman e de Bear Call
     if has(r"HALF[-\s]?CALL|CALL[-\s]?HALF|HALF\s*BAT|CALL[-\s]?FLY|CALL\s*BROKEN|BW\s*CALL|BULL\s*FLY"):
         return "Call Fly"
-    # Put Fly (inclui Bear Fly) — ANTES de Bull Put
-    if has(r"PUT[-\s]?FLY|PUT\s*BROKEN|BW\s*PUT|PUT[-\s]?HALF|BEAR\s*FLY"):
+    # Put Fly (inclui Bear Fly e a abreviacao "PFly" da JUN26) — ANTES de Bull Put
+    if has(r"PUT[-\s]?FLY|\bPFLY\d*\b|PUT\s*BROKEN|BW\s*PUT|PUT[-\s]?HALF|BEAR\s*FLY"):
         return "Put Fly"
     # Batman (BATMAN, HYB BAT, BAT, BWB) — depois de HALF BAT
     if has(r"BATMAN|HYB\s*BAT|\bBAT\d*\b|\bBWB\d*\b"):
@@ -552,11 +598,13 @@ def strategy_family(name: str) -> str:
     # Bull Call (DÉBITO) — ANTES de Bear Call, pois "Bull Call Spread" contém "Call Spread"
     if has(r"BULL\s*CALL"):
         return "Bull Call"
-    # Bear Call Spread (Bear Call, BCS, Call Spread, BearCS)
-    if has(r"BEAR\s*CALL|CALL\s*BEAR|\bBCS\d*\b|\bBEARCS\d*\b|CALL\s*SPREAD|CALL\s*CREDIT"):
+    # Bear Call Spread = call spread = call credit spread (CZ, 2026-07-09). Iniciais: BCS, CCS,
+    # CS ("T70 SLV CS8"), BearCS. \bCS\d*\b nao pega "BearCS7" (sem word-boundary depois do 'r').
+    if has(r"BEAR\s*CALL|CALL\s*BEAR|\bBCS\d*\b|\bCCS\d*\b|\bCS\d*\b|\bBEARCS\d*\b|CALL\s*SPREAD|CALL\s*CREDIT"):
         return "Bear Call Spread"
-    # Bull Put Spread (Bull Put, BPS, Put Spread, BullPutCreditSpread, PCS, Put Credit, BearPS)
-    if has(r"BULL\s*PUT|\bBPS\d*\b|BULLPUTCRE|PUT\s*SPREAD|PUT\s*CREDIT|\bPCS\d*\b|\bBEARPS\b"):
+    # Bull Put Spread = put spread = put credit spread. Iniciais: BPS, PCS, PS ("T73 EWY PS7").
+    # \bPS\d*\b nao pega "BPS3" (sem word-boundary entre B e P) nem "SP7" (short put).
+    if has(r"BULL\s*PUT|\bBPS\d*\b|BULLPUTCRE|PUT\s*SPREAD|PUT\s*CREDIT|\bPCS\d*\b|\bPS\d*\b|\bBEARPS\b"):
         return "Bull Put Spread"
     # Nakeds (shorthand do CZ): SS=short strangle, SC=short call, SP=short put. DEPOIS dos
     # spreads/flies/JL (o "+ SP" do Jade Lizard ja foi tratado). \bXX\d*\b casa SS4/SC4/SP7
@@ -570,12 +618,12 @@ def strategy_family(name: str) -> str:
     return "Other"
 
 
-_CALENDAR_DTE_RE = re.compile(r"(\d{1,2})\s*/\s*(\d{1,2})\s*DTE", re.IGNORECASE)
-_CALENDAR_BARE_RE = re.compile(r"\b(\d{1,2})\s*/\s*(\d{1,2})\b")
-_CALENDAR_KEYWORD_RE = re.compile(
-    r"\b(?:TC|DC|TRIPLE\s*CAL(?:ENDAR)?|DOUBLE\s*CAL(?:ENDAR)?|CALENDAR)\b",
-    re.IGNORECASE,
-)
+_CALENDAR_DTE_RE = re.compile(r"(\d{1,3})\s*/\s*(\d{1,3})\s*DTE", re.IGNORECASE)
+_CALENDAR_BARE_RE = re.compile(r"\b(\d{1,3})\s*/\s*(\d{1,3})\b")
+_CALENDAR_KEYWORD_PATTERN = r"\b(?:TC|DC|TRIPLE\s*CAL(?:ENDAR)?|DOUBLE\s*CAL(?:ENDAR)?|CALENDAR)\b"
+# Estruturas cujo "X/Y" no nome sao os dois VENCIMENTOS (não strikes/width): calendários e o
+# 1-1-1 do CZ ("SPY 1-1-1 45/85" = pernas em 45 e 85 DTE). A perna da frente manda no DTE.
+_MULTI_EXP_KEYWORD_RE = re.compile(f"{_CALENDAR_KEYWORD_PATTERN}|{_RATIO_111_PATTERN}", re.IGNORECASE)
 _STRUCTURE_SUFFIX_RE = re.compile(
     r"\b(?:IC|BWIC|BAT(?:MAN)?|RJL|BWB|PCS|HALF[-\s]?CALL|CALL[-\s]?HALF|"
     r"BullPutCreditSpread|BULL\s*CALL\s*SP|BEAR\s*CALL|BW\s*IC)\s*(\d{1,2})\b",
@@ -599,12 +647,12 @@ def parse_strategy_structure(name: str | None, dte_open: int | None = None) -> s
         m = _CALENDAR_DTE_RE.search(name)
         if m:
             return f"{int(m.group(1))}/{int(m.group(2))}"
-        # Loose: bare "X/Y" when the name carries a calendar keyword
-        # (TC / DC / TRIPLE CAL / DOUBLE CAL / CALENDAR). Catches CZ's
+        # Loose: bare "X/Y" when the name carries a multi-expiration keyword
+        # (TC / DC / TRIPLE CAL / DOUBLE CAL / CALENDAR / 1-1-1). Catches CZ's
         # shorthand "FOR TC 01 RUT 7/10; 8/11" where the first pair is the
-        # primary calendar leg.
-        if _CALENDAR_KEYWORD_RE.search(name):
-            m = _CALENDAR_BARE_RE.search(name)
+        # primary calendar leg, and "SPY 1-1-1 45/85".
+        if _MULTI_EXP_KEYWORD_RE.search(name):
+            m = _CALENDAR_BARE_RE.search(strip_ratio_structure(name))
             if m:
                 return f"{int(m.group(1))}/{int(m.group(2))}"
         # Single-DTE structures (IC42, BWIC21, etc.)
@@ -666,7 +714,10 @@ def trade_pnl_event_date(trade: dict[str, Any]) -> str:
 # DTE colado na estrutura: "BPS7"=bull put spread 7DTE, "IC4", "BearCS8", "PL5 SPY 30D").
 _NAME_DTE_SUFFIX_RE = re.compile(r"(\d{1,2})\s*DTE\b", re.IGNORECASE)   # "7 DTE", "21DTE"
 _NAME_DTE_D_RE = re.compile(r"\b(\d{1,2})\s*D\b")                       # "30D"
-_TRADE_ID_PREFIX_RE = re.compile(r"^\s*T\d+\s+")                        # remove "T58 " (id do trade)
+# Id do trade no inicio do nome: "T58 " (padrao antigo) ou "260607-3 " (YYMMDD-seq, padrao que o
+# CZ adotou em jul/2026). Precisa sair ANTES de qualquer varredura numerica: a data tem digitos e
+# um nome sem ticker conhecido acabava lendo o DTE de dentro dela ("260607-2 BE ..." -> DTE 26).
+_TRADE_ID_PREFIX_RE = re.compile(r"^\s*(?:T\d+|\d{6}-\d+)\s+", re.IGNORECASE)
 
 
 def _first_num_after_ticker(s: str) -> int | None:
@@ -685,20 +736,20 @@ def _first_num_after_ticker(s: str) -> int | None:
 
 
 def dte_from_name(name: str | None) -> int | None:
-    """Extrai o DTE do NOME do trade (fonte confiável do CZ). Prioridade:
-    1) calendário "X/YDTE" ou keyword+"X/Y" → front leg;
+    """Extrai o DTE do NOME do trade (fonte confiável do CZ). O id do trade ("T58 ", "260607-3 ")
+    sai primeiro — senão a data do id vira DTE. Prioridade:
+    1) calendário "X/YDTE" ou keyword multi-exp + "X/Y" → front leg (inclui "1-1-1 45/85"→45);
     2) "NN DTE"; 3) "NND" (ex.: 30D);
-    4) 1º número após o ticker ("T58 SMH BPS3"→3, "FOR01 RUT FULL BAT42"→42,
-       "T78 RUT SP7 ... hedge LP5"→7);
-    5) fallback: remove o id "T58 " e pega o 1º número ("T22 42 IC"→42)."""
+    4) 1º número após o ticker ("SMH BPS3"→3, "RUT FULL BAT42"→42, "RUT SP7 ... hedge LP5"→7);
+    5) fallback: 1º número do que sobrou ("T22 42 IC"→42)."""
     if not name:
         return None
-    s = str(name).strip()
+    s = _TRADE_ID_PREFIX_RE.sub("", str(name).strip())
     m = _CALENDAR_DTE_RE.search(s)                          # "21/28DTE" → front leg
     if m:
         return int(m.group(1))
-    if _CALENDAR_KEYWORD_RE.search(s):                      # "TC"/"TripleCalendar" + "7/10"
-        m = _CALENDAR_BARE_RE.search(s)
+    if _MULTI_EXP_KEYWORD_RE.search(s):                     # "TC"/"TripleCalendar"/"1-1-1" + "7/10"
+        m = _CALENDAR_BARE_RE.search(strip_ratio_structure(s))
         if m:
             return int(m.group(1))
     m = _NAME_DTE_SUFFIX_RE.search(s)                       # "7 DTE"
@@ -707,19 +758,19 @@ def dte_from_name(name: str | None) -> int | None:
     m = _NAME_DTE_D_RE.search(s)                            # "30D"
     if m:
         return int(m.group(1))
-    n = _first_num_after_ticker(s)                          # ancorado no ticker
+    body = strip_ratio_structure(s)                         # "1-1-1" nao e DTE
+    n = _first_num_after_ticker(body)                       # ancorado no ticker
     if n is not None:
         return n
-    body = _TRADE_ID_PREFIX_RE.sub("", s)                   # sem ticker: remove "T58 "
-    m = re.search(r"(\d{1,2})", body)
+    m = re.search(r"(\d{1,2})", body)                       # sem ticker conhecido
     if m:
         return int(m.group(1))
     return None
 
 
 # Famílias de DTE (definidas pelo CZ). Limites inteiros não-sobrepostos; nas bordas
-# ambíguas do spec (21, 28, 35) o valor pertence à família INFERIOR. Topo (≥36) cai
-# em "35-40DTE" p/ não perder trades ~40-42 DTE.
+# ambíguas do spec (21, 28, 35) o valor pertence à família INFERIOR. Acima de 40 DTE existe
+# "40+DTE" (BAT42, BWIC42, RJL42, 1-1-1 45/85) — antes tudo isso caía em "35-40DTE".
 def dte_bucket_from_int(dte: int | None) -> str:
     if dte is None:
         return "Unknown"
@@ -736,11 +787,15 @@ def dte_bucket_from_int(dte: int | None) -> str:
         return "21/28DTE"
     if d <= 35:
         return "28/35DTE"
-    return "35-40DTE"
+    if d <= 40:
+        return "35-40DTE"
+    return "40+DTE"
 
 
 # Ordem canônica das famílias (p/ exibição estável no gráfico "DTE bucket edge").
-DTE_BUCKET_ORDER = ["1DTE", "4DTE", "7-13DTE", "14-21DTE", "21/28DTE", "28/35DTE", "35-40DTE", "Unknown"]
+DTE_BUCKET_ORDER = [
+    "1DTE", "4DTE", "7-13DTE", "14-21DTE", "21/28DTE", "28/35DTE", "35-40DTE", "40+DTE", "Unknown",
+]
 
 
 def dte_from_dates(trade: dict[str, Any]) -> int | None:
@@ -1209,6 +1264,9 @@ def get_trades(
     for t in trades:
         t["pnl"] = trade_pnl(t, individual_pnls)
         t["delta"] = trade_delta(t)
+        # Como o app leu o nome do trade — o CZ confere a leitura direto na tabela.
+        t["strategy"] = strategy_family(t.get("name") or "")
+        t["structure"] = parse_strategy_structure(t.get("name"), t.get("dte_open"))
         if t.get("dte_open") is None and t.get("visual_dte_open") is not None:
             t["dte_open"] = t["visual_dte_open"]
         if t.get("open_date") is None and t.get("visual_open_date"):
@@ -1263,7 +1321,7 @@ def get_kpis(
     rlzd = 0.0
     delta_total = 0.0
     max_loss_exposed = 0.0
-    net_credit_at_risk = 0.0
+    max_profit_at_risk = 0.0
     n_active = 0
     n_closed = 0
     closed_pnls: list[float] = []
@@ -1277,11 +1335,11 @@ def get_kpis(
             open_pnl += _num(pnl)
             delta_total += _num(trade_delta(t))
             max_loss_exposed += _num(t.get("max_loss"))      # naked (SC/SP/SS) = NaN -> 0 (risco indefinido, nao soma)
-            net_credit_at_risk += _num(t.get("net_credit"))
+            max_profit_at_risk += _num(trade_max_profit(t))
             dte = t.get("dte_remaining")
-            nc = _num(t.get("net_credit"))
-            if dte and nc and _num(dte) > 0:
-                daily_theta += nc / _num(dte)
+            mp = _num(trade_max_profit(t))
+            if dte and mp and _num(dte) > 0:
+                daily_theta += mp / _num(dte)
         else:
             n_closed += 1
             rlzd += _num(pnl)
@@ -1302,8 +1360,8 @@ def get_kpis(
         if m in sheet_summaries and (env is None or sheet_summaries[m].get("env") == env)
     ]
     # Sheet TOTAL row is authoritative for OpenPnL / RLZD / Delta / MaxProfit when filtering by month.
-    # net_credit_at_risk and max_loss_exposed stay trade-level (sum of NC / MaxLoss across active trades).
-    max_profit_total = sum(_num(t.get("net_credit")) for t in trades if t.get("is_active"))
+    # max_profit_at_risk and max_loss_exposed stay trade-level (sum of MaxProfit / MaxLoss across active trades).
+    max_profit_total = sum(_num(trade_max_profit(t)) for t in trades if t.get("is_active"))
     if selected_summaries:
         open_pnl = sum(_num(s.get("open_pnl")) for s in selected_summaries)
         rlzd = sum(_num(s.get("rlzd")) for s in selected_summaries)
@@ -1322,7 +1380,7 @@ def get_kpis(
         },
         risk={
             "max_loss_exposed": round(max_loss_exposed, 2),
-            "net_credit_at_risk": round(net_credit_at_risk, 2),
+            "max_profit_at_risk": round(max_profit_at_risk, 2),
             "est_daily_theta": round(daily_theta, 2),
         },
         performance={
@@ -2935,18 +2993,16 @@ def _ft_closed_trade_to_kpi_row(t: dict[str, Any], individual: dict[str, float])
 def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
     """Compute DIT-to-10/25/50/75% MaxProfit and path drawdown.
 
-    Credit strategies: `net_credit` is the max profit; %MP milestones are pct
-    of net_credit.
-    Debit strategies (Triple/Double Calendar, Bull Call): `net_credit` is the
-    debit paid up-front. Per desk convention, the milestone target = 100% of
-    the debit (i.e. "% of max profit" = % of debit recovered). The UI uses
-    `is_debit` to label the metric appropriately. `net_debit_usd` is surfaced
-    for the UI to display "Net debit" instead of "Net credit".
+    Credit strategies: `max_profit` é o alvo; %MP milestones são pct de max_profit.
+    Debit strategies (Triple/Double Calendar, Bull Call): `max_profit` guarda o débito pago na
+    entrada. Por convenção do desk, o alvo do milestone = 100% do débito (i.e. "% do max profit"
+    = % do débito recuperado). A UI usa `is_debit` para rotular a métrica, e `net_debit_usd`
+    para mostrar "Net debit" em vez de "Net credit".
     """
     history = trade.get("daily_history") or []
     family = strategy_family(str(trade.get("name") or ""))
     is_debit = _is_debit_family(family)
-    raw_credit = trade.get("net_credit")
+    raw_max_profit = trade_max_profit(trade)
     open_dt = parse_iso_date(trade.get("open_date") or trade.get("visual_open_date"))
 
     result: dict[str, Any] = {
@@ -2962,8 +3018,8 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
         "dit_to_75mp": None,
     }
 
-    if is_debit and isinstance(raw_credit, (int, float)) and raw_credit > 0:
-        result["net_debit_usd"] = round(float(raw_credit), 2)
+    if is_debit and isinstance(raw_max_profit, (int, float)) and raw_max_profit > 0:
+        result["net_debit_usd"] = round(float(raw_max_profit), 2)
 
     pnls = [
         (h.get("date"), h.get("pnl"))
@@ -2986,8 +3042,8 @@ def _ft_milestones(trade: dict[str, Any]) -> dict[str, Any]:
 
     # Milestone target: net_credit for credit (= max profit) and for debit
     # (= debit paid, treated as 100% recovery target per desk convention).
-    if isinstance(raw_credit, (int, float)) and raw_credit > 0 and open_dt:
-        target_usd = float(raw_credit)
+    if isinstance(raw_max_profit, (int, float)) and raw_max_profit > 0 and open_dt:
+        target_usd = float(raw_max_profit)
         result["max_profit_usd"] = round(target_usd, 2)
         targets = [(10, 0.10), (25, 0.25), (50, 0.50), (75, 0.75)]
         for date_str, pnl in pnls:
@@ -3463,7 +3519,10 @@ def _build_system_prompt(trades: list[dict[str, Any]], snap: dict[str, Any], mon
             f"days_open_as_of_last_pnl={t.get('days_open_as_of_last_pnl') if t.get('days_open_as_of_last_pnl') is not None else '?'}): "
             f"PnL=${pnl:.0f}, status={'ACTIVE' if t.get('is_active') else 'CLOSED'}, "
             f"Δ={trade_delta(t):.1f}, DTE={t.get('dte_remaining','—')}, "
-            f"NC=${t.get('net_credit','—')}, MaxLoss=${t.get('max_loss','—')}"
+            f"contracts={t.get('contracts') if t.get('contracts') is not None else '—'}, "
+            f"MaxProfit=${trade_max_profit(t) if trade_max_profit(t) is not None else '—'}, "
+            f"NC=${t.get('net_credit') if t.get('net_credit') is not None else '—'} (credit +/debit −), "
+            f"MaxLoss=${t.get('max_loss','—')}"
         )
     trade_block = "\n".join(trade_lines) if trade_lines else "(no trades match the current filter)"
 

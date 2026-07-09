@@ -166,6 +166,9 @@ MONTH_SHEET_REGEX = re.compile(r"^(JS )?[A-Z]{3}\d{2}$")
 # regular `FOR Trades` tab — this sheet only enriches display.
 FT_STRATEGIES_SHEET = "FT Strategies"
 
+# Mantida IDENTICA a apps/api/main.py:TRADE_UNDERLYINGS (tests/test_trade_parsing.py trava a
+# paridade). A ordem importa: _infer_underlying devolve o PRIMEIRO simbolo da tupla que casa,
+# nao o mais a esquerda do nome — tickers ambiguos e curtos (BE) ficam no fim.
 TRADE_UNDERLYINGS = (
     "SPX",
     "SPXW",
@@ -190,10 +193,42 @@ TRADE_UNDERLYINGS = (
     "XLU",
     "XLV",
     "XLY",
-    "DRAM",
-    "SPCX",
     "BTC",
     "BITCOIN",
+    # commodity / country / macro ETFs (CZ trades estes; antes caíam em "?")
+    "USO",
+    "UNG",
+    "EWY",
+    "EWZ",
+    "EEM",
+    "FXI",
+    "EFA",
+    "EWJ",
+    "TLT",
+    "HYG",
+    "GDX",
+    "XOP",
+    "SMH",
+    "XBI",
+    "TQQQ",
+    "SQQQ",
+    "DRAM",
+    "SPCX",
+    # nomes que aparecem no book do CZ (atribuir em vez de deixar em branco)
+    "NVDA",
+    "META",
+    "GOOGL",
+    "AMZN",
+    "AAPL",
+    "MSFT",
+    "TSLA",
+    "JPM",
+    "QCOM",
+    "BRK",
+    "ARM",
+    # "BE" (Bloom Energy) e curto e colide com anotacoes de breakeven — deixar por ULTIMO
+    # para que qualquer nome com outro ticker resolva no outro ticker primeiro.
+    "BE",
 )
 
 UNDERLYING_ALIASES = {
@@ -487,6 +522,25 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
                     return r, ci
         return None, None
 
+    def mxprofit_row(rows: dict[int, tuple]) -> int | None:
+        """Linha do 'Mx Profit (middle zone), Mx Loss' — achada pelo rotulo do template.
+        Row 9 no layout `Titel` (APR26/MAY26/JUN26/JS *), row 8 no legado (MAR26/FOR Trades)."""
+        for r, row_data in rows.items():
+            for val in row_data:
+                if val is not None and str(val).strip().lower().startswith("mx profit"):
+                    return r
+        return None
+
+    def positive_int(v) -> int | None:
+        """Contratos: so aceita inteiro positivo. As abas legadas guardam deltas soltos na
+        linha acima do MxProfit (MAR26 AQ7=-19) — sem essa guarda virariam 'contratos'."""
+        if not is_num(v):
+            return None
+        f = float(v)
+        if f <= 0 or f > 10_000 or not f.is_integer():
+            return None
+        return int(f)
+
     def sheet_last_update(rows: dict[int, tuple]) -> date | None:
         for row_data in rows.values():
             for ci, val in enumerate(row_data):
@@ -717,6 +771,13 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
         info_row = all_rows.get(info_r, ())
         strikes_row = all_rows.get(strikes_r, ())
 
+        # Bloco (bc = coluna inicial):
+        #   mxp_r - 1 : [bc] = nº de contratos (linha "Deltas ...", livre hoje)
+        #   mxp_r     : [bc] = MxProfit | [bc+1] = net credit(+)/debit(-) | [bc+3] = MxLoss
+        mxp_r = mxprofit_row(all_rows) or (info_r + 3)
+        mxprofit_row_vals = all_rows.get(mxp_r, ())
+        contracts_row = all_rows.get(mxp_r - 1, ())
+
         # Record every detected trade name for this sheet (membership map)
         sheet_to_trades.setdefault(sheet_name, []).extend(name for _, name in blocks)
         sheet_daily_pnls[sheet_name] = daily_sheet_pnl(
@@ -738,6 +799,9 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
             exp_dt = info_row[bc + 2] if len(info_row) > bc + 2 else None
             dte_open = info_row[bc + 3] if len(info_row) > bc + 3 else None
             strikes = strikes_row[bc] if len(strikes_row) > bc else None
+            mxp_val = mxprofit_row_vals[bc] if len(mxprofit_row_vals) > bc else None
+            nc_val = mxprofit_row_vals[bc + 1] if len(mxprofit_row_vals) > bc + 1 else None
+            contracts = positive_int(contracts_row[bc] if len(contracts_row) > bc else None)
             open_date_obj = as_date(open_dt)
             last_mark = last_pnl_mark(ws, pnl_series_start_r, date_col, bc)
             last_mark_date = last_mark.get("date_obj") if last_mark else None
@@ -773,6 +837,9 @@ def read_individual_trade_pnls(xlsx_path: Path) -> tuple[dict[str, float], dict[
                     "exp_date": as_date_str(exp_dt),
                     "dte_open": int(dte_open) if is_num(dte_open) else None,
                     "strikes": str(strikes).strip() if strikes is not None and str(strikes).strip() else None,
+                    "max_profit": float(mxp_val) if is_num(mxp_val) else None,
+                    "net_credit": float(nc_val) if is_num(nc_val) else None,
+                    "contracts": contracts,
                     "pnl": pnl,
                     "last_pnl": float(last_mark["pnl"]) if last_mark else None,
                     "last_pnl_date": last_mark.get("date") if last_mark else None,
@@ -876,7 +943,13 @@ def load_db_robots(xlsx_path: Path) -> pd.DataFrame:
 
 
 def load_db_cria(xlsx_path: Path) -> pd.DataFrame:
-    """Carrega db_cria (dados de abertura de cada trade)."""
+    """Carrega db_cria (dados de abertura de cada trade).
+
+    A coluna I ("net credit" no cabecalho da planilha) sempre foi, de fato, o **Max Profit** do
+    trade — o CZ confirmou em 2026-07-09. O net credit/debit real passa a ser anotado a mao na
+    aba visual (ver read_individual_trade_pnls). Aqui a chave se chama `max_profit` para o codigo
+    parar de mentir.
+    """
     wb = openpyxl.load_workbook(xlsx_path, data_only=True, read_only=True)
     ws = wb["db_cria"]
 
@@ -898,7 +971,7 @@ def load_db_cria(xlsx_path: Path) -> pd.DataFrame:
             "underlying_price": _parse_money(_get(5)),
             "soll_lw_be":       _parse_money(_get(6)),
             "soll_up_be":       _parse_money(_get(7)),
-            "net_credit":       _parse_money(_get(8)),
+            "max_profit":       _parse_money(_get(8)),
             "max_loss":         _parse_money(_get(9)),
             "strikes":          str(_get(10)) if _get(10) else None,
             "ist_lw_be":        _parse_money(_get(11)),
@@ -1085,7 +1158,7 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
         cria_rows = db_cria[db_cria["trade_name"] == name]
         cria = cria_rows.iloc[0].to_dict() if not cria_rows.empty else {}
 
-        net_credit = cria.get("net_credit")
+        max_profit = cria.get("max_profit")
         max_loss   = cria.get("max_loss")
         dte_open       = cria.get("dte_open")
         dte_open_raw   = cria.get("dte_open_raw")
@@ -1119,8 +1192,8 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
         # PnL%
         pnl_current = row.get("pnl")
         pnl_pct_max = None
-        if pnl_current is not None and net_credit and net_credit != 0:
-            pnl_pct_max = round(pnl_current / net_credit * 100, 1)
+        if pnl_current is not None and max_profit and max_profit != 0:
+            pnl_pct_max = round(pnl_current / max_profit * 100, 1)
 
         # % spot para BEs
         pct_to_lw = None
@@ -1149,7 +1222,11 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
             "dte_remaining":     dte_remaining,
             "underlying_price_at_open": und_price,
             "strikes":           cria.get("strikes"),
-            "net_credit":        net_credit,
+            # max_profit vem do db_cria; net_credit (assinado) e contracts vem da aba visual e
+            # sao preenchidos no merge de run_export — None ate o CZ anotar as celulas novas.
+            "max_profit":        max_profit,
+            "net_credit":        None,
+            "contracts":         None,
             "max_loss":          max_loss,
             "sd":                cria.get("sd"),
             "lw_be":             lw_be,
@@ -1227,12 +1304,12 @@ def build_monthly_summary(db_robots: pd.DataFrame, db_cria: pd.DataFrame) -> pd.
 
     # Juntar db_cria
     if not db_cria.empty:
-        cria_sub = db_cria[["trade_name", "net_credit", "max_loss", "dte_open", "underlying_price"]].copy()
+        cria_sub = db_cria[["trade_name", "max_profit", "max_loss", "dte_open", "underlying_price"]].copy()
         summary = summary.merge(cria_sub, left_on="strategy", right_on="trade_name", how="left")
 
     summary["pnl_pct_max"] = np.where(
-        summary["net_credit"].notna() & (summary["net_credit"] != 0),
-        (summary["pnl_last"] / summary["net_credit"] * 100).round(1),
+        summary["max_profit"].notna() & (summary["max_profit"] != 0),
+        (summary["pnl_last"] / summary["max_profit"] * 100).round(1),
         None
     )
     summary["won"] = (summary["pnl_last"] > 0).astype(int)
@@ -1250,12 +1327,12 @@ def build_trade_history(db_robots: pd.DataFrame, db_cria: pd.DataFrame) -> pd.Da
 
     # Enriquecer com dados de abertura
     if not db_cria.empty:
-        cria_sub = db_cria[["trade_name", "net_credit", "max_loss", "open_date", "dte_open"]].copy()
+        cria_sub = db_cria[["trade_name", "max_profit", "max_loss", "open_date", "dte_open"]].copy()
         df = df.merge(cria_sub, left_on="strategy", right_on="trade_name", how="left")
 
     df["pnl_pct_max"] = np.where(
-        df["net_credit"].notna() & (df["net_credit"] != 0),
-        (df["pnl"] / df["net_credit"] * 100).round(2),
+        df["max_profit"].notna() & (df["max_profit"] != 0),
+        (df["pnl"] / df["max_profit"] * 100).round(2),
         None
     )
     return df
@@ -1381,6 +1458,11 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only
             t["inferred_close_weekday"] = details.get("inferred_close_weekday")
             t["days_held"] = details.get("days_held")
             t["days_open_as_of_last_pnl"] = details.get("days_open_as_of_last_pnl")
+            # Anotacoes manuais do CZ na aba visual (celulas ao lado / acima do MxProfit).
+            t["net_credit"] = details.get("net_credit")
+            t["contracts"] = details.get("contracts")
+            if t.get("max_profit") is None:          # 0.0 e falsy — comparar com None
+                t["max_profit"] = details.get("max_profit")
             if not t.get("strikes"):
                 t["strikes"] = details.get("strikes")
             if t.get("underlying") == "?":
@@ -1411,7 +1493,9 @@ def run_export(xlsx_path: Path, gdrive_file_id: str | None = None, snapshot_only
                 "dte_remaining": None,
                 "underlying_price_at_open": details.get("open_price"),
                 "strikes": details.get("strikes"),
-                "net_credit": None,
+                "max_profit": details.get("max_profit"),
+                "net_credit": details.get("net_credit"),
+                "contracts": details.get("contracts"),
                 "max_loss": None,
                 "sd": None,
                 "lw_be": None,

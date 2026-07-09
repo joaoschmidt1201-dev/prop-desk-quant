@@ -111,6 +111,14 @@ def load_history() -> pd.DataFrame:
 
 # ─── KPI computation ──────────────────────────────────────────────────────────
 
+def _max_profit(t: dict):
+    """Max profit do trade. Ate 2026-07-09 esse numero morava em `net_credit` (nome errado: a
+    coluna I do db_cria sempre foi MxProfit). Hoje `net_credit` guarda o credito(+)/debito(-)
+    real anotado pelo CZ; o fallback so serve p/ snapshots antigos."""
+    v = t.get("max_profit")
+    return v if v is not None else t.get("net_credit")
+
+
 def compute_kpis(trades: list[dict], history: pd.DataFrame,
                  monthly_summaries: list[dict]) -> dict:
     """
@@ -126,14 +134,14 @@ def compute_kpis(trades: list[dict], history: pd.DataFrame,
     delta    = sum(m["delta"]    for m in monthly_summaries)
 
     # ── Risk (trade level) ──
-    max_loss_exp = sum(t["max_loss"]   or 0 for t in active if t.get("max_loss")   is not None)
-    nc_risk      = sum(t["net_credit"] or 0 for t in active if t.get("net_credit") is not None)
+    max_loss_exp = sum(t["max_loss"] or 0 for t in active if t.get("max_loss") is not None)
+    mp_risk      = sum(_max_profit(t) or 0 for t in active if _max_profit(t) is not None)
 
-    # ── Est. Daily Theta: net_credit / dte_remaining per active trade ──
+    # ── Est. Daily Theta: max_profit / dte_remaining per active trade ──
     theta_daily = sum(
-        (t["net_credit"] / t["dte_remaining"])
+        (_max_profit(t) / t["dte_remaining"])
         for t in active
-        if t.get("net_credit") and t.get("dte_remaining") and t["dte_remaining"] > 0
+        if _max_profit(t) and t.get("dte_remaining") and t["dte_remaining"] > 0
     )
 
     # ── DTE counts ──
@@ -186,7 +194,7 @@ def compute_kpis(trades: list[dict], history: pd.DataFrame,
         "delta":             delta,
         # Risk
         "max_loss_exp":      max_loss_exp,
-        "nc_risk":           nc_risk,
+        "mp_risk":           mp_risk,
         "theta_daily":       theta_daily,
         "expiring_14":       expiring_14,
         "expiring_7":        expiring_7,
@@ -459,7 +467,7 @@ def build_ai_system_prompt(trades: list[dict], kpis: dict, env_label: str) -> st
         f"  Total PnL   : ${kpis['total_pnl']:+,.0f}",
         f"  Portfolio Delta: {kpis['delta']:+.0f}",
         f"  Max Loss Exposed: ${kpis['max_loss_exp']:,.0f}",
-        f"  Net Credit at Risk: ${kpis['nc_risk']:,.0f}",
+        f"  Max Profit at Risk: ${kpis['mp_risk']:,.0f}",
         f"  Est. Daily Theta: ${kpis['theta_daily']:,.0f}/day" if kpis['theta_daily'] else "  Est. Daily Theta: N/A",
         f"  Win Rate: {kpis['win_rate']:.1f}%" if kpis['win_rate'] else "  Win Rate: N/A",
         f"  Profit Factor: {kpis['profit_factor']:.2f}" if kpis['profit_factor'] else "  Profit Factor: N/A",
@@ -473,7 +481,7 @@ def build_ai_system_prompt(trades: list[dict], kpis: dict, env_label: str) -> st
         pct  = t.get("pnl_pct_max")
         dte  = t.get("dte_remaining")
         dlta = t.get("delta_current")
-        nc   = t.get("net_credit")
+        mp   = _max_profit(t)
         ml   = t.get("max_loss")
         lw   = t.get("lw_be")
         up   = t.get("up_be")
@@ -482,7 +490,7 @@ def build_ai_system_prompt(trades: list[dict], kpis: dict, env_label: str) -> st
         if pct  is not None: parts.append(f"({pct:+.0f}% max)")
         if dte  is not None: parts.append(f"DTE={dte}")
         if dlta is not None: parts.append(f"Delta={dlta:+.0f}")
-        if nc:               parts.append(f"NC=${nc:,.0f}")
+        if mp:               parts.append(f"MaxProfit=${mp:,.0f}")
         if ml:               parts.append(f"MaxLoss=${ml:,.0f}")
         if lw:               parts.append(f"LwBE={lw:.1f}")
         if up:               parts.append(f"UpBE={up:.1f}")
@@ -495,11 +503,11 @@ def build_ai_system_prompt(trades: list[dict], kpis: dict, env_label: str) -> st
     for t in closed_s:
         pnl = t.get("pnl_current")
         pct = t.get("pnl_pct_max")
-        nc  = t.get("net_credit")
+        mp  = _max_profit(t)
         result = "WIN" if (pnl or 0) > 0 else "LOSS"
         line = f"  [{result}] {t['name']}: ${pnl:+,.0f}"
         if pct is not None: line += f" ({pct:+.0f}% max)"
-        if nc:               line += f" | NC=${nc:,.0f}"
+        if mp:               line += f" | MaxProfit=${mp:,.0f}"
         lines.append(line)
 
     lines += [
@@ -693,8 +701,8 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
     v = f"${k['max_loss_exp']:,.0f}" if k['max_loss_exp'] else "—"
     c1.markdown(kpi("Max Loss Exposed", v, "sum of active max losses", "c-yellow"), unsafe_allow_html=True)
 
-    v = f"${k['nc_risk']:,.0f}" if k['nc_risk'] else "—"
-    c2.markdown(kpi("Net Credit at Risk", v, "premium on active trades", "c-blue"), unsafe_allow_html=True)
+    v = f"${k['mp_risk']:,.0f}" if k['mp_risk'] else "—"
+    c2.markdown(kpi("Max Profit at Risk", v, "max profit on active trades", "c-blue"), unsafe_allow_html=True)
 
     v = f"${k['theta_daily']:,.0f}/day" if k['theta_daily'] else "—"
     c3.markdown(kpi("Est. Daily Theta", v, "approx. time decay earned/day", "c-purple"), unsafe_allow_html=True)
@@ -816,7 +824,7 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
             pct  = t.get("pnl_pct_max")
             dte  = t.get("dte_remaining")
             dlta = t.get("delta_current")
-            nc   = t.get("net_credit")
+            mp   = _max_profit(t)
             ml   = t.get("max_loss")
             lw   = t.get("lw_be")
             up   = t.get("up_be")
@@ -836,7 +844,7 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
                 m2.metric("% Max Profit", pct_s)
                 m3.metric("Delta",        f"{dlta:+.0f}" if dlta is not None else "—")
                 m4.metric("DTE",          dte_s)
-                m5.metric("Net Credit",   f"${nc:,.0f}"  if nc   else "—")
+                m5.metric("Max Profit",   f"${mp:,.0f}"  if mp   else "—")
                 m6.metric("Max Loss",     f"${ml:,.0f}"  if ml   else "—")
                 m7, m8, m9 = st.columns(3)
                 m7.metric("Lower BE",     f"{lw:.1f}" if lw else "—")
@@ -854,14 +862,14 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
         for t in sorted(closed, key=lambda x: x.get("pnl_current") or 0, reverse=True):
             pnl = t.get("pnl_current")
             pct = t.get("pnl_pct_max")
-            nc  = t.get("net_credit")
+            mp  = _max_profit(t)
             ml  = t.get("max_loss")
             rows_c.append({
                 "Trade":       t["name"],
                 "Result":      "WIN"  if (pnl or 0) > 0 else "LOSS",
                 "Final PnL":   f"${pnl:+,.0f}" if pnl is not None else "—",
                 "% of Max":    f"{pct:+.0f}%"  if pct is not None else "—",
-                "Net Credit":  f"${nc:,.0f}"   if nc  else "—",
+                "Max Profit":  f"${mp:,.0f}"   if mp  else "—",
                 "Max Loss":    f"${ml:,.0f}"   if ml  else "—",
             })
         st.dataframe(pd.DataFrame(rows_c), use_container_width=True, hide_index=True)
@@ -955,7 +963,7 @@ def render_tab(trades_env: list[dict], history: pd.DataFrame,
         df_c = pd.DataFrame([{
             "trade": t["name"], "result": "WIN" if (t.get("pnl_current") or 0) > 0 else "LOSS",
             "pnl": t.get("pnl_current"), "pct_max": t.get("pnl_pct_max"),
-            "net_credit": t.get("net_credit"),
+            "max_profit": _max_profit(t),
         } for t in closed])
         d2.download_button(
             "Download Closed Trades CSV",
