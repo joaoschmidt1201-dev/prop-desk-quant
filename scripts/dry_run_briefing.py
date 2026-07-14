@@ -18,6 +18,14 @@ import os
 import sys
 from pathlib import Path
 
+# Consoles Windows usam cp1252 por padrão e quebram ao imprimir o 🔴 (e outros
+# emojis) que o briefing top-tier agora inclui. Força UTF-8 no stdout para o
+# dry-run nunca morrer com UnicodeEncodeError na hora de imprimir.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 # Adiciona a pasta scripts ao path para importar morning_briefing
 sys.path.insert(0, str(Path(__file__).parent))
 import morning_briefing as mb

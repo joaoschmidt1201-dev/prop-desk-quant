@@ -124,12 +124,23 @@ def fetch_spx_technicals() -> dict:
 
 # ─── FINNHUB — ECONOMIC & EARNINGS CALENDAR ──────────────────────────────────
 
-def fetch_economic_calendar(today: date, api_key: str) -> str:
+def fetch_economic_calendar(today: date, api_key: str) -> dict:
     """Fetches high-impact US economic events from Finnhub for today.
-    Returns formatted string to inject into Perplexity prompt.
-    Returns '' on failure (graceful degradation)."""
+
+    Returns a dict so the caller can tell a genuine 'nothing scheduled' apart from
+    a failed/empty fetch. We must NEVER inject a false 'nothing scheduled' as
+    authoritative — that once masked a CPI day. Finnhub's free-tier economic
+    calendar is unreliable (often misses/undertags CPI), so this is only ever a
+    CORROBORATOR; the briefing prompt does the authoritative top-tier detection
+    via web search.
+
+    Returns {"status": "ok"|"empty"|"error", "text": str}:
+      error → no key or request failed
+      empty → request ok but zero US high-impact events
+      ok    → events found; text = formatted bullet lines
+    """
     if not api_key:
-        return ""
+        return {"status": "error", "text": ""}
     date_str = today.strftime("%Y-%m-%d")
     try:
         resp = requests.get(
@@ -141,7 +152,7 @@ def fetch_economic_calendar(today: date, api_key: str) -> str:
         events = resp.json().get("economicCalendar", [])
     except Exception as e:
         print(f"  [WARNING] Finnhub economic calendar failed: {e}")
-        return ""
+        return {"status": "error", "text": ""}
 
     # Filter: US + high impact only (medium = too much noise for the desk)
     filtered = [
@@ -150,12 +161,11 @@ def fetch_economic_calendar(today: date, api_key: str) -> str:
         and e.get("impact", "").lower() == "high"
     ]
     if not filtered:
-        return "No high-impact US macro releases scheduled."
+        return {"status": "empty", "text": ""}
 
     filtered.sort(key=lambda e: e.get("time", ""))
 
-    date_label = today.strftime("%A, %B %d")
-    lines = [f"--- ECONOMIC CALENDAR — {date_label} (source: Finnhub) ---"]
+    lines = []
     for e in filtered:
         name   = e.get("event", "Unknown")
         impact = e.get("impact", "").upper()
@@ -171,12 +181,12 @@ def fetch_economic_calendar(today: date, api_key: str) -> str:
                 time_str = t_et.strftime("%H:%M ET") + "  "
             except (ValueError, AttributeError):
                 pass
-        line = f"• {time_str}{name}  [{impact} IMPACT]"
+        line = f"• {time_str}{name}  ({impact} impact)"
         if est:
             line += f"  est: {est}{unit}"
         lines.append(line)
 
-    return "\n".join(lines)
+    return {"status": "ok", "text": "\n".join(lines)}
 
 
 def fetch_earnings_calendar(today: date, api_key: str) -> dict:
@@ -720,17 +730,31 @@ def generate_briefing(
                 f"  {ma}: {round(data['value'])}  ({data['dist_pct']:+.1f}% — SPX is {data['side']})"
             )
 
-    # Build calendar block (from Finnhub — authoritative structured data)
+    # Build calendar block. Finnhub's economic feed is only a CORROBORATOR — it is
+    # unreliable on the free tier, so we inject its events ONLY when it actually
+    # returns some (status == "ok"). We deliberately NEVER inject a "nothing
+    # scheduled" line: an empty/failed fetch must not become an authoritative
+    # false-negative (that once masked a CPI day). Top-tier detection is the
+    # prompt's job (mandatory web search in §2§). Earnings stay authoritative.
     cal = calendar_data or {}
-    econ_block     = cal.get("economic", "") or ""
+    econ           = cal.get("economic") or {}
+    if isinstance(econ, dict):
+        econ_status, econ_text = econ.get("status", "error"), econ.get("text", "")
+    else:  # backward-compat if a plain string is ever passed
+        econ_status, econ_text = ("ok" if econ else "empty"), (econ or "")
     earnings_block = cal.get("earnings", "") or ""
+
     calendar_block = ""
-    if econ_block or earnings_block:
-        calendar_block = (
-            f"\n--- ECONOMIC CALENDAR — TODAY (authoritative, from Finnhub) ---\n"
-            f"{econ_block or 'No high-impact US macro releases scheduled today.'}\n"
-            f"\n--- EARNINGS CALENDAR — YESTERDAY through NEXT 7 DAYS (authoritative, from Finnhub) ---\n"
-            f"{earnings_block or 'No major S&P 500 earnings in this window.'}"
+    if econ_status == "ok" and econ_text:
+        calendar_block += (
+            "\n--- ECONOMIC CALENDAR — TODAY (CORROBORATING only; Finnhub free tier, "
+            "may be INCOMPLETE — still verify today's top-tier events via web search) ---\n"
+            f"{econ_text}"
+        )
+    if earnings_block:
+        calendar_block += (
+            "\n--- EARNINGS CALENDAR — YESTERDAY through NEXT 7 DAYS (authoritative, from Finnhub) ---\n"
+            f"{earnings_block}"
         )
 
     # Build verified EPS actuals block (authoritative — Perplexity must use these exact numbers)
@@ -785,27 +809,38 @@ Do NOT make any ranking comparison between instruments (e.g. "X leads gains") wi
 Punchy, direct.
 
 §2§
-Your job is a sharp intelligence brief — not a scheduled events list. Two mandatory components:
+Your job is a sharp intelligence brief — not a scheduled events list.
+
+TOP-TIER CATALYST CHECK (do this FIRST, before anything else in this section):
+You MUST consult today's US economic calendar via web search (Investing.com / ForexFactory / TradingEconomics / MarketWatch). TOP-TIER market movers are: FOMC rate decision, FOMC minutes, Fed Chair (Powell) speeches/testimony, CPI, Core CPI, PCE / Core PCE, Employment Situation (Non-Farm Payrolls + unemployment rate), GDP, PPI, Retail Sales.
+  - If ANY top-tier event is scheduled TODAY, the VERY FIRST line of §2§ MUST be a flagged line — one line per event, in this EXACT shape:
+    🔴 TOP-TIER TODAY — <EVENT> at <HH:MM> ET (consensus <x> / prior <y>)
+  - Immediately after the flag(s), add ONE line beginning "Coming up:" naming any top-tier events in the next 4 trading sessions (omit this line entirely if none).
+  - If NO top-tier event is scheduled today, write no 🔴 line and do NOT announce its absence — just proceed to the components below.
+  - NEVER claim "no high-impact releases today" unless you actively checked the calendar and confirmed it.
+  - Figures rule: give consensus/prior ONLY if you can verify them; if unsure of the exact number, name the event and time and omit the number — never invent one.
+
+Then two components:
 
 COMPONENT A — EARNINGS (include ONLY if relevant data exists):
   (a) REPORTED: Include ONLY if there are VERIFIED EPS RESULTS in the data above. Use THOSE EXACT NUMBERS — do NOT search for or invent EPS actuals. For each company: EPS actual vs estimate, beat/miss verdict, brief context (record result? pre-market reaction? SPX/QQQ weight impact?). If the VERIFIED EPS block is absent or empty, skip this sub-section entirely.
   (b) COMING UP: Include ONLY if the EARNINGS CALENDAR above contains Magnificent Seven (AAPL NVDA MSFT AMZN META GOOGL TSLA) or mega-bank (JPM GS MS BAC) earnings within the next 5 days. Flag the 1-2 most impactful with timing and EPS estimate. If no such names appear, skip this sub-section.
 
-COMPONENT B — MACRO CATALYSTS:
-From the ECONOMIC CALENDAR or web search, pick 1-2 genuine macro catalysts only: Fed decisions/speeches, CPI/PPI/PCE, NFP, GDP prints. Ignore routine low-impact releases. If nothing significant is scheduled, state that in one short line.
+COMPONENT B — OTHER MACRO (second-tier, optional):
+Only if genuinely relevant, note second-tier releases due today (ISM Mfg/Services, JOLTS, Initial Jobless Claims, Consumer Confidence, UMich sentiment, Durable Goods). Ignore routine low-impact data. Do NOT repeat anything already shown in a 🔴 top-tier line.
 
-FORMAT: Each item on its own line starting with a dash (-). Include ET timing when known. Maximum 5-6 items total. Only include items that could genuinely move SPX.
+FORMAT: The 🔴 top-tier line(s) come FIRST and are NOT dash bullets. Every other item goes on its own line starting with a dash (-). Include ET timing when known. Maximum 6 items total. Only include items that could genuinely move SPX.
 
 §3§
 3-4 sentences using the moving averages in the data above. State where SPX is relative to D EMA9, D EMA20, W EMA9, W EMA20, D SMA50, and D SMA200. You do NOT need to mention every level every day, but you should explicitly use the ones that are most relevant for trend, support/resistance, or compression. Which MA is nearest support, which is nearest resistance. What does the MA structure imply for near-term direction?
 
 §5§
-One direct sentence: the desk's tactical bias for today and the single most important reason.
+One direct sentence: the desk's tactical bias for today and the single most important reason. If a top-tier macro event is scheduled today (a 🔴 line appears in §2§), the sentence MUST acknowledge it — e.g. how it tempers position sizing or direction into the print.
 
 --- OUTPUT RULES ---
-- The ONLY special characters allowed are the four delimiters §1§ §2§ §3§ §5§ and dashes (-) for bullet lines.
+- Allowed special characters: the four delimiters §1§ §2§ §3§ §5§, dashes (-) for bullet lines, and — ONLY on a top-tier flag line — the 🔴 emoji, an em-dash (—) and a middot (·). Use none of these elsewhere.
 - Do NOT write section titles or headers.
-- Do NOT include any citation markers like [1], [2], [provided data], or anything in square brackets.
+- Do NOT include any citation markers like [1], [2], [provided data], or anything in square brackets. Use parentheses ( ) for consensus/prior figures, never square brackets.
 - Total content: 280-420 words (excluding delimiters).
 - Professional, data-driven tone."""
 
@@ -978,14 +1013,16 @@ def main():
     technicals = fetch_spx_technicals()
 
     print("  Fetching economic & earnings calendar (Finnhub)...")
-    ec_result = fetch_earnings_calendar(today, finnhub_key)
+    ec_result   = fetch_earnings_calendar(today, finnhub_key)
+    econ_result = fetch_economic_calendar(today, finnhub_key)
     calendar_data = {
-        "economic":         fetch_economic_calendar(today, finnhub_key),
+        "economic":         econ_result,
         "earnings":         ec_result.get("text", ""),
         "earnings_actuals": {},
     }
-    if calendar_data["economic"]:
-        print(f"  [CALENDAR] Economic: {calendar_data['economic'][:120]}...")
+    print(f"  [CALENDAR] Economic (Finnhub corroborator): status={econ_result.get('status')}")
+    if econ_result.get("status") == "ok":
+        print(f"  [CALENDAR] Economic events: {econ_result.get('text', '')[:120]}...")
     if calendar_data["earnings"]:
         print(f"  [CALENDAR] Earnings: {calendar_data['earnings'][:120]}...")
 

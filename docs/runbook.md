@@ -11,7 +11,8 @@ Procedures recorrentes do desk. Cada uma foi validada em produção.
 
 Publica no Discord: VIX, futures ES/NQ/RTY, SPX + moving averages,
 GEX levels da semana, earnings intelligence (Finnhub EPS actuals),
-calendário macro (Finnhub high-impact).
+top-tier macro movers (CPI/FOMC/PCE/NFP/GDP/PPI/Retail) detectados via web-search
+com flag 🔴 no topo do KEY NEWS — Finnhub high-impact entra só como corroborador.
 
 **Debug local:**
 ```bash
