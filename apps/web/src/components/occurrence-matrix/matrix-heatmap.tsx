@@ -165,6 +165,9 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
           onSort={setSort}
         />
       </div>
+      <div className="fade-in">
+        <Legend selectedMetric={selectedMetric} minSample={data.min_sample} />
+      </div>
       <div className="mt-6 fade-in">
         <TopSetupsTable
           matrix={data.data}
@@ -178,7 +181,6 @@ export function OccurrenceMatrixDashboard({ initialData }: DashboardProps) {
       <div className="mt-6 fade-in">
         <Leaderboards meanReversion={meanReversion} breakout={breakout} minSample={data.min_sample} />
       </div>
-      <Legend selectedMetric={selectedMetric} />
     </main>
   );
 }
@@ -522,14 +524,14 @@ function RankedCell({ slot, selectedMetric }: { slot: RankedSlot | null; selecte
     return (
       <td
         className="h-[46px] min-w-[100px] border-l border-border/20 px-1.5 text-center"
-        style={{ backgroundColor: "oklch(0.22 0.018 250 / 0.4)" }}
+        style={{ backgroundColor: HEAT_EMPTY }}
       >
         <span className="text-[11px] font-medium text-muted-foreground/45">—</span>
       </td>
     );
   }
   const { tf, ma, metric } = slot;
-  const bg = heatBands(metricValue(metric, selectedMetric) ?? 0, selectedMetric);
+  const bg = heatColor(metricValue(metric, selectedMetric) ?? 0, selectedMetric);
   const tooltip = [
     `${tf} · ${ma}`,
     `Total events: ${metric.T}`,
@@ -663,37 +665,119 @@ function averagePct(values: number[]): number | null {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
-// Minimal 3-tone palette: red (< 30%), neutral gray (30-54%), green (>= 55%).
-// Same thresholds applied across bounce/break (high = good) and false%
-// (inverted: high = bad). Events use a separate neutral→blue scale since
-// it's magnitude, not polarity.
-const COLOR_RED = "oklch(0.45 0.18 25)";
-const COLOR_NEUTRAL = "oklch(0.32 0.025 250)";
-const COLOR_GREEN = "oklch(0.52 0.20 148)";
+// Continuous diverging heat scale (replaces the old 3-band red/gray/green cut).
+//
+// The 3-band scheme collapsed the matrix into ~2 tones because the real data
+// never centers on 50%: across live snapshots, bounce% clusters 38-57 (median
+// 43), so 72% of cells fell in ONE gray band. This scale instead centers each
+// metric's NEUTRAL on its real median and saturates toward the poles near its
+// p10/p90 spread — so the full color range lands where the data actually lives
+// and "which level is better" reads at a glance.
+//
+// Midpoints/spans are hardcoded (not recomputed per snapshot) so a given number
+// always maps to the same color: comparable across dates and across filters.
+// Domains derived from state/occurrence_matrix_snapshots (pooled, 2026-07).
+type HeatDomain = { mid: number; span: number; goodDir: 1 | -1 };
+const HEAT_DOMAINS: Record<Exclude<OccurrenceMetricKey, "T">, HeatDomain> = {
+  bounce_pct: { mid: 43, span: 15, goodDir: 1 }, // high = good  → red 28 · green 58
+  break_pct: { mid: 39, span: 15, goodDir: 1 }, //  high = good  → red 24 · green 54
+  false_pct: { mid: 17, span: 9, goodDir: -1 }, //  low  = good  → green 8 · red 26
+  bouncefalse_pct: { mid: 61, span: 15, goodDir: 1 }, // high = good → red 46 · green 76
+};
 
-const COLOR_BLUE_SOFT = "oklch(0.36 0.10 250)";
-const COLOR_BLUE = "oklch(0.46 0.18 250)";
-const COLOR_BLUE_STRONG = "oklch(0.54 0.22 250)";
+// Dark neutral that recedes into the surface; poles glow. Pole lightness is
+// capped so white cell text stays >= 4.5:1 (verified worst-case 4.98 green,
+// 5.45 events). See scratchpad oklch_contrast.py.
+const HEAT_NEUTRAL = { L: 0.305, C: 0.015 };
+const GOOD_POLE = { L: 0.52, C: 0.17, H: 150 };
+const BAD_POLE = { L: 0.5, C: 0.205, H: 25 };
+const EVENTS_POLE = { L: 0.52, C: 0.15, H: 248 };
+const EVENTS_MIN = 20;
+const EVENTS_MAX = 2500;
+const HEAT_EMPTY = "oklch(0.22 0.018 250 / 0.4)";
 
-function heatBands(value: number, selectedMetric: OccurrenceMetricKey): string {
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+// signed in [-1, +1]: +1 = strongest good (green), -1 = strongest bad (red).
+// ease < 1 expands the dense middle so small edges above/below typical still
+// separate visibly.
+function divergingColor(signed: number): string {
+  const s = Math.max(-1, Math.min(1, signed));
+  const e = Math.pow(Math.abs(s), 0.7);
+  const pole = s >= 0 ? GOOD_POLE : BAD_POLE;
+  const L = lerp(HEAT_NEUTRAL.L, pole.L, e);
+  const C = lerp(HEAT_NEUTRAL.C, pole.C, e);
+  return `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${pole.H})`;
+}
+
+// Events = magnitude, not polarity → sequential single hue (blue) on a log
+// scale, since sample counts are heavily right-skewed (median ~680, max ~2900).
+function eventsColor(total: number): string {
+  const lo = Math.log10(EVENTS_MIN);
+  const hi = Math.log10(EVENTS_MAX);
+  const n = Math.max(0, Math.min(1, (Math.log10(Math.max(total, 1)) - lo) / (hi - lo)));
+  const e = Math.pow(n, 0.85);
+  const L = lerp(HEAT_NEUTRAL.L, EVENTS_POLE.L, e);
+  const C = lerp(0.02, EVENTS_POLE.C, e);
+  return `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${EVENTS_POLE.H})`;
+}
+
+function heatColor(value: number, selectedMetric: OccurrenceMetricKey): string {
+  if (selectedMetric === "T") return eventsColor(value);
+  const d = HEAT_DOMAINS[selectedMetric];
+  return divergingColor(((value - d.mid) / d.span) * d.goodDir);
+}
+
+// A continuous CSS gradient sampled from the SAME ramp the cells use, so the
+// legend is an exact key to the matrix.
+function heatGradient(selectedMetric: OccurrenceMetricKey): string {
+  const steps = 12;
+  const stops: string[] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    let value: number;
+    if (selectedMetric === "T") {
+      const lo = Math.log10(EVENTS_MIN);
+      const hi = Math.log10(EVENTS_MAX);
+      value = Math.pow(10, lerp(lo, hi, t));
+    } else {
+      const d = HEAT_DOMAINS[selectedMetric];
+      value = lerp(d.mid - d.span, d.mid + d.span, t);
+    }
+    stops.push(`${heatColor(value, selectedMetric)} ${Math.round(t * 100)}%`);
+  }
+  return `linear-gradient(to right, ${stops.join(", ")})`;
+}
+
+// Legend text: numeric ticks (left/center/right of the gradient) + a caption
+// whose words follow the COLORS — red end = worse, green end = better — which
+// flips left/right for the inverted false% metric.
+function heatLegend(selectedMetric: OccurrenceMetricKey): {
+  gradient: string;
+  ticks: [string, string, string];
+  caption: string;
+} {
+  const gradient = heatGradient(selectedMetric);
   if (selectedMetric === "T") {
-    if (value < 50) return COLOR_NEUTRAL;
-    if (value < 200) return COLOR_BLUE_SOFT;
-    if (value < 1000) return COLOR_BLUE;
-    return COLOR_BLUE_STRONG;
+    const mid = Math.round(Math.pow(10, lerp(Math.log10(EVENTS_MIN), Math.log10(EVENTS_MAX), 0.5)));
+    return {
+      gradient,
+      ticks: [`${EVENTS_MIN}`, `~${mid.toLocaleString("en-US")}`, `${(EVENTS_MAX / 1000).toFixed(1)}k+`],
+      caption: "fewer ◄ events ► more",
+    };
   }
-
-  if (selectedMetric === "false_pct") {
-    // inverted: low false% = good (green), high = bad (red)
-    if (value < 30) return COLOR_GREEN;
-    if (value < 50) return COLOR_NEUTRAL;
-    return COLOR_RED;
-  }
-
-  // bounce_pct / break_pct: high = good
-  if (value < 30) return COLOR_RED;
-  if (value < 50) return COLOR_NEUTRAL;
-  return COLOR_GREEN;
+  const d = HEAT_DOMAINS[selectedMetric];
+  const lo = d.mid - d.span;
+  const hi = d.mid + d.span;
+  const leftWord = d.goodDir === 1 ? "worse" : "better";
+  const rightWord = d.goodDir === 1 ? "better" : "worse";
+  return {
+    gradient,
+    ticks: [`≤${lo}%`, `${d.mid}%`, `≥${hi}%`],
+    caption: `${leftWord} ◄ typical ► ${rightWord}`,
+  };
 }
 
 function metricValue(metric: OccurrenceMetric, selectedMetric: OccurrenceMetricKey): number | null {
@@ -724,50 +808,41 @@ function formatPct(value: number | null): string {
   return value == null ? "—" : `${value}%`;
 }
 
-function Legend({ selectedMetric }: { selectedMetric: OccurrenceMetricKey }) {
-  const stops =
-    selectedMetric === "T"
-      ? [
-          { color: COLOR_NEUTRAL, label: "< 50" },
-          { color: COLOR_BLUE_SOFT, label: "50-199" },
-          { color: COLOR_BLUE, label: "200-999" },
-          { color: COLOR_BLUE_STRONG, label: "≥ 1000" },
-        ]
-      : selectedMetric === "false_pct"
-        ? [
-            { color: COLOR_GREEN, label: "< 30%" },
-            { color: COLOR_NEUTRAL, label: "30-49%" },
-            { color: COLOR_RED, label: "≥ 50%" },
-          ]
-        : [
-            { color: COLOR_RED, label: "< 30%" },
-            { color: COLOR_NEUTRAL, label: "30-49%" },
-            { color: COLOR_GREEN, label: "≥ 50%" },
-          ];
-
+function Legend({
+  selectedMetric,
+  minSample,
+}: {
+  selectedMetric: OccurrenceMetricKey;
+  minSample: number;
+}) {
+  const legend = heatLegend(selectedMetric);
   return (
-    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-card/30 px-4 py-3 text-xs text-muted-foreground fade-in">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/80">
-          Legend · {metricLabel(selectedMetric)}
-        </span>
-        <div className="flex items-center gap-1">
-          {stops.map((stop) => (
-            <div key={stop.label} className="flex items-center gap-1.5">
-              <div className="h-3.5 w-7 rounded shadow-inner shadow-black/30" style={{ backgroundColor: stop.color }} />
-              <span className="text-[10px] text-foreground/75">{stop.label}</span>
-            </div>
-          ))}
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4 rounded-xl border border-border/50 bg-card/30 px-4 py-3 text-xs text-muted-foreground fade-in">
+      <div className="flex min-w-[300px] flex-1 flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/80">
+            Legend · {metricLabel(selectedMetric)}
+          </span>
+          <span className="text-[9px] uppercase tracking-[0.16em] text-muted-foreground/70">
+            {legend.caption}
+          </span>
+        </div>
+        <div
+          className="h-3.5 w-full rounded-full"
+          style={{ background: legend.gradient, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.14)" }}
+        />
+        <div className="flex items-center justify-between text-[10px] tabular text-foreground/70">
+          <span>{legend.ticks[0]}</span>
+          <span>{legend.ticks[1]}</span>
+          <span>{legend.ticks[2]}</span>
         </div>
       </div>
-      <div className="flex items-center gap-4 text-[10px]">
-        <span className="flex items-center gap-1.5">
-          <span
-            className="inline-block h-3.5 w-3.5 rounded"
-            style={{ backgroundColor: COLOR_NEUTRAL, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.25)" }}
-          />
-          Low sample (n &lt; min)
-        </span>
+      <div className="flex items-center gap-1.5 text-[10px]">
+        <span
+          className="inline-block h-3.5 w-7 rounded"
+          style={{ backgroundColor: HEAT_EMPTY, boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 0.15)" }}
+        />
+        No qualifying level (n &lt; {minSample})
       </div>
     </div>
   );
