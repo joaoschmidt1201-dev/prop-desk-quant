@@ -2029,6 +2029,36 @@ for _ssdte in (28, 35, 42):
         "close_rules": _SS_CLOSE_RULES,
     })
 
+# Layer B — 1x2 Square Root Hedge (portfolio black swan hedge, pedido do CZ). Posição ROLADA
+# contínua (não trades independentes): 1 roll/semana = 1 linha. kind="layerb" tem seu próprio
+# renderer (3 pernas: 2 long puts d10 + 1 short put d25; direção do roll; net_roll). P&L por linha
+# = variação do MTM semanal → soma == headline (-$65k SPX / -$31k RUT), verificado no export.
+# Hedge carregado até o fim: sem close-rules (não há TP num hedge). mult=100 (opção de índice).
+_LB_DIR = BACKTESTS_ROOT / "layer_b"
+for _lbtag, _lbund in (("LB_SPX", "SPX"), ("LB_RUT", "RUT")):
+    if not (_LB_DIR / _lbtag / "trades.csv").exists():
+        continue
+    BACKTESTS_REGISTRY.append({
+        "id": f"layerb-{_lbund.lower()}",
+        "name": f"Layer B Hedge · {_lbund}",
+        "underlying": _lbund,
+        "strategy": f"1x2 Square Root Hedge · {_lbund} · black swan portfolio hedge · weekly Friday roll",
+        "family": "Layer B Hedge",
+        "horizon": "42 DTE",
+        "description": (
+            f"1x2 Square Root Hedge on {_lbund} (Layer B black-swan portfolio hedge): buy 2 long puts "
+            f"at ~10 delta, finance with 1 short put at ~25 delta, target 42 DTE, rolled every Friday "
+            f"(asymmetric: on an up week re-strike deltas to 10/25; on a down week roll horizontally, "
+            f"keeping strikes). 5-year QuantConnect backtest priced at MID, 1 unit. Each row is one "
+            f"weekly roll; per-row P&L is that week's mark-to-market change, so the table sums to the "
+            f"headline. Carried continuously — no take-profit (it is a hedge)."
+        ),
+        "trades_csv": f"layer_b/{_lbtag}/trades.csv",
+        "daily_csv": f"layer_b/{_lbtag}/daily.csv",
+        "kind": "layerb", "multiplier": 100,
+    })
+
+
 _backtest_csv_cache: dict[str, dict[str, Any]] = {}
 
 
@@ -2298,6 +2328,21 @@ def _apply_rule(
                 nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
                 nt["effective_dit_at_close"] = None
             nt["result"] = "WIN" if float(nt.get("pnl_usd") or 0) > 0 else "LOSS"
+            out.append(nt)
+        return out
+
+    if kind == "layerb":
+        # Hedge rolado: pnl_usd já é a variação de MTM da semana (pronto no CSV, reconcilia com o
+        # headline). Só Hold — não há scan de TP/stop; não depende de colunas de strike no daily.
+        out: list[dict[str, Any]] = []
+        for t in trades:
+            nt = dict(t)
+            hold = float(t.get("pnl_usd") or 0)
+            nt["effective_pnl_usd"] = hold
+            nt["pnl_usd_at_exp"] = hold
+            nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
+            nt["effective_dit_at_close"] = None
+            nt["result"] = "WIN" if hold > 0 else ("LOSS" if hold < 0 else "FLAT")
             out.append(nt)
         return out
 
@@ -2644,6 +2689,9 @@ def get_backtest(
         # close-rule options — no separate backtests. Hold is always available.
         _tp = [r for r, c in _BATMAN_TP_COLS.items() if any(c in t for t in raw_trades)]
         available_rules = ["Hold to Expiration"] + _tp
+    elif meta["kind"] == "layerb":
+        # Hedge carregado continuamente e rolado — não há take-profit nem stop. Só Hold.
+        available_rules = ["Hold to Expiration"]
     else:
         available_rules = IC7_RULES
     rule_to_use = rule if rule in available_rules else "Hold to Expiration"
@@ -2691,6 +2739,14 @@ def get_backtest(
         "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "result", "exit_method",
     ]
+    display_cols_layerb = [
+        "trade_date", "exp_date", "underlying", "dte_entry", "spot_entry", "vix_entry",
+        "roll_dir", "restruck", "short_put", "long_put", "delta_short", "delta_long",
+        "cash_close", "cash_open", "net_roll", "net_roll_usd", "dd_index", "k_gap",
+        "mark", "cum_pnl_pts", "pnl_usd", "pnl_usd_at_exp", "result", "exit_method", "in_range",
+        # não viram coluna da tabela (o renderer layerb não as lê) — só alimentam a linha T+0 do payoff
+        "iv_short", "iv_long", "dte_close",
+    ]
     display_cols_ibfly = [
         "trade_date", "exp_date", "underlying", "dte_entry", "width_sigma", "spot_entry",
         "iv_atm_pct", "expected_move", "call_lo", "call_atm", "call_up", "total_credit",
@@ -2707,6 +2763,8 @@ def get_backtest(
         cols = display_cols_pl5
     elif meta["kind"] == "ibfly":
         cols = display_cols_ibfly
+    elif meta["kind"] == "layerb":
+        cols = display_cols_layerb
     else:
         cols = display_cols_ic7
     trades_view = [{c: t.get(c) for c in cols} for t in trades_with_rule]

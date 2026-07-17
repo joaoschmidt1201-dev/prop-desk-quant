@@ -78,6 +78,21 @@ type BacktestTrade = {
   call_lo?: number | string | null;
   call_up?: number | string | null;
   width_sigma?: number | string | null;
+  // Layer B (1x2 square root hedge) per-roll fields
+  roll_dir?: string | null;
+  restruck?: number | string | null;
+  delta_short?: number | string | null;
+  delta_long?: number | string | null;
+  cash_close?: number | string | null;
+  cash_open?: number | string | null;
+  net_roll?: number | string | null;
+  net_roll_usd?: number | string | null;
+  dd_index?: number | string | null;
+  k_gap?: number | string | null;
+  cum_pnl_pts?: number | string | null;
+  iv_short?: number | string | null;
+  iv_long?: number | string | null;
+  dte_close?: number | string | null;
 };
 
 type BacktestDailyRow = {
@@ -97,6 +112,7 @@ type PayoffPoint = {
   profit: number;
   loss: number;
   pctFromEntry: number;
+  pnlClose?: number;   // Layer B: valor da posição no fechamento (T+0, ~35 DTE) — a "cova rasa"
 };
 
 type JourneyPoint = {
@@ -736,7 +752,10 @@ function TradesTable({
   const isSs42 = detail.meta.kind === "ss42";
   const isPl5 = detail.meta.kind === "pl5";
   const isIbfly = detail.meta.kind === "ibfly";
-  const headers = isSs42
+  const isLayerB = detail.meta.kind === "layerb";
+  const headers = isLayerB
+    ? ["Roll", "Exp", "Spot", "VIX", "Dir", "Short / Long×2", "Δ s / l", "Net roll", "P&L wk", "Result"]
+    : isSs42
     ? ["Trade", "Exp", "Spot in", "IV%", "Put / Call", "Credit", "Spot out", "P&L", "Result"]
     : isPl5
     ? ["Trade", "Exp", "Spot in", "IV%", "EM%", "Strikes (K1/K2/K3)", "Mid debit", "Spread", "P&L", "Result"]
@@ -779,8 +798,32 @@ function TradesTable({
                   <td className="px-4 py-2.5 font-medium tabular">{fmtDate(t.trade_date as string)}</td>
                   <td className="px-4 py-2.5 text-muted-foreground tabular">{fmtDate(t.exp_date as string)}</td>
                   <td className="px-4 py-2.5 tabular text-muted-foreground">{fmtNum(Number(t.spot_entry))}</td>
-                  <td className="px-4 py-2.5 tabular text-muted-foreground">{t.iv_atm_pct != null ? `${Number(t.iv_atm_pct).toFixed(1)}%` : "—"}</td>
-                  {isSs42 ? (
+                  <td className="px-4 py-2.5 tabular text-muted-foreground">
+                    {isLayerB
+                      ? (t.vix_entry != null ? Number(t.vix_entry).toFixed(1) : "—")
+                      : (t.iv_atm_pct != null ? `${Number(t.iv_atm_pct).toFixed(1)}%` : "—")}
+                  </td>
+                  {isLayerB ? (
+                    <>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground capitalize">
+                        {(() => {
+                          const dir = String(t.roll_dir ?? "");
+                          if (dir === "up") return "up · re-strike";
+                          if (dir === "down") return "down · horiz";
+                          return dir || "—";
+                        })()}
+                      </td>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
+                        {t.short_put != null ? Number(t.short_put).toFixed(0) : "—"} / {t.long_put != null ? Number(t.long_put).toFixed(0) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
+                        {t.delta_short != null ? Number(t.delta_short).toFixed(2) : "—"} / {t.delta_long != null ? Number(t.delta_long).toFixed(2) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
+                        {t.net_roll_usd != null ? fmtMoney(Number(t.net_roll_usd)) : "—"}
+                      </td>
+                    </>
+                  ) : isSs42 ? (
                     <>
                       <td className="px-4 py-2.5 tabular text-muted-foreground">
                         {t.short_put != null ? Number(t.short_put).toFixed(0) : "—"} / {t.short_call != null ? Number(t.short_call).toFixed(0) : "—"}
@@ -1012,9 +1055,10 @@ function PayoffDiagram({
   multiplier: number;
   credit: number | null;
 }) {
+  const hasClose = !!payoff?.points.some((p) => p.pnlClose != null);
   return (
     <ChartCard
-      title="Expiration payoff"
+      title={hasClose ? "Payoff — at expiration vs at close" : "Expiration payoff"}
       icon={<Crosshair className="h-4 w-4" />}
       sub={credit != null ? `${fmtNum(credit)} pts / ${fmtMoney(credit * multiplier)}` : undefined}
     >
@@ -1059,7 +1103,10 @@ function PayoffDiagram({
               ))}
               <Area type="linear" dataKey="profit" stroke="none" fill="url(#payoff-gain-fill)" isAnimationActive={false} />
               <Area type="linear" dataKey="loss" stroke="none" fill="url(#payoff-loss-fill)" isAnimationActive={false} />
-              <Line type="linear" dataKey="pnl" stroke="var(--primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+              <Line type="linear" dataKey="pnl" stroke="var(--primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} name="At expiration" />
+              {hasClose && (
+                <Line type="monotone" dataKey="pnlClose" stroke="var(--warning)" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} isAnimationActive={false} name="At close (~35 DTE)" />
+              )}
               {payoff.marker && (
                 <ReferenceDot
                   x={payoff.marker.spot}
@@ -1073,6 +1120,18 @@ function PayoffDiagram({
             </AreaChart>
           </ResponsiveContainer>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+            {hasClose && (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--primary)" }} />
+                  At expiration
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--warning)" }} />
+                  At close (~35 DTE)
+                </span>
+              </>
+            )}
             {payoff.references.map((ref) => (
               <span key={ref.key} className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ref.color }} />
@@ -1548,6 +1607,42 @@ function buildPayoffSeries(
         : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
     };
   }
+  if (kind === "layerb") {
+    // 1x2 square root hedge: 2 long puts (K_long) + 1 short put (K_short). Desenha a assinatura:
+    // crédito no topo, a COVA (pit) entre os strikes, e a cauda convexa que sobe no fundo (o hedge).
+    const ks = asNum(trade.short_put), kl = asNum(trade.long_put);
+    const entrySpot = asNum(trade.spot_entry);
+    if (ks == null || kl == null || entrySpot == null) return null;
+    // range: desce o bastante p/ mostrar a cauda cruzar zero (~2·K_long−K_short) e sobe acima do spot
+    const xMin = Math.max(0, entrySpot * 0.80);
+    const xMax = entrySpot * 1.06;
+    const settle = entrySpot;   // marca o SPOT no roll (posição rolada; não há "exit" tradicional)
+    const steps = 240;
+    const points = Array.from({ length: steps + 1 }, (_, idx) => {
+      const spot = xMin + ((xMax - xMin) * idx) / steps;
+      const pnl = payoffAtSpot(spot, trade, kind, multiplier);
+      const close = layerbCloseValue(spot, trade, multiplier);   // linha T+0 (~35 DTE): a cova rasa
+      return {
+        spot, pnl,
+        profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0,
+        pctFromEntry: ((spot - entrySpot) / entrySpot) * 100,
+        ...(close != null ? { pnlClose: close } : {}),
+      };
+    });
+    const references: PayoffReference[] = [
+      { key: "short-put", label: "Short Put (Δ25)", value: ks, color: "var(--loss)", dash: "3 3" },
+      { key: "long-put", label: "Long Put ×2 (Δ10)", value: kl, color: "var(--gain)", dash: "4 4" },
+      { key: "entry", label: "SPOT", value: entrySpot, color: "var(--primary)", dash: "4 4" },
+    ];
+    return {
+      points,
+      references,
+      domain: [xMin, xMax],
+      marker: settle < xMin || settle > xMax
+        ? null
+        : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+    };
+  }
   const spotEntry = asNum(trade.spot_entry);
   const credit = asNum(trade.total_credit);
   const shortPut = asNum(trade.short_put);
@@ -1614,6 +1709,36 @@ function buildPayoffSeries(
 // SPX index options settle at $100/point; Batman P&L is in USD already (total_credit in USD).
 const SPX_PT = 100;
 
+// Normal CDF (Abramowitz-Stegun 7.1.26) — usada só pela linha T+0 do Layer B (valor no fechamento).
+function normCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+  const p = d * t * (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+
+// Black-Scholes de uma PUT (r=0, sem dividendos): valor no tempo T (anos) dado sigma.
+function bsPut(spot: number, strike: number, T: number, sigma: number): number {
+  if (T <= 0 || sigma <= 0) return Math.max(0, strike - spot);   // no vencimento vira intrínseco
+  const d1 = (Math.log(spot / strike) + (sigma * sigma / 2) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+  return strike * normCdf(-d2) - spot * normCdf(-d1);
+}
+
+// Valor da estrutura Layer B (2 long puts + 1 short put) a `dteClose` dias, em USD.
+// = 2·put(K_long) − 1·put(K_short) − custo de abrir (−cash_open). cash_open é crédito líquido em pts.
+function layerbCloseValue(spot: number, trade: BacktestTrade, multiplier: number): number | null {
+  const ks = asNum(trade.short_put), kl = asNum(trade.long_put);
+  const ivs = asNum(trade.iv_short), ivl = asNum(trade.iv_long);
+  const dteClose = asNum(trade.dte_close), cashOpen = asNum(trade.cash_open);
+  if (ks == null || kl == null || ivs == null || ivl == null || dteClose == null || cashOpen == null) return null;
+  if (ivs <= 0 || ivl <= 0) return null;
+  const T = dteClose / 365;
+  const structVal = 2 * bsPut(spot, kl, T, ivl) - bsPut(spot, ks, T, ivs);   // pts
+  // P&L no fechamento = valor atual da estrutura + o caixa líquido recebido na abertura
+  return (structVal + cashOpen) * multiplier;
+}
+
 function payoffAtSpot(
   spot: number,
   trade: BacktestTrade,
@@ -1655,6 +1780,16 @@ function payoffAtSpot(
     const putLoss = Math.max(0, Math.min(sp - spot, putWing));
     const callLoss = Math.max(0, Math.min(spot - sc, callWing));
     return (asNum(trade.total_credit) ?? 0) - (putLoss + callLoss) * SPX_PT;
+  }
+  if (kind === "layerb") {
+    // 1x2 square root hedge: +2 long puts (K_long, d10) / -1 short put (K_short, d25).
+    // cash_open = crédito líquido de abertura EM PONTOS (sh_mid - 2·lg_mid no motor).
+    // Assinatura: crédito no topo, a COVA entre os strikes, cauda convexa (protege no crash).
+    const ks = asNum(trade.short_put) ?? 0;
+    const kl = asNum(trade.long_put) ?? 0;
+    const cashOpen = asNum(trade.cash_open) ?? 0;
+    const intrinsic = 2 * Math.max(0, kl - spot) - Math.max(0, ks - spot);
+    return (intrinsic + cashOpen) * multiplier;
   }
   const credit = asNum(trade.total_credit) ?? 0;
   const shortPut = asNum(trade.short_put) ?? 0;
