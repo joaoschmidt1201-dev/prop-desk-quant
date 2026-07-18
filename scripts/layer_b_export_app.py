@@ -71,13 +71,12 @@ MULT = 100.0   # $/pt (opcao de indice, SPX e RUT)
 # seletor troca a variante. Tag = "<UND>_<variante>". So exporta as que tem CROLL no disco
 # (as do sweep aparecem conforme terminam). (tag, arquivo CROLL, underlying)
 QC = HOME / "qc_batman"
+# Só a estrutura da fonte (Δ10/Δ25). As variantes de delta d12.5/d15 foram testadas e PIORARAM
+# (ver §8 do ACHADOS) → removidas do app por decisão do João. (Os CROLLs delas seguem em
+# ~/qc_batman se um dia quisermos re-analisar; basta re-adicionar as linhas aqui.)
 RUNS = [
-    ("SPX_d10",  QC / "croll_spx_5y.csv",   "SPX"),
-    ("SPX_d125", QC / "croll_spx_d125.csv", "SPX"),
-    ("SPX_d15",  QC / "croll_spx_d15.csv",  "SPX"),
-    ("RUT_d10",  QC / "croll_rut_5y.csv",   "RUT"),
-    ("RUT_d125", QC / "croll_rut_d125.csv", "RUT"),
-    ("RUT_d15",  QC / "croll_rut_d15.csv",  "RUT"),
+    ("SPX_d10", QC / "croll_spx_5y.csv", "SPX"),
+    ("RUT_d10", QC / "croll_rut_5y.csv", "RUT"),
 ]
 
 
@@ -168,6 +167,11 @@ def build(tag: str, croll: Path, underlying: str):
             "exit_method": "roll" if not is_entry else "entry",
             "in_range": 1 if pnl_usd >= 0 else 0,
         })
+
+    # spot_close = spot no roll SEGUINTE (onde esta posicao foi fechada/rolada). O marcador do
+    # payoff cai aqui, na linha T+0, mostrando "onde o trade fechou". Ultimo roll: sem proximo.
+    for i, t in enumerate(trades):
+        t["spot_close"] = trades[i + 1]["spot_entry"] if i + 1 < len(trades) else None
 
     # ---- RECONCILIACAO (trava) ----
     total_usd = round(sum(t["pnl_usd"] for t in trades), 2)

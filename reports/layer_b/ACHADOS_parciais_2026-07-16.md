@@ -314,3 +314,33 @@ a causa medida:
 
 Custo real: subir o delta das compradas encarece as pernas long e reduz a alavancagem convexa no tail.
 É trade-off mensurável, não almoço grátis.
+
+---
+
+## 8. Sweep de delta — o "conserto" da §4.2 tem efeito CONTRÁRIO (2026-07-18)
+
+A §4.2 propôs que a perda vinha do delta comprado de nascença (+0,05) e que nascer neutro/vendido
+consertaria. **Testado nos 5 anos do SPX (short fixo Δ25, long variando), a hipótese foi refutada:**
+
+| Variante | Delta de nascença | P&L 5 anos (mid) |
+|---|---|---|
+| Δ10 / Δ25 (a fonte) | **+0,05** (long) | **−$65.020** |
+| Δ12,5 / Δ25 | 0,00 (neutro) | −$82.760 |
+| Δ15 / Δ25 | **−0,05** (short) | **−$96.475** |
+
+**Nascer mais neutro/vendido PIORA, monotonicamente.** O mecanismo é simples em retrospecto: o SPX
+subiu ~40% no período (bull secular), então o pequeno delta **comprado** de nascença do Δ10 era um
+**vento a favor**, não a causa da sangria. Removê-lo (subindo o delta das pernas compradas) só tirou
+o tailwind.
+
+**Conclusão para o desk:** a perda do Layer B é **estrutural** — fricção do roll (52×/ano), a cova, e
+o decay do short put nas semanas de queda — e **não** se conserta mexendo no delta de nascença. O
+"conserto óbvio" que a intuição sugere (achatar o delta) piora o resultado. Isso *fortalece* o veredito
+de que a estrutura, como está, não é o hedge: nem o parâmetro mais natural a otimizar a salva.
+
+> Nota metodológica: NÃO varremos as 18 combinações de roll atrás de um resultado positivo (seria
+> curve-fit). Testamos **um** eixo, escolhido por mecanismo (o delta de nascença), e ele refutou a
+> própria hipótese. Um resultado que refuta é mais confiável que um que confirma após busca ampla.
+
+*(Braço RUT das variantes rodando; será somado quando fechar. k_gap nos runs d125/d15 = grid-snapping
+benigno de ~5–25 pts, comum a todas as variantes, imaterial ao headline.)*

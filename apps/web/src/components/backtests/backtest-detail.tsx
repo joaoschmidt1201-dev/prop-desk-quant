@@ -93,6 +93,7 @@ type BacktestTrade = {
   iv_short?: number | string | null;
   iv_long?: number | string | null;
   dte_close?: number | string | null;
+  spot_close?: number | string | null;
 };
 
 type BacktestDailyRow = {
@@ -758,7 +759,7 @@ function TradesTable({
   const isIbfly = detail.meta.kind === "ibfly";
   const isLayerB = detail.meta.kind === "layerb";
   const headers = isLayerB
-    ? ["Roll", "Exp", "Spot", "VIX", "Dir", "Short / Long×2", "Δ s / l", "Net roll", "P&L wk", "Result"]
+    ? ["Date", "Exp", "Spot", "VIX", "Roll type", "Short / Long×2", "Δ s / l", "Net roll", "P&L wk", "Result"]
     : isSs42
     ? ["Trade", "Exp", "Spot in", "IV%", "Put / Call", "Credit", "Spot out", "P&L", "Result"]
     : isPl5
@@ -809,11 +810,12 @@ function TradesTable({
                   </td>
                   {isLayerB ? (
                     <>
-                      <td className="px-4 py-2.5 tabular text-muted-foreground capitalize">
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
                         {(() => {
                           const dir = String(t.roll_dir ?? "");
-                          if (dir === "up") return "up · re-strike";
-                          if (dir === "down") return "down · horiz";
+                          if (dir === "up") return "Up · re-strike";
+                          if (dir === "down") return "Down · keep strikes";
+                          if (dir === "entry") return "Entry";
                           return dir || "—";
                         })()}
                       </td>
@@ -1347,10 +1349,24 @@ function PayoffTooltip({ active, payload }: any) {
   const point = payload[0].payload as PayoffPoint | undefined;
   if (!point) return null;
   const pct = `${point.pctFromEntry >= 0 ? "+" : ""}${point.pctFromEntry.toFixed(1)}%`;
+  const hasClose = point.pnlClose != null;
   return (
     <div className="rounded-lg border border-border/70 bg-popover/95 px-3 py-2 text-xs shadow-xl">
       <div className="font-medium tabular">Spot {Math.round(point.spot).toLocaleString("en-US")} ({pct})</div>
-      <div className={`mt-1 tabular ${pnlClass(point.pnl)}`}>theoretical {fmtMoney(point.pnl)}</div>
+      {hasClose ? (
+        <>
+          <div className="mt-1 flex items-center justify-between gap-3 tabular">
+            <span className="text-muted-foreground">At expiration</span>
+            <span className={pnlClass(point.pnl)}>{fmtMoney(point.pnl)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 tabular">
+            <span className="text-muted-foreground">At close (~35 DTE)</span>
+            <span className={pnlClass(point.pnlClose as number)}>{fmtMoney(point.pnlClose as number)}</span>
+          </div>
+        </>
+      ) : (
+        <div className={`mt-1 tabular ${pnlClass(point.pnl)}`}>theoretical {fmtMoney(point.pnl)}</div>
+      )}
     </div>
   );
 }
@@ -1617,10 +1633,13 @@ function buildPayoffSeries(
     const ks = asNum(trade.short_put), kl = asNum(trade.long_put);
     const entrySpot = asNum(trade.spot_entry);
     if (ks == null || kl == null || entrySpot == null) return null;
-    // range: desce o bastante p/ mostrar a cauda cruzar zero (~2·K_long−K_short) e sobe acima do spot
-    const xMin = Math.max(0, entrySpot * 0.80);
-    const xMax = entrySpot * 1.06;
-    const settle = entrySpot;   // marca o SPOT no roll (posição rolada; não há "exit" tradicional)
+    // onde o trade FECHOU = spot no roll seguinte (a posição foi rolada lá). O marcador cai nesse
+    // ponto, na linha T+0 (o P&L com que de fato fechou). Sem próximo roll (última linha) → sem marca.
+    const spotClose = asNum(trade.spot_close);
+    // range: desce o bastante p/ a cauda cruzar zero e sobe acima do spot; inclui o ponto de fecho
+    let xMin = Math.max(0, entrySpot * 0.80);
+    let xMax = entrySpot * 1.06;
+    if (spotClose != null) { xMin = Math.min(xMin, spotClose * 0.995); xMax = Math.max(xMax, spotClose * 1.005); }
     const steps = 240;
     const points = Array.from({ length: steps + 1 }, (_, idx) => {
       const spot = xMin + ((xMax - xMin) * idx) / steps;
@@ -1636,15 +1655,17 @@ function buildPayoffSeries(
     const references: PayoffReference[] = [
       { key: "short-put", label: "Short Put (Δ25)", value: ks, color: "var(--loss)", dash: "3 3" },
       { key: "long-put", label: "Long Put ×2 (Δ10)", value: kl, color: "var(--gain)", dash: "4 4" },
-      { key: "entry", label: "SPOT", value: entrySpot, color: "var(--primary)", dash: "4 4" },
+      { key: "entry", label: "SPOT at open", value: entrySpot, color: "var(--primary)", dash: "4 4" },
     ];
+    const closePnl = spotClose != null ? layerbCloseValue(spotClose, trade, multiplier) : null;
     return {
       points,
       references,
       domain: [xMin, xMax],
-      marker: settle < xMin || settle > xMax
+      // marca o ponto de FECHAMENTO na linha T+0 (não na de expiração): é onde o trade fechou de fato
+      marker: spotClose == null || closePnl == null || spotClose < xMin || spotClose > xMax
         ? null
-        : { label: markerLabel, spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+        : { label: "Closed here", spot: spotClose, pnl: closePnl },
     };
   }
   const spotEntry = asNum(trade.spot_entry);

@@ -2035,24 +2035,13 @@ for _ssdte in (28, 35, 42):
 # = variação do MTM semanal → soma == headline (-$65k SPX / -$31k RUT), verificado no export.
 # Hedge carregado até o fim: sem close-rules (não há TP num hedge). mult=100 (opção de índice).
 _LB_DIR = BACKTESTS_ROOT / "layer_b"
-# UM card por underlying (SPX, RUT); dentro, o seletor troca a VARIANTE de delta. O delta de
-# nascença da estrutura = -1·(-Δshort)+2·(-Δlong): d10 nasce +5Δ (altista), d12.5 neutro, d15
-# vendido. Testa se nascer neutro/vendido conserta a perda por delta sem tocar a convexidade da
-# cauda. Registro DINÂMICO: variante só aparece se a pasta tiver trades.csv (novas surgem no deploy).
-def _lb_variants(und: str) -> dict[str, str]:
-    return {
-        "Δ10 / Δ25 · source (born +5Δ long)": f"{und}_d10",
-        "Δ12.5 / Δ25 · born delta-neutral":   f"{und}_d125",
-        "Δ15 / Δ25 · born slightly short":     f"{und}_d15",
-    }
-
-for _lbund in ("SPX", "RUT"):
-    _lbvars = _lb_variants(_lbund)
-    _lbavail = [lbl for lbl, tag in _lbvars.items() if (_LB_DIR / tag / "trades.csv").exists()]
-    if not _lbavail:
+# UM card por underlying (SPX, RUT). Estrutura da fonte: 2 long puts Δ10 + 1 short put Δ25, rolada
+# toda sexta. (Testamos variantes de delta d12.5/d15 e ambas PIORARAM — removidas do app; ver §8 do
+# ACHADOS. Fica só o Δ10, a estrutura original.) 1 roll/semana = 1 linha; pnl da linha = variação de
+# MTM da semana -> soma == headline. Sem close-rules (hedge não tem TP). mult=100 (opção de índice).
+for _lbund, _lbtag in (("SPX", "SPX_d10"), ("RUT", "RUT_d10")):
+    if not (_LB_DIR / _lbtag / "trades.csv").exists():
         continue
-    _lbdef = _lbavail[0]
-    _lbtag = _lbvars[_lbdef]
     BACKTESTS_REGISTRY.append({
         "id": f"layerb-{_lbund.lower()}",
         "name": f"Layer B Hedge · {_lbund}",
@@ -2061,21 +2050,16 @@ for _lbund in ("SPX", "RUT"):
         "family": "Layer B Hedge",
         "horizon": "42 DTE",
         "description": (
-            f"1x2 Square Root Hedge on {_lbund} (Layer B black-swan portfolio hedge): buy 2 long puts, "
-            f"finance with 1 short put at ~25 delta, target 42 DTE, rolled every Friday (asymmetric: on "
-            f"an up week re-strike the deltas; on a down week roll horizontally, keeping strikes). "
-            f"5-year QuantConnect backtest priced at MID, 1 unit. Each row is one weekly roll; per-row "
-            f"P&L is that week's mark-to-market change, so the table sums to the headline. Carried "
-            f"continuously — no take-profit (it is a hedge). Use the variant selector to compare the "
-            f"long-put delta: Δ10 (the source, born ~+5 delta long), Δ12.5 (born delta-neutral) or Δ15 "
-            f"(born slightly short) — testing whether being born flatter fixes the delta bleed."
+            f"1x2 Square Root Hedge on {_lbund} (Layer B black-swan portfolio hedge): buy 2 long puts at "
+            f"~10 delta, finance with 1 short put at ~25 delta, target 42 DTE, rolled every Friday "
+            f"(asymmetric: on an up week re-strike the deltas to 10/25; on a down week roll horizontally, "
+            f"keeping strikes). 5-year QuantConnect backtest priced at MID, 1 unit. Each row is one weekly "
+            f"roll; per-row P&L is that week's mark-to-market change, so the table sums to the headline. "
+            f"Carried continuously — no take-profit (it is a hedge)."
         ),
         "trades_csv": f"layer_b/{_lbtag}/trades.csv",
         "daily_csv": f"layer_b/{_lbtag}/daily.csv",
         "kind": "layerb", "multiplier": 100,
-        "variants": _lbvars,
-        "variants_dir": "layer_b",
-        "default_width": _lbdef,
     })
 
 
@@ -2765,7 +2749,7 @@ def get_backtest(
         "cash_close", "cash_open", "net_roll", "net_roll_usd", "dd_index", "k_gap",
         "mark", "cum_pnl_pts", "pnl_usd", "pnl_usd_at_exp", "result", "exit_method", "in_range",
         # não viram coluna da tabela (o renderer layerb não as lê) — só alimentam a linha T+0 do payoff
-        "iv_short", "iv_long", "dte_close",
+        "iv_short", "iv_long", "dte_close", "spot_close",
     ]
     display_cols_ibfly = [
         "trade_date", "exp_date", "underlying", "dte_entry", "width_sigma", "spot_entry",
