@@ -267,7 +267,9 @@ function Header({
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex items-center gap-2">
                 <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">Width / placement</span>
+                <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                  {detail.meta.kind === "layerb" ? "Delta variant" : "Width / placement"}
+                </span>
               </div>
               <Select value={widthValue} onValueChange={(v) => v && onWidthRuleChange(v)}>
                 <SelectTrigger className="h-9 min-w-[170px] border-border/60 bg-card/50 text-sm focus:border-primary/60">
@@ -279,7 +281,9 @@ function Header({
                   ))}
                 </SelectContent>
               </Select>
-              <span className="text-[11px] text-muted-foreground">short strike set by the debit rule</span>
+              <span className="text-[11px] text-muted-foreground">
+                {detail.meta.kind === "layerb" ? "long-put delta at open (short fixed at Δ25)" : "short strike set by the debit rule"}
+              </span>
             </div>
           )}
           {hasVixOptions && (

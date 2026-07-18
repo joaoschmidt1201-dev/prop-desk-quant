@@ -67,10 +67,17 @@ def iv_from_delta(target_delta: float, S: float, K: float, T: float, is_call: bo
 OUT = REPO / "reports" / "layer_b"
 MULT = 100.0   # $/pt (opcao de indice, SPX e RUT)
 
-# (tag no app, arquivo CROLL, underlying)
+# Uma PASTA por variante de delta; a API agrupa por underlying (1 card SPX + 1 card RUT) e o
+# seletor troca a variante. Tag = "<UND>_<variante>". So exporta as que tem CROLL no disco
+# (as do sweep aparecem conforme terminam). (tag, arquivo CROLL, underlying)
+QC = HOME / "qc_batman"
 RUNS = [
-    ("LB_SPX", HOME / "qc_batman" / "croll_spx_5y.csv", "SPX"),
-    ("LB_RUT", HOME / "qc_batman" / "croll_rut_5y.csv", "RUT"),
+    ("SPX_d10",  QC / "croll_spx_5y.csv",   "SPX"),
+    ("SPX_d125", QC / "croll_spx_d125.csv", "SPX"),
+    ("SPX_d15",  QC / "croll_spx_d15.csv",  "SPX"),
+    ("RUT_d10",  QC / "croll_rut_5y.csv",   "RUT"),
+    ("RUT_d125", QC / "croll_rut_d125.csv", "RUT"),
+    ("RUT_d15",  QC / "croll_rut_d15.csv",  "RUT"),
 ]
 
 
