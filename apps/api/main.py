@@ -1826,6 +1826,46 @@ if (_IF0DTE_DIR / "IF0DTE" / "trades.csv").exists():
         "close_rules": _IF0DTE_RULES,
     })
 
+# ───────── IRON DUCK 45DTE (Reiner / EdgeSeeker) — SPX, RUT ─────────
+# Iron condor 45 DTE com o lado CALL dentro do dinheiro (o "duck"): SELL put 15Δ / BUY put −offset;
+# SELL call 65Δ ITM / BUY call +offset. Entra semanal (Segunda). Reusa kind="ic0dte" (renderer de
+# iron condor; a fórmula credit_usd − (putLoss+callLoss)*100 desenha o payoff correto, com call ITM).
+# Close-rules record-and-derive: combo do Reiner (default) + TP/DTE/stop/tested isolados.
+_ID_DIR = BACKTESTS_ROOT / "iron_duck"
+# Default = HOLD (settle analítico limpo; reconcilia com o Reiner por-trade). As saídas antecipadas
+# usam buyback cruzando o bid-ask (realista, mas distorce muito na iliquidez do RUT) → diagnóstico.
+_ID_RULES = {
+    "Hold to Expiration": None,                             # = pnl_usd (default, limpo)
+    "Reiner combo (TP + DTE exit + stop + tested)": "pnl_reiner",
+    "TP 25% of credit": "pnl_tp25", "TP 40% of credit": "pnl_tp40",
+    "TP 50% of credit": "pnl_tp50", "TP 75% of credit": "pnl_tp75",
+    "Exit at 5 DTE": "pnl_dte5", "Exit at 2 DTE": "pnl_dte2",
+    "Stop at 3× credit": "pnl_sm30", "Exit when tested (put side)": "pnl_tested",
+}
+for _idund, _idcombo in (("SPX", "TP40 or 5DTE"), ("RUT", "TP50 or 2DTE")):
+    if not (_ID_DIR / _idund / "trades.csv").exists():
+        continue
+    BACKTESTS_REGISTRY.append({
+        "id": f"iron-duck-{_idund.lower()}",
+        "name": f"Iron Duck 45DTE · {_idund}",
+        "underlying": _idund,
+        "strategy": f"Iron Duck 45 DTE · {_idund} · weekly · SELL put 15Δ / SELL call 65Δ (ITM)",
+        "family": "Iron Duck",
+        "horizon": "45DTE",
+        "description": (
+            f"Iron Duck 45 DTE income trade (Reiner / EdgeSeeker) on {_idund}, opened weekly. Put credit "
+            f"spread (SELL ~15Δ put, BUY put at a fixed point offset below = the wide risk) + an IN-THE-MONEY "
+            f"call spread (SELL ~65Δ call, BUY call a few points above = the 'duck'). Net credit; max loss = "
+            f"put width − credit. 5-year QuantConnect backtest at MID, 1 contract. Use the close-rule "
+            f"selector: the Reiner combo ({_idcombo} or 3× stop or exit-when-tested, whichever comes first), "
+            f"hold to expiration, or each rule in isolation (record-and-derive)."
+        ),
+        "trades_csv": f"iron_duck/{_idund}/trades.csv",
+        "daily_csv": f"iron_duck/{_idund}/daily.csv",
+        "kind": "ic0dte", "multiplier": 1,
+        "close_rules": _ID_RULES,
+    })
+
 # ───────── JADE LIZARD SPX (estudo confirmatório tasty · Fase B) ─────────
 # JL = call spread ESTREITO ~ATM (lado eliminado/alta) + put spread LARGO OTM (lado retido/baixa);
 # net credit ≥ largura estreita → sem risco de alta. Close-rules: Hold / TP a 10/25/50/75% do crédito.
