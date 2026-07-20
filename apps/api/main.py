@@ -1866,6 +1866,33 @@ for _idund, _idcombo in (("SPX", "TP40 or 5DTE"), ("RUT", "TP50 or 2DTE")):
         "close_rules": _ID_RULES,
     })
 
+# ───────── HEDGE HOG (Reiner / EdgeSeeker) — SPX ─────────
+# LPV débito ~30DTE (buy 30Δ/sell 20Δ) + far short put crédito ~90DTE (7Δ), posição rolada por 4
+# triggers. Reusa kind="layerb" (viewer de posição rolada: tabela de eventos + P&L; o export mapeia
+# as colunas). Payoff de 2 expirações é complexo → o renderer degrada p/ "unavailable" (honesto).
+_HH_DIR = BACKTESTS_ROOT / "hedge_hog"
+if (_HH_DIR / "SPX" / "trades.csv").exists():
+    BACKTESTS_REGISTRY.append({
+        "id": "hedge-hog-spx",
+        "name": "Hedge Hog · SPX",
+        "underlying": "SPX",
+        "strategy": "Hedge Hog · SPX · LPV 30DTE (30Δ/20Δ debit) + far short put 90DTE (7Δ credit)",
+        "family": "Hedge Hog",
+        "horizon": "30/90DTE",
+        "description": (
+            "Hedge Hog high-probability income trade (Reiner / EdgeSeeker) on SPX. A short-duration long "
+            "put vertical (BUY ~30Δ put, SELL ~20Δ put, ~30 DTE — 'Der Hedge', a debit) financed by a "
+            "long-duration short put (SELL ~7Δ put, ~90 DTE — 'Das Schwein', a credit); net credit since "
+            "the far premium exceeds the vertical debit. Continuously rolled by 4 triggers (far >50% "
+            "profit, LPV >80% profit, LPV <7 DTE, or price breaking the LPV short within 10 days). Each "
+            "row is one event (entry/roll); per-row P&L is the mark-to-market change, so the table sums "
+            "to the headline. 5-year QuantConnect backtest at MID, 1 unit."
+        ),
+        "trades_csv": "hedge_hog/SPX/trades.csv",
+        "daily_csv": "hedge_hog/SPX/daily.csv",
+        "kind": "layerb", "multiplier": 100,
+    })
+
 # ───────── JADE LIZARD SPX (estudo confirmatório tasty · Fase B) ─────────
 # JL = call spread ESTREITO ~ATM (lado eliminado/alta) + put spread LARGO OTM (lado retido/baixa);
 # net credit ≥ largura estreita → sem risco de alta. Close-rules: Hold / TP a 10/25/50/75% do crédito.
