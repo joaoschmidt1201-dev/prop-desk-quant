@@ -68,6 +68,11 @@ class LayerBHedgeV1(QCAlgorithm):
         # entao ele deriva p/ ITM num bear -- cortar a janela positiva quebraria justo 2022.
         self.exp_lo    = int(self.get_parameter("exp_lo", "0"))
         self.puts_only = self.get_parameter("puts_only", "0").strip().lower() in ("1", "true", "yes")
+        # --- robustez do mid no roll (pedido Joao 2026-07-19): mediana de ~15min p/ nao pegar 1 minuto
+        # spiky/stale. robust_mark=1 usa o robusto no headline; mkdev loga o desvio vs instantaneo. ---
+        self.robust_mark = self.get_parameter("robust_mark", "1").strip().lower() in ("1", "true", "yes")
+        self.robust_min  = int(self.get_parameter("robust_min", "15"))
+        self._last_close_mkdev = 0.0
         self.ticker       = self.get_parameter("ticker", "SPX")
         self.opt_target   = self.get_parameter("opt_target", "SPXW").strip()
         self.fill_mode    = self.get_parameter("fill_mode", "mid").lower().strip()
@@ -242,11 +247,17 @@ class LayerBHedgeV1(QCAlgorithm):
         if keep is not None:
             k_gap = max(abs(sh.strike - keep[0]), abs(lg.strike - keep[1]))
 
-        sh_mid, lg_mid = self._mid(sh), self._mid(lg)
+        # MID ROBUSTO (mediana de ~15 min) p/ a valuation nao pegar 1 minuto spiky/stale no roll.
+        # Guarda tambem o instantaneo p/ MEDIR o desvio (mkdev) e provar que a robustez importou.
+        sh_mid, sh_inst = self._robust_mid_sym(sh.symbol, self.robust_min)
+        lg_mid, lg_inst = self._robust_mid_sym(lg.symbol, self.robust_min)
+        if not self.robust_mark:
+            sh_mid, lg_mid = sh_inst, lg_inst
         if sh_mid <= 0 or lg_mid <= 0:
             self._skip("preco<=0 numa perna"); return None
 
-        cash_open      = sh_mid - 2.0 * lg_mid                    # headline: mid
+        cash_open      = sh_mid - 2.0 * lg_mid                    # headline: mid robusto
+        cash_open_inst = sh_inst - 2.0 * lg_inst                 # mesma conta no minuto do roll
         cash_open_cons = sh.bid_price - 2.0 * lg.ask_price        # cruzando o spread
 
         self.market_order(sh.symbol, -1)
@@ -262,15 +273,23 @@ class LayerBHedgeV1(QCAlgorithm):
             "sh_sym": sh.symbol, "lg_sym": lg.symbol,
             "d_sh": self._delta(sh, S, expiry), "d_lg": self._delta(lg, S, expiry),
             "cash_open": cash_open, "cash_open_cons": cash_open_cons,
+            "open_mark": 2.0 * lg_mid - sh_mid,               # mark robusto do que acabou de abrir (= -cash_open)
+            "mkdev_open": abs(cash_open - cash_open_inst),    # |robusto - instantaneo| na abertura
             "S_min": S, "mark_max": None, "k_gap": k_gap,
         }
         self.pos = p
         return p
 
     def _close(self, pos):
-        """Desmonta: recompra o short, vende os 2 longs. Retorna (cash_mid, cash_cons)."""
-        sh_mid = self._mid_sym(pos["sh_sym"]); lg_mid = self._mid_sym(pos["lg_sym"])
+        """Desmonta: recompra o short, vende os 2 longs. Retorna (cash_mid, cash_cons).
+        cash_close = P&L REALIZADO da semana -> e o mais critico de robustecer contra pico/stale."""
+        sh_mid, sh_inst = self._robust_mid_sym(pos["sh_sym"], self.robust_min)
+        lg_mid, lg_inst = self._robust_mid_sym(pos["lg_sym"], self.robust_min)
+        if not self.robust_mark:
+            sh_mid, lg_mid = sh_inst, lg_inst
         cash_mid = 2.0 * lg_mid - sh_mid
+        cash_inst = 2.0 * lg_inst - sh_inst
+        self._last_close_mkdev = abs(cash_mid - cash_inst)   # |robusto - instantaneo| no desmonte
         sh_a = self.securities[pos["sh_sym"]].ask_price
         lg_b = self.securities[pos["lg_sym"]].bid_price
         cash_cons = 2.0 * lg_b - sh_a
@@ -295,8 +314,14 @@ class LayerBHedgeV1(QCAlgorithm):
         # net do roll = o que sobrou ao desmontar a velha + o credito da nova  <- restricao #1
         net_roll      = cash_close + newp["cash_open"]
         net_roll_cons = cash_close_cons + newp["cash_open_cons"]
-        mark = self._mark_value(newp)
+        # mark ROBUSTO do que acabou de abrir (mesmos mids do cash_open -> invariante P&L=0 na abertura).
+        mark = newp.get("open_mark")
+        if mark is None:
+            mark = self._mark_value(newp)
         pnl_total = self.cum_cash + (mark if mark is not None else 0.0)
+        # desvio robusto-vs-instantaneo deste roll (abre + desmonta) -> quantifica o efeito do pico
+        mkdev = round(newp.get("mkdev_open", 0.0) + getattr(self, "_last_close_mkdev", 0.0), 2)
+        self._last_close_mkdev = 0.0
         # extremos INTRA-SEMANA da posicao que acabou de ser desmontada
         dd_wk = ""
         mk_wk = ""
@@ -323,6 +348,7 @@ class LayerBHedgeV1(QCAlgorithm):
             "pnl_total": round(pnl_total, 2),
             "comm": round(self.cum_comm, 2),
             "k_gap": round(newp["k_gap"], 2),   # >0 num roll "down" = re-strike proibido, silencioso
+            "mkdev": mkdev,                     # |robusto - instantaneo| do roll (pts): pico/stale detectado
         })
         if newp["id"] <= 3:
             self.debug(f"{self.time} LB#{newp['id']} {direction} dte={newp['dte']} "
@@ -432,6 +458,35 @@ class LayerBHedgeV1(QCAlgorithm):
             return (b + a) / 2.0
         return self.securities[sym].price or a or b or 0.0
 
+    @staticmethod
+    def _median(vals):
+        v = sorted(x for x in vals if x is not None and x > 0)
+        n = len(v)
+        if n == 0:
+            return None
+        return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0
+
+    def _robust_mid_sym(self, sym, minutes=15):
+        """Mid ROBUSTO a pico/stale de 1 minuto: mediana do mid dos ultimos `minutes` minutos
+        (pedido do Joao 2026-07-19 -- 'veja horarios proximos, troque se nao fizer sentido').
+        Fallback: mid instantaneo se a history vier vazia. Devolve (robusto, instantaneo)."""
+        inst = self._mid_sym(sym)
+        try:
+            # forma com indexador generico -> devolve QuoteBar tipado (nao DataFrame do pandas)
+            hist = self.history[QuoteBar](sym, timedelta(minutes=minutes), Resolution.MINUTE)
+            mids = []
+            for bar in hist:
+                bid = bar.bid.close if bar.bid is not None else 0.0
+                ask = bar.ask.close if bar.ask is not None else 0.0
+                if bid > 0 and ask > 0:
+                    mids.append((bid + ask) / 2.0)
+            med = self._median(mids)
+            if med is not None:
+                return med, inst
+        except Exception:
+            self._robust_fail = getattr(self, "_robust_fail", 0) + 1
+        return inst, inst
+
     def _skip(self, reason):
         self.skips.append((self.time.strftime("%Y-%m-%d"), reason))
 
@@ -498,7 +553,7 @@ class LayerBHedgeV1(QCAlgorithm):
         cols = ["id", "date", "dir", "restruck", "S", "dd", "dd_wk", "vix", "exp", "dte",
                 "in_band", "k_sh", "k_lg", "d_sh", "d_lg", "cash_close", "cash_open",
                 "net_roll", "net_roll_cons", "cum_cash", "cum_cash_cons", "mark",
-                "mark_max_wk", "pnl_total", "comm", "k_gap"]
+                "mark_max_wk", "pnl_total", "comm", "k_gap", "mkdev"]
         lines = [",".join(cols)] + [",".join(str(r.get(c, "")) for c in cols) for r in self.rows]
         try:
             self.object_store.save(f"layer_b_{self.run_tag}.csv", "\n".join(lines))

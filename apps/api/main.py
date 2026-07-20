@@ -2336,17 +2336,19 @@ def _apply_rule(
         return out
 
     if kind == "layerb":
-        # Hedge rolado: pnl_usd já é a variação de MTM da semana (pronto no CSV, reconcilia com o
-        # headline). Só Hold — não há scan de TP/stop; não depende de colunas de strike no daily.
+        # Hedge rolado: pnl_usd já é o P&L realizado no período em que a posição viveu (aberta no
+        # roll, fechada no roll seguinte), pronto no CSV e reconciliando com o headline. Só Hold.
+        # NÃO sobrescrever effective_close_date com exp_date — a posição fecha no ROLL, não na
+        # expiração; o export já traz a data real de fechamento.
         out: list[dict[str, Any]] = []
         for t in trades:
             nt = dict(t)
             hold = float(t.get("pnl_usd") or 0)
             nt["effective_pnl_usd"] = hold
             nt["pnl_usd_at_exp"] = hold
-            nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
+            nt.setdefault("effective_close_date", t.get("effective_close_date"))
             nt["effective_dit_at_close"] = None
-            nt["result"] = "WIN" if hold > 0 else ("LOSS" if hold < 0 else "FLAT")
+            nt["result"] = t.get("result") or ("win" if hold > 0 else ("loss" if hold < 0 else "flat"))
             out.append(nt)
         return out
 
@@ -2746,9 +2748,10 @@ def get_backtest(
     display_cols_layerb = [
         "trade_date", "exp_date", "underlying", "dte_entry", "spot_entry", "vix_entry",
         "roll_dir", "restruck", "short_put", "long_put", "delta_short", "delta_long",
-        "cash_close", "cash_open", "net_roll", "net_roll_usd", "dd_index", "k_gap",
+        "total_credit", "cash_close", "cash_open", "net_roll", "net_roll_usd", "dd_index", "k_gap",
         "mark", "cum_pnl_pts", "pnl_usd", "pnl_usd_at_exp", "result", "exit_method", "in_range",
-        # não viram coluna da tabela (o renderer layerb não as lê) — só alimentam a linha T+0 do payoff
+        "spot_exit", "effective_close_date",
+        # não viram coluna da tabela (o renderer layerb não as lê) — alimentam payoff/inspector
         "iv_short", "iv_long", "dte_close", "spot_close",
     ]
     display_cols_ibfly = [

@@ -938,6 +938,15 @@ function TradeInspector({
             <h3 className="text-lg font-semibold tracking-tight">
               {fmtDate(trade.trade_date)} <span className="text-muted-foreground">to</span> {fmtDate(trade.exp_date)}
             </h3>
+            {/* Layer B nunca segura até a expiração — rola/fecha na semana seguinte. Deixa as datas de
+                expiração no título mas avisa aqui que a posição foi fechada antes. */}
+            {detail.meta.kind === "layerb" && (
+              <p className="mt-0.5 text-[11px] text-[var(--warning)]">
+                {open
+                  ? "Still open — rolls weekly, not held to expiration"
+                  : `Rolled / closed on ${fmtDate((trade.effective_close_date as string) ?? "")} (before expiration)`}
+              </p>
+            )}
             <p className="mt-1 text-xs text-muted-foreground">
               {detail.meta.strategy} {detail.meta.underlying} / {detail.meta.rule}
             </p>
@@ -1410,7 +1419,8 @@ function fmtAxisMoney(value: unknown): string {
 }
 
 function isOpenTrade(trade: BacktestTrade): boolean {
-  return String(trade.exit_method ?? "").toLowerCase() === "fallback_entry";
+  const m = String(trade.exit_method ?? "").toLowerCase();
+  return m === "fallback_entry" || m === "open";   // "open" = última posição do Layer B, ainda rolando
 }
 
 function getTradeDailyRows(trade: BacktestTrade, daily: BacktestDailyRow[]): BacktestDailyRow[] {
@@ -1640,11 +1650,19 @@ function buildPayoffSeries(
     let xMin = Math.max(0, entrySpot * 0.80);
     let xMax = entrySpot * 1.06;
     if (spotClose != null) { xMin = Math.min(xMin, spotClose * 0.995); xMax = Math.max(xMax, spotClose * 1.005); }
+    // A linha T+0 é uma reconstrução BS (IV do open reprecificada ~7d depois): a FORMA (cova rasa)
+    // é confiável, mas o NÍVEL erra quando a vol muda muito na semana. Ancoramos no ponto realizado:
+    // deslocamos a curva por uma constante p/ passar exatamente por (spot_close, pnl_usd realizado).
+    // Corrige o viés de nível com a única verdade que temos e mantém a forma. Marcador cai na curva.
+    const realized = asNum(trade.pnl_usd);
+    const theoAtClose = spotClose != null ? layerbCloseValue(spotClose, trade, multiplier) : null;
+    const closeOffset = realized != null && theoAtClose != null ? realized - theoAtClose : 0;
     const steps = 240;
     const points = Array.from({ length: steps + 1 }, (_, idx) => {
       const spot = xMin + ((xMax - xMin) * idx) / steps;
       const pnl = payoffAtSpot(spot, trade, kind, multiplier);
-      const close = layerbCloseValue(spot, trade, multiplier);   // linha T+0 (~35 DTE): a cova rasa
+      const closeRaw = layerbCloseValue(spot, trade, multiplier);   // linha T+0 (~35 DTE): a cova rasa
+      const close = closeRaw != null ? closeRaw + closeOffset : null;
       return {
         spot, pnl,
         profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0,
@@ -1657,15 +1675,16 @@ function buildPayoffSeries(
       { key: "long-put", label: "Long Put ×2 (Δ10)", value: kl, color: "var(--gain)", dash: "4 4" },
       { key: "entry", label: "SPOT at open", value: entrySpot, color: "var(--primary)", dash: "4 4" },
     ];
-    const closePnl = spotClose != null ? layerbCloseValue(spotClose, trade, multiplier) : null;
+    // marcador = onde o trade FECHOU de fato: spot no roll seguinte, com o P&L REALIZADO (pnl_usd,
+    // o mesmo número da tabela). Como a curva de fechamento foi ancorada nesse ponto, o marcador
+    // cai EXATAMENTE sobre a linha "At close".
     return {
       points,
       references,
       domain: [xMin, xMax],
-      // marca o ponto de FECHAMENTO na linha T+0 (não na de expiração): é onde o trade fechou de fato
-      marker: spotClose == null || closePnl == null || spotClose < xMin || spotClose > xMax
+      marker: spotClose == null || realized == null || spotClose < xMin || spotClose > xMax
         ? null
-        : { label: "Closed here", spot: spotClose, pnl: closePnl },
+        : { label: "Closed here", spot: spotClose, pnl: realized },
     };
   }
   const spotEntry = asNum(trade.spot_entry);

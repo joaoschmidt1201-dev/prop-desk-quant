@@ -33,37 +33,39 @@ from greeks import delta as bs_delta   # noqa: E402  (invert IV a partir do delt
 
 
 def iv_from_delta(target_delta: float, S: float, K: float, T: float, is_call: bool = False) -> float:
-    """Acha o sigma tal que o delta BS bate o delta logado. Usa a vol REAL que o motor negociou
-    (fiel a superficie) p/ a linha T+0. Robusto a monotonicidade: |delta| de put OTM CRESCE com
-    sigma, mas de put ITM (roll horizontal com spot caido) DECRESCE -> busca em GRADE + refino,
-    nao bisseccao direcional. Devolve 0.0 se nao casar (o viewer pula a linha T+0 dessa roll)."""
+    """Acha o sigma tal que o delta BS bate o delta logado, p/ a linha T+0.
+
+    CUIDADO (bug achado pelo Joao 2026-07-19): p/ uma put OTM, |delta| como funcao de sigma SOBE
+    de 0, atinge um PICO, e volta a CAIR -> ha DUAS raizes de IV p/ o mesmo delta. A raiz de sigma
+    BAIXO e a financeiramente correta; a de sigma ALTO (~250-290%) e espuria e explodia o valor BS
+    do put -> curva T+0 de $380k. Solucao: varrer de baixo p/ cima e pegar a PRIMEIRA raiz (menor
+    sigma). P/ put ITM (|delta| decresce monotonico de ~1) a primeira raiz tambem e a unica/correta.
+    Cap em 150%: acima disso e degenerado -> 0.0 (o viewer pula a linha T+0 dessa roll)."""
     if T <= 0 or S <= 0 or K <= 0 or target_delta == 0:
         return 0.0
     tgt = abs(target_delta)
-    # grade grossa em log-sigma -> pega o sigma cujo |delta| mais se aproxima do alvo (qualquer direcao)
-    best_sig, best_err = 0.0, 1e9
-    steps = 240
-    for i in range(steps + 1):
-        sig = 0.02 * (3.0 / 0.02) ** (i / steps)          # 2%..300% geometrico
-        err = abs(abs(bs_delta(S, K, T, sig, is_call=is_call)) - tgt)
-        if err < best_err:
-            best_err, best_sig = err, sig
-    # refino local em torno do melhor ponto da grade
-    span = best_sig * 0.1
-    lo, hi = max(0.001, best_sig - span), best_sig + span
-    for _ in range(40):
-        m1 = lo + (hi - lo) / 3
-        m2 = hi - (hi - lo) / 3
-        e1 = abs(abs(bs_delta(S, K, T, m1, is_call=is_call)) - tgt)
-        e2 = abs(abs(bs_delta(S, K, T, m2, is_call=is_call)) - tgt)
-        if e1 < e2:
-            hi = m2
-        else:
-            lo = m1
-    sig = (lo + hi) / 2
-    if abs(abs(bs_delta(S, K, T, sig, is_call=is_call)) - tgt) > 0.01:
-        return 0.0        # nao casou (degenerado) -> invalido
-    return round(sig, 4)
+    SIG_MAX = 1.5                                          # 150% de vol; acima e espurio
+    steps = 300
+    prev_sig = 0.01
+    prev_d = abs(bs_delta(S, K, T, prev_sig, is_call=is_call))
+    for i in range(1, steps + 1):
+        sig = 0.01 + (SIG_MAX - 0.01) * i / steps
+        d = abs(bs_delta(S, K, T, sig, is_call=is_call))
+        if (prev_d - tgt) * (d - tgt) <= 0:               # o alvo esta entre prev_sig e sig (1a raiz)
+            lo, hi = prev_sig, sig
+            for _ in range(60):                           # bisseccao no bracket da PRIMEIRA raiz
+                m = (lo + hi) / 2
+                dm = abs(bs_delta(S, K, T, m, is_call=is_call))
+                d_lo = abs(bs_delta(S, K, T, lo, is_call=is_call))
+                if (d_lo - tgt) * (dm - tgt) <= 0:
+                    hi = m
+                else:
+                    lo = m
+            root = (lo + hi) / 2
+            if abs(abs(bs_delta(S, K, T, root, is_call=is_call)) - tgt) < 0.01:
+                return round(root, 4)
+        prev_sig, prev_d = sig, d
+    return 0.0                                             # sem raiz <=150% -> degenerado
 OUT = REPO / "reports" / "layer_b"
 MULT = 100.0   # $/pt (opcao de indice, SPX e RUT)
 
@@ -122,17 +124,25 @@ def build(tag: str, croll: Path, underlying: str):
         print(f"  {tag}: 0 rolls, pulo")
         return None
 
+    # ATRIBUICAO FORWARD (corrige o desalinhamento que o Joao achou 2026-07-19): cada linha =
+    # a posicao ABERTA naquele roll, mantida ate o roll SEGUINTE (quando e fechada/rolada). Logo
+    # o P&L da linha = variacao de MTM da ABERTURA (roll i) ao FECHAMENTO (roll i+1) = pnl_total[i+1]
+    # - pnl_total[i]. Antes eu usava pnl_total[i]-pnl_total[i-1] (o P&L da posicao ANTERIOR), o que
+    # nao batia com o payoff/strikes desta linha. A ultima posicao fica ABERTA (P&L nao realizado).
+    pnl_tot = [fnum(r, "pnl_total") for r in rows]
+    n = len(rows)
     trades = []
-    prev_pnl_total = 0.0
-    for r in rows:
-        pnl_total = fnum(r, "pnl_total")
-        d_pnl = pnl_total - prev_pnl_total          # variacao MTM da semana (pts)
-        prev_pnl_total = pnl_total
-        is_entry = r.get("dir") == "entry"
+    for i, r in enumerate(rows):
+        is_open = (i == n - 1)                            # ultima posicao ainda nao foi fechada
+        d_pnl = 0.0 if is_open else (pnl_tot[i + 1] - pnl_tot[i])   # realizado no periodo que ela viveu
         pnl_usd = round(d_pnl * MULT, 2)
+        nxt = rows[i + 1] if not is_open else None
+        spot_close = round(fnum(nxt, "S"), 2) if nxt else None
+        close_date = nxt.get("date") if nxt else None
+        cum_at_close = pnl_tot[i + 1] if not is_open else pnl_tot[i]
         net_roll = fnum(r, "net_roll")
-        # IV por perna (invertida do delta logado) p/ a linha T+0 no viewer. dte do CROLL = DTE
-        # da posicao NOVA na abertura (~42); a linha "no fechamento" reprecifica ~7d depois.
+        # IV por perna (invertida do delta logado) p/ a linha T+0. dte do CROLL = DTE da posicao na
+        # abertura (~42); a linha "no fechamento" reprecifica ~7d depois (quando ela e rolada).
         S = fnum(r, "S"); k_sh = fnum(r, "k_sh"); k_lg = fnum(r, "k_lg")
         dte_open = fnum(r, "dte", 42.0)
         iv_sh = iv_from_delta(fnum(r, "d_sh"), S, k_sh, dte_open / 365.0) if k_sh else 0.0
@@ -153,25 +163,24 @@ def build(tag: str, croll: Path, underlying: str):
             "iv_short": iv_sh,                          # IV invertida do delta (linha T+0)
             "iv_long": iv_lg,
             "dte_close": max(round(dte_open - 7), 1),   # ~35 DTE: onde a posicao sera rolada
-            "cash_close": round(fnum(r, "cash_close"), 2),   # desmontar a posicao velha
-            "cash_open": round(fnum(r, "cash_open"), 2),     # abrir a nova
-            "net_roll": round(net_roll, 2),                  # caixa realizado da semana (pts)
+            "total_credit": round(fnum(r, "cash_open"), 2),  # CREDITO liquido de abertura (pts) = o "credit"
+            "cash_close": round(fnum(r, "cash_close"), 2),   # custo de desmontar (no fechamento)
+            "cash_open": round(fnum(r, "cash_open"), 2),
+            "net_roll": round(net_roll, 2),
             "net_roll_usd": round(net_roll * MULT, 2),
-            "dd_index": round(fnum(r, "dd") * 100, 2),       # drawdown do indice (%)
-            "k_gap": round(fnum(r, "k_gap"), 2),             # >0 num 'down' = re-strike proibido
+            "spot_close": spot_close,                        # exit spot (spot no roll seguinte)
+            "spot_exit": spot_close,                         # alias p/ o inspector generico
+            "effective_close_date": close_date,              # data em que a posicao foi fechada
+            "dd_index": round(fnum(r, "dd") * 100, 2),
+            "k_gap": round(fnum(r, "k_gap"), 2),
             "mark": round(fnum(r, "mark"), 2) if r.get("mark") not in ("", None) else None,
-            "cum_pnl_pts": round(pnl_total, 2),
-            "pnl_usd": pnl_usd,                              # <- KPI/equity: soma == headline
+            "cum_pnl_pts": round(cum_at_close, 2),
+            "pnl_usd": pnl_usd,                              # realizado no periodo em que a posicao viveu
             "pnl_usd_at_exp": pnl_usd,
-            "result": "win" if pnl_usd > 0 else ("loss" if pnl_usd < 0 else "flat"),
-            "exit_method": "roll" if not is_entry else "entry",
+            "result": "open" if is_open else ("win" if pnl_usd > 0 else ("loss" if pnl_usd < 0 else "flat")),
+            "exit_method": "open" if is_open else "roll",
             "in_range": 1 if pnl_usd >= 0 else 0,
         })
-
-    # spot_close = spot no roll SEGUINTE (onde esta posicao foi fechada/rolada). O marcador do
-    # payoff cai aqui, na linha T+0, mostrando "onde o trade fechou". Ultimo roll: sem proximo.
-    for i, t in enumerate(trades):
-        t["spot_close"] = trades[i + 1]["spot_entry"] if i + 1 < len(trades) else None
 
     # ---- RECONCILIACAO (trava) ----
     total_usd = round(sum(t["pnl_usd"] for t in trades), 2)
