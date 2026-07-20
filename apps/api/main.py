@@ -2044,10 +2044,10 @@ for _lbund, _lbtag in (("SPX", "SPX_d10"), ("RUT", "RUT_d10")):
         continue
     BACKTESTS_REGISTRY.append({
         "id": f"layerb-{_lbund.lower()}",
-        "name": f"Layer B Hedge · {_lbund}",
+        "name": f"Hedge · {_lbund}",
         "underlying": _lbund,
         "strategy": f"1x2 Square Root Hedge · {_lbund} · black swan portfolio hedge · weekly Friday roll",
-        "family": "Layer B Hedge",
+        "family": "Hedge",
         "horizon": "42 DTE",
         "description": (
             f"1x2 Square Root Hedge on {_lbund} (Layer B black-swan portfolio hedge): buy 2 long puts at "
