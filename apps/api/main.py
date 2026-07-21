@@ -1836,11 +1836,12 @@ _ID_DIR = BACKTESTS_ROOT / "iron_duck"
 # usam buyback cruzando o bid-ask (realista, mas distorce muito na iliquidez do RUT) → diagnóstico.
 _ID_RULES = {
     "Hold to Expiration": None,                             # = pnl_usd (default, limpo)
-    "Reiner combo (TP + DTE exit + stop + tested)": "pnl_reiner",
-    "TP 25% of credit": "pnl_tp25", "TP 40% of credit": "pnl_tp40",
-    "TP 50% of credit": "pnl_tp50", "TP 75% of credit": "pnl_tp75",
+    "Reiner combo (exact config)": "pnl_reiner",           # SPX: TP40 ou 5DTE ou $300 · RUT: TP50 ou 5DTE
+    "TP 40% of credit": "pnl_tp40", "TP 50% of credit": "pnl_tp50",
     "Exit at 5 DTE": "pnl_dte5", "Exit at 2 DTE": "pnl_dte2",
-    "Stop at 3× credit": "pnl_sm30", "Exit when tested (put side)": "pnl_tested",
+    "Stop $300 (Reiner)": "pnl_ls300", "Stop $750": "pnl_ls750",
+    "Stop $1500": "pnl_ls1500", "Stop $3000": "pnl_ls3000",
+    "Stop 2× credit": "pnl_sm20", "Stop 3× credit": "pnl_sm30",
 }
 for _idund, _idcombo in (("SPX", "TP40 or 5DTE"), ("RUT", "TP50 or 2DTE")):
     if not (_ID_DIR / _idund / "trades.csv").exists():
@@ -1868,8 +1869,8 @@ for _idund, _idcombo in (("SPX", "TP40 or 5DTE"), ("RUT", "TP50 or 2DTE")):
 
 # ───────── HEDGE HOG (Reiner / EdgeSeeker) — SPX ─────────
 # LPV débito ~30DTE (buy 30Δ/sell 20Δ) + far short put crédito ~90DTE (7Δ), posição rolada por 4
-# triggers. Reusa kind="layerb" (viewer de posição rolada: tabela de eventos + P&L; o export mapeia
-# as colunas). Payoff de 2 expirações é complexo → o renderer degrada p/ "unavailable" (honesto).
+# triggers. kind="hedgehog": tabela de eventos estilo layerb + payoff PRÓPRIO (3 pernas, 2
+# expirações: LPV intrínseco no vencimento do LPV + residual BS do far, linha T+0 ancorada).
 _HH_DIR = BACKTESTS_ROOT / "hedge_hog"
 if (_HH_DIR / "SPX" / "trades.csv").exists():
     BACKTESTS_REGISTRY.append({
@@ -1880,17 +1881,20 @@ if (_HH_DIR / "SPX" / "trades.csv").exists():
         "family": "Hedge Hog",
         "horizon": "30/90DTE",
         "description": (
-            "Hedge Hog high-probability income trade (Reiner / EdgeSeeker) on SPX. A short-duration long "
-            "put vertical (BUY ~30Δ put, SELL ~20Δ put, ~30 DTE — 'Der Hedge', a debit) financed by a "
-            "long-duration short put (SELL ~7Δ put, ~90 DTE — 'Das Schwein', a credit); net credit since "
-            "the far premium exceeds the vertical debit. Continuously rolled by 4 triggers (far >50% "
-            "profit, LPV >80% profit, LPV <7 DTE, or price breaking the LPV short within 10 days). Each "
-            "row is one event (entry/roll); per-row P&L is the mark-to-market change, so the table sums "
-            "to the headline. 5-year QuantConnect backtest at MID, 1 unit."
+            "Hedge Hog high-probability income trade (Reiner / EdgeSeeker) on SPX, managed EXACTLY per "
+            "the source PDF. A short-duration long put vertical (BUY ~30Δ put, SELL ~20Δ put, ~30 DTE — "
+            "'Der Hedge', a debit) financed by a long-duration short put (SELL 5-10Δ put, 75-115 DTE — "
+            "'Das Schwein', a credit); net credit since the far premium exceeds the vertical debit. "
+            "Triggers per the PDF: T1 far >50% profit → roll the far up if the LPV still has ≥14 DTE, "
+            "otherwise close and re-establish the whole spread; T2 LPV >80% profit → roll the LPV down; "
+            "T3 LPV <7 DTE → close and re-establish the whole spread; T4 price breaks the LPV short "
+            "strike within 10 days of entry → close and re-establish. Each row is one event (entry/"
+            "roll); per-row P&L is the realized change, so the table sums to the headline. 5-year "
+            "QuantConnect backtest at MID, 1 unit."
         ),
         "trades_csv": "hedge_hog/SPX/trades.csv",
         "daily_csv": "hedge_hog/SPX/daily.csv",
-        "kind": "layerb", "multiplier": 100,
+        "kind": "hedgehog", "multiplier": 100,
     })
 
 # ───────── JADE LIZARD SPX (estudo confirmatório tasty · Fase B) ─────────
@@ -2368,11 +2372,19 @@ def _apply_rule(
                 eff = float(t[col])
                 nt["pnl_usd"] = eff
                 nt["effective_pnl_usd"] = eff
-                nt["effective_close_date"] = None
+                # ONDE/QUANDO a regra fechou (Iron Duck grava spot_close_<rule>/close_date_<rule>):
+                # alimenta o marcador "Closed here" do payoff. Datasets antigos: colunas ausentes.
+                sfx = col[4:] if col.startswith("pnl_") else col
+                spot_c = t.get(f"spot_close_{sfx}")
+                date_c = t.get(f"close_date_{sfx}")
+                nt["spot_close"] = spot_c
+                nt["effective_close_date"] = str(date_c) if date_c else None
                 nt["effective_dit_at_close"] = None
-                nt["exit_method"] = "rule_triggered"
+                held = date_c is not None and str(date_c) == str(t.get("exp_date"))
+                nt["exit_method"] = "hold" if held else "rule_triggered"
             else:
                 nt["effective_pnl_usd"] = hold
+                nt["spot_close"] = t.get("spot_exit")
                 nt["effective_close_date"] = str(t.get("exp_date")) if t.get("exp_date") else None
                 nt["effective_dit_at_close"] = None
             # Result segue o P&L DA REGRA escolhida (não o da expiração).
@@ -2402,8 +2414,8 @@ def _apply_rule(
             out.append(nt)
         return out
 
-    if kind == "layerb":
-        # Hedge rolado: pnl_usd já é o P&L realizado no período em que a posição viveu (aberta no
+    if kind in ("layerb", "hedgehog"):
+        # Posição rolada: pnl_usd já é o P&L realizado no período em que a posição viveu (aberta no
         # roll, fechada no roll seguinte), pronto no CSV e reconciliando com o headline. Só Hold.
         # NÃO sobrescrever effective_close_date com exp_date — a posição fecha no ROLL, não na
         # expiração; o export já traz a data real de fechamento.
@@ -2762,8 +2774,8 @@ def get_backtest(
         # close-rule options — no separate backtests. Hold is always available.
         _tp = [r for r, c in _BATMAN_TP_COLS.items() if any(c in t for t in raw_trades)]
         available_rules = ["Hold to Expiration"] + _tp
-    elif meta["kind"] == "layerb":
-        # Hedge carregado continuamente e rolado — não há take-profit nem stop. Só Hold.
+    elif meta["kind"] in ("layerb", "hedgehog"):
+        # Posição carregada continuamente e rolada — não há take-profit nem stop. Só Hold.
         available_rules = ["Hold to Expiration"]
     else:
         available_rules = IC7_RULES
@@ -2792,6 +2804,8 @@ def get_backtest(
         "em_pct", "short_put", "long_put", "short_call", "long_call", "total_credit",
         "spot_exit", "vix_entry", "pnl_usd", "pnl_usd_at_exp", "effective_close_date",
         "effective_dit_at_close", "max_risk_usd", "in_range", "result", "exit_method",
+        # onde a regra fechou (Iron Duck record-and-derive) — alimenta o marcador do payoff
+        "spot_close", "dte_entry",
     ] + _ic7_rule_cols
     display_cols_triplecal = [
         "trade_date", "exp_date", "underlying", "dte_entry", "total_credit", "vix_entry",
@@ -2821,6 +2835,16 @@ def get_backtest(
         # não viram coluna da tabela (o renderer layerb não as lê) — alimentam payoff/inspector
         "iv_short", "iv_long", "dte_close", "spot_close",
     ]
+    # HEDGE HOG: evento por linha (entry/roll), 3 pernas em 2 expirações. lpv_* + far_* alimentam a
+    # tabela de pernas e o payoff próprio; spot_close/pnl ancoram o marcador "Closed here".
+    display_cols_hedgehog = [
+        "trade_date", "exp_date", "underlying", "spot_entry", "vix_entry",
+        "roll_dir", "restruck", "short_put", "long_put", "delta_short", "delta_long",
+        "lpv_debit", "far_short", "far_exp", "far_credit", "delta_far", "total_credit",
+        "net_roll", "net_roll_usd", "spot_close", "spot_exit", "effective_close_date",
+        "cash_close", "mark", "cum_pnl_pts", "pnl_usd", "pnl_usd_at_exp",
+        "result", "exit_method", "in_range",
+    ]
     display_cols_ibfly = [
         "trade_date", "exp_date", "underlying", "dte_entry", "width_sigma", "spot_entry",
         "iv_atm_pct", "expected_move", "call_lo", "call_atm", "call_up", "total_credit",
@@ -2839,6 +2863,8 @@ def get_backtest(
         cols = display_cols_ibfly
     elif meta["kind"] == "layerb":
         cols = display_cols_layerb
+    elif meta["kind"] == "hedgehog":
+        cols = display_cols_hedgehog
     else:
         cols = display_cols_ic7
     trades_view = [{c: t.get(c) for c in cols} for t in trades_with_rule]

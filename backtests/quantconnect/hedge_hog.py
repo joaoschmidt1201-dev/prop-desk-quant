@@ -16,13 +16,16 @@ class HedgeHog(QCAlgorithm):
         SELL put @ ~0.05-0.10 delta
       Restricao: premio do short longo > debito do LPV  ->  net CREDITO.
 
-    GESTAO (4 triggers do PDF; acao universal = fechar+reabrir a peca):
-      T1  Short longo > 50% do lucro max      -> rola o short longo (reabre 90 DTE)
-      T2  LPV > 80% do lucro max              -> rola o LPV (reabre 30 DTE)
-      T3  LPV < 7 DTE                          -> rola o LPV (gamma acelera)
-      T4  Spot fura o short strike do LPV      -> fecha+reabre TUDO (o hedge nao ajuda mais)
-          em < 10 dias da entrada do LPV
-      + hold: cada perna rola no proprio vencimento.
+    GESTAO — LETRA EXATA DO PDF (pedido João 2026-07-21, zero interpretacao):
+      T1  Short longo > 50% do lucro max:
+            se LPV >= 14 DTE -> rola SO o short longo p/ strike mais alto (reabre ~90 DTE)
+            senao            -> fecha o spread INTEIRO + reposiciona TUDO
+          ("Short Put auf einen hoeheren Strike rollen (wenn noch mindestens 14 DTE im LPV)")
+      T2  LPV > 80% do lucro max              -> rola o LPV p/ baixo (1a acao listada no PDF)
+      T3  LPV < 7 DTE                          -> fecha o spread INTEIRO + reposiciona TUDO
+          ("Den gesamten HH-Spread schliessen / neu positionieren")
+      T4  Spot fura o short strike do LPV em < 10 dias da entrada -> fecha+reabre TUDO.
+      Reposicionar = zera a posicao; a proxima barra HORARIA reabre LPV 30DTE + far 90DTE novos.
 
     Contabilidade = FLUXO DE CAIXA (posicao continua rolada, como o Layer B): cada roll = fecha a
     perna velha (cash) + abre a nova (cash). P&L = cum_cash + mark. Naked short longo -> BuyingPowerModel.
@@ -43,6 +46,7 @@ class HedgeHog(QCAlgorithm):
         self.tp_lpv       = float(self.get_parameter("tp_lpv", "0.80"))            # T2
         self.lpv_roll_dte = int(self.get_parameter("lpv_roll_dte", "7"))           # T3
         self.break_days   = int(self.get_parameter("break_days", "10"))           # T4 janela
+        self.t1_min_lpv_dte = int(self.get_parameter("t1_min_lpv_dte", "14"))      # T1: guarda do PDF
         self.strike_dn    = int(self.get_parameter("strike_dn", "120"))
         self.strike_up    = int(self.get_parameter("strike_up", "10"))
         self.fill_mode    = self.get_parameter("fill_mode", "mid").lower().strip()
@@ -152,10 +156,15 @@ class HedgeHog(QCAlgorithm):
             self.debug(f"{self.time} HH#{self.seq} LPV {lpv['lg_k']}/{lpv['sh_k']} deb={lpv['debit']:.2f} "
                        f"far {far['f_k']} cr={far['credit']:.2f} net={net_credit:.2f}")
 
+    def _mid_sym(self, sym):
+        b = self.securities[sym].bid_price; a = self.securities[sym].ask_price
+        if b > 0 and a > 0:
+            return (b + a) / 2.0
+        return self.securities[sym].price or a or b or 0.0
+
     def _close_lpv(self, lpv):
-        lg_b = self.securities[lpv["lg_sym"]].bid_price     # vende o long (bid)
-        sh_a = self.securities[lpv["sh_sym"]].ask_price     # recompra o short (ask)
-        val = lg_b - sh_a                                   # valor de desmontagem do LPV
+        # REGRA DA MESA: tudo no MID. Desmonta o LPV = vende long + recompra short, ambos no mid.
+        val = self._mid_sym(lpv["lg_sym"]) - self._mid_sym(lpv["sh_sym"])
         for sym in (lpv["lg_sym"], lpv["sh_sym"]):
             if self.portfolio[sym].invested:
                 self.liquidate(sym)
@@ -163,11 +172,11 @@ class HedgeHog(QCAlgorithm):
         return val
 
     def _close_far(self, far):
-        a = self.securities[far["f_sym"]].ask_price         # recompra o short (ask)
+        m = self._mid_sym(far["f_sym"])                     # recompra o short no MID
         if self.portfolio[far["f_sym"]].invested:
             self.liquidate(far["f_sym"])
-        self.cum_cash -= a
-        return -a
+        self.cum_cash -= m
+        return -m
 
     # ===================== GESTAO =====================
     def _manage(self, contracts, S):
@@ -175,36 +184,42 @@ class HedgeHog(QCAlgorithm):
         lpv_dte_now = (lpv["expiry"] - self.time.date()).days
         far_dte_now = (far["expiry"] - self.time.date()).days
 
-        # valores atuais (recompra)
+        # valores atuais (recompra) no MID
         lpv_val = self._lpv_value(lpv)     # quanto vale desmontar o LPV agora (>0 = a favor)
-        far_buyback = self.securities[far["f_sym"]].ask_price
+        far_buyback = self._mid_sym(far["f_sym"])
 
-        # T4: spot furou o short strike do LPV em < break_days da entrada do LPV -> fecha+reabre TUDO
+        # T4: spot furou o short strike do LPV em < break_days da entrada do LPV -> fecha+reabre TUDO.
+        # pos=None ANTES do record -> mark=0 e o P&L do evento fica exato (sem dupla contagem).
         days_since_lpv = (self.time - lpv["open_dt"]).days
         if S <= lpv["sh_k"] and days_since_lpv < self.break_days:
             self.n_t["T4"] += 1
             self._close_lpv(lpv); self._close_far(far)
-            self._record("T4_reopen", S); self.pos = None; return
+            self.pos = None; self._record("T4_reopen", S); return
 
-        # T3: LPV < 7 DTE -> rola o LPV
+        # T3 (LETRA DO PDF): LPV < 7 DTE -> fecha o spread INTEIRO + reposiciona TUDO
         if lpv_dte_now <= self.lpv_roll_dte:
             self.n_t["T3"] += 1
-            self._roll_lpv(contracts, S, "T3_lpv_roll"); return
+            self._close_lpv(lpv); self._close_far(far)
+            self.pos = None; self._record("T3_reopen", S); return
 
-        # T2: LPV > 80% do lucro max -> rola o LPV
+        # T2: LPV > 80% do lucro max -> rola o LPV p/ baixo (1a acao listada no PDF)
         if lpv["max_profit"] > 0 and lpv_val >= self.tp_lpv * lpv["max_profit"]:
             self.n_t["T2"] += 1
             self._roll_lpv(contracts, S, "T2_lpv_tp"); return
 
-        # far vencendo -> rola o far
+        # far vencendo (guarda; com o T3 repondo tudo a cada ciclo, quase nunca dispara)
         if far_dte_now <= self.lpv_roll_dte:
             self.n_t["far_exp"] += 1
             self._roll_far(contracts, S, "far_exp"); return
 
-        # T1: short longo > 50% do lucro max (buyback <= 50% do credito) -> rola o far
+        # T1 (LETRA DO PDF): short longo > 50% do lucro max ->
+        #   LPV >= 14 DTE: rola SO o short p/ strike mais alto · senao: fecha+reposiciona TUDO
         if far["credit"] > 0 and far_buyback <= (1.0 - self.tp_far) * far["credit"]:
             self.n_t["T1"] += 1
-            self._roll_far(contracts, S, "T1_far_tp"); return
+            if lpv_dte_now >= self.t1_min_lpv_dte:
+                self._roll_far(contracts, S, "T1_far_roll"); return
+            self._close_lpv(lpv); self._close_far(far)
+            self.pos = None; self._record("T1_reopen", S); return
 
     def _roll_lpv(self, contracts, S, reason):
         self._close_lpv(self.pos["lpv"])
@@ -226,9 +241,7 @@ class HedgeHog(QCAlgorithm):
         self._record(reason, S)
 
     def _lpv_value(self, lpv):
-        lg_b = self.securities[lpv["lg_sym"]].bid_price
-        sh_a = self.securities[lpv["sh_sym"]].ask_price
-        return lg_b - sh_a
+        return self._mid_sym(lpv["lg_sym"]) - self._mid_sym(lpv["sh_sym"])   # valor do LPV no MID
 
     # ===================== SETTLE (guarda de vencimento) =====================
     # A marcacao horaria + rolls por DTE (<=7) tratam quase tudo; um vencimento nao rolado seria
@@ -284,7 +297,7 @@ class HedgeHog(QCAlgorithm):
         if p is None:
             return 0.0
         lpv_val = self._lpv_value(p["lpv"])
-        far_bb  = self.securities[p["far"]["f_sym"]].ask_price
+        far_bb  = self._mid_sym(p["far"]["f_sym"])       # far buyback no MID
         return lpv_val - far_bb
 
     def _record(self, event, S):

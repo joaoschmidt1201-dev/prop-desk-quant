@@ -40,8 +40,12 @@ class IronDuck(QCAlgorithm):
         self.dte_hi       = int(self.get_parameter("dte_hi", "52"))
         self.d_put_short  = float(self.get_parameter("delta_put_short",  "0.15"))
         self.d_call_short = float(self.get_parameter("delta_call_short", "0.65"))  # ITM
-        self.put_offset   = float(self.get_parameter("put_offset",  "480"))    # SPX 480 / RUT 70
-        self.call_offset  = float(self.get_parameter("call_offset", "20"))     # SPX 20  / RUT 15
+        # LONGS: "offset" = ponto fixo (SPX/SPY, config Reiner) | "delta" = por delta (RUT: LP10/LC65).
+        self.long_mode    = self.get_parameter("long_mode", "offset").lower().strip()
+        self.d_put_long   = float(self.get_parameter("delta_put_long",  "0.10"))
+        self.d_call_long  = float(self.get_parameter("delta_call_long", "0.65"))
+        self.put_offset   = float(self.get_parameter("put_offset",  "480"))    # SPX 480 / SPY 30
+        self.call_offset  = float(self.get_parameter("call_offset", "20"))     # SPX 20  / SPY 3
         self.vix_max      = float(self.get_parameter("vix_max", "40"))
         # strike_dn tem que alcancar o LONG PUT = (spot − dist_short_put) − put_offset.
         # Ex SPX: 15d put ~230pt abaixo + offset 480 = ~710pt = ~142 strikes de 5pt -> 175 c/ margem.
@@ -69,9 +73,10 @@ class IronDuck(QCAlgorithm):
         self.vix = self.add_index("VIX", Resolution.MINUTE).symbol
 
         # niveis a GRAVAR (record-and-derive)
-        self.profit_levels = [0.25, 0.40, 0.50, 0.75]     # TP: recompra <= (1-lvl)*credito
-        self.stop_mults    = [2.0, 3.0]                   # stop: buyback >= m*credito
-        self.dte_exits     = [7, 5, 2]                    # saida por tempo
+        self.profit_levels = [0.25, 0.40, 0.50, 0.75]         # TP: recompra <= (1-lvl)*credito
+        self.stop_mults    = [1.5, 2.0, 2.5, 3.0]             # stop: buyback >= m*credito (cap da perda)
+        self.loss_stops    = [300, 750, 1500, 3000]           # stop por PERDA ABSOLUTA ($) — Reiner SPX=$300
+        self.dte_exits     = [7, 5, 2]                        # saida por tempo
 
         self.rows = []
         self.skips = []
@@ -127,9 +132,13 @@ class IronDuck(QCAlgorithm):
         if sp is None or sc is None:
             self._skip("sem short put/call"); return
 
-        # longs por OFFSET fixo (strike mais proximo do alvo)
-        lp = self._pick_by_strike(legs, OptionRight.PUT,  sp.strike - self.put_offset)
-        lc = self._pick_by_strike(legs, OptionRight.CALL, sc.strike + self.call_offset)
+        # longs: por DELTA (RUT: LP10/LC65) ou por OFFSET fixo em pontos (SPX/SPY, config Reiner)
+        if self.long_mode == "delta":
+            lp = self._pick_by_delta(legs, OptionRight.PUT,  S, expiry, self.d_put_long)
+            lc = self._pick_by_delta(legs, OptionRight.CALL, S, expiry, self.d_call_long)
+        else:
+            lp = self._pick_by_strike(legs, OptionRight.PUT,  sp.strike - self.put_offset)
+            lc = self._pick_by_strike(legs, OptionRight.CALL, sc.strike + self.call_offset)
         if lp is None or lc is None:
             self._skip("sem long put/call"); return
 
@@ -161,6 +170,7 @@ class IronDuck(QCAlgorithm):
             "max_value": credit, "closed": False,
             "cross_p": {lvl: None for lvl in self.profit_levels},
             "cross_sm": {m: None for m in self.stop_mults},
+            "cross_ls": {L: None for L in self.loss_stops}, # stop por perda absoluta ($)
             "dte_bb": {n: None for n in self.dte_exits},     # buyback no 1o toque de dte<=n
             "cross_tested": None,                            # 1o toque spot fura short strike
         }
@@ -190,17 +200,23 @@ class IronDuck(QCAlgorithm):
         side = [c for c in legs if c.right == right]
         return min(side, key=lambda c: abs(c.strike - target)) if side else None
 
+    def _mid_sym(self, sym):
+        b = self.securities[sym].bid_price; a = self.securities[sym].ask_price
+        if b > 0 and a > 0:
+            return (b + a) / 2.0
+        return self.securities[sym].price or a or b or 0.0
+
     # ===================== MARCACAO =====================
     def _mark(self, d):
         if d.get("closed"):
             return
-        sp_a = self.securities[d["sp_sym"]].ask_price
-        sc_a = self.securities[d["sc_sym"]].ask_price
-        lp_b = self.securities[d["lp_sym"]].bid_price
-        lc_b = self.securities[d["lc_sym"]].bid_price
-        if min(sp_a, sc_a) <= 0:
+        # REGRA DA MESA: tudo no MID (entradas, saidas, hold). O buyback (custo de fechar) usa o mid de
+        # cada perna, NAO o cruzamento bid-ask -> as regras de saida ficam comparaveis ao hold.
+        sp_m = self._mid_sym(d["sp_sym"]); sc_m = self._mid_sym(d["sc_sym"])
+        lp_m = self._mid_sym(d["lp_sym"]); lc_m = self._mid_sym(d["lc_sym"])
+        if sp_m <= 0 or sc_m <= 0:
             return
-        buyback = (sp_a + sc_a) - (lp_b + lc_b)          # custo de recompra (fechar)
+        buyback = (sp_m + sc_m) - (lp_m + lc_m)          # custo de recompra (fechar) no MID
         if buyback > d["max_value"]:
             d["max_value"] = buyback
         cr = d["credit"]
@@ -208,24 +224,32 @@ class IronDuck(QCAlgorithm):
         # offset COMPACTO em horas desde a abertura (p/ o combo ordenar first-touch sem gastar bytes)
         hoff = int((self.time - d["open_time"]).total_seconds() // 3600)
         bb = round(buyback, 1)
+        # spot no toque, como OFFSET inteiro vs entrada (compacto; export reconstroi S_entry+dS).
+        # Necessario p/ o Trade Auditor marcar ONDE (eixo X) cada regra fechou o trade.
+        dS = int(round(S - d["S_entry"]))
 
         # TP: recompra barata
         for lvl in self.profit_levels:
             if d["cross_p"][lvl] is None and buyback <= (1.0 - lvl) * cr:
-                d["cross_p"][lvl] = (hoff, bb)
-        # STOP: recompra cara
+                d["cross_p"][lvl] = (hoff, bb, dS)
+        # STOP por MULTIPLO do credito
         for m in self.stop_mults:
             if d["cross_sm"][m] is None and buyback >= m * cr:
-                d["cross_sm"][m] = (hoff, bb)
+                d["cross_sm"][m] = (hoff, bb, dS)
+        # STOP por PERDA ABSOLUTA ($): perda = (buyback − credito)*mult. Reiner SPX = $300.
+        loss_usd = (buyback - cr) * self.mult
+        for L in self.loss_stops:
+            if d["cross_ls"][L] is None and loss_usd >= L:
+                d["cross_ls"][L] = (hoff, bb, dS)
         # SAIDA POR TEMPO: buyback no 1o toque de dte<=n
         dte_now = (d["expiry"] - self.time.date()).days
         for n in self.dte_exits:
             if d["dte_bb"][n] is None and dte_now <= n:
-                d["dte_bb"][n] = (hoff, bb)
+                d["dte_bb"][n] = (hoff, bb, dS)
         # EXIT WHEN TESTED: SÓ o lado PUT (o short call e ITM POR DESIGN -> "S>=sc" seria verdade
         # desde a entrada; o teste que importa e o downside furar o short put).
         if d["cross_tested"] is None and S <= d["sp"]:
-            d["cross_tested"] = (hoff, bb)
+            d["cross_tested"] = (hoff, bb, dS)
 
     # ===================== SETTLE =====================
     def _settle_due(self):
@@ -250,8 +274,8 @@ class IronDuck(QCAlgorithm):
         commissions = round(4 * self.comm_leg, 2)        # entrada 4 pernas; cash-settle = sem saida
         net = round(pnl_pts * self.mult, 2)
 
-        def pack(x):   # (hoff, buyback) -> "hoff:buyback" ou ""
-            return f"{x[0]}:{x[1]}" if x else ""
+        def pack(x):   # (hoff, buyback, dS) -> "hoff:buyback:dS" ou ""
+            return f"{x[0]}:{x[1]}:{x[2]}" if x else ""
 
         row = {
             "id": d["id"], "open_date": d["open_date"].strftime("%Y-%m-%d"),
@@ -280,6 +304,8 @@ class IronDuck(QCAlgorithm):
             row[f"tp{int(lvl*100)}"] = pack(d["cross_p"][lvl])
         for m in self.stop_mults:
             row[f"sm{int(m*10)}"] = pack(d["cross_sm"][m])
+        for L in self.loss_stops:
+            row[f"ls{L}"] = pack(d["cross_ls"][L])
         for n in self.dte_exits:
             row[f"dte{n}"] = pack(d["dte_bb"][n])
         self.rows.append(row)
@@ -330,7 +356,7 @@ class IronDuck(QCAlgorithm):
         if rule.startswith("tp"):
             bb = bb_of(rule)
             return (cr - bb) * self.mult if bb is not None else settle
-        if rule.startswith("sm"):
+        if rule.startswith("sm") or rule.startswith("ls"):
             bb = bb_of(rule)
             return (cr - bb) * self.mult if bb is not None else settle
         if rule.startswith("dte"):
@@ -370,31 +396,41 @@ class IronDuck(QCAlgorithm):
         # cada regra isolada
         rules = ["hold"] + [f"tp{int(l*100)}" for l in self.profit_levels] \
                 + [f"sm{int(m*10)}" for m in self.stop_mults] \
+                + [f"ls{L}" for L in self.loss_stops] \
                 + [f"dte{n}" for n in self.dte_exits] + ["tested"]
         for rule in rules:
             ps = [self._derive(r, rule) for r in rows]
             n = sum(ps); w = 100.0 * sum(1 for x in ps if x > 0) / len(ps)
-            self.set_runtime_statistic(f"R {rule}", f"${n:,.0f} / WR {w:.0f}%")
+            worst = min(ps)                              # pior trade unico = o quanto a regra CAPA a perda
+            self.set_runtime_statistic(f"R {rule}", f"${n:,.0f} / WR {w:.0f}% / pior ${worst:,.0f}")
 
-        # COMBO da config Reiner: "TP ou stop ou DTE ou tested, o que vier 1o" (first-touch por tempo)
-        def combo_pnl(r, tp_field, dte_field, stop_field, tested=True):
+        # COMBOS EXATOS do Reiner (SEM "tested"): SPX=TP40+5DTE+stop · RUT=TP50+5DTE · SPY=TP50+2DTE.
+        # first-touch por horas desde a abertura. Cada campo passado e um gatilho ativo.
+        def combo_pnl(r, fields):
             cr = r["credit"]
-            cands = []  # (hoff, buyback)
-            for f in (tp_field, dte_field, stop_field) + (("cross_tested",) if tested else ()):
+            cands = []
+            for f in fields:
                 v = r.get(f, "")
                 if v not in ("", None):
                     parts = str(v).split(":")
                     cands.append((int(parts[0]), float(parts[1])))
             if not cands:
                 return r["settle_net"]
-            cands.sort(key=lambda x: x[0])                # o mais cedo (por horas desde a abertura)
-            bb = cands[0][1]
-            return (cr - bb) * self.mult
-        for tp in ("tp40", "tp50"):
-            for dn in ("dte5", "dte2"):
-                ps = [combo_pnl(r, tp, dn, "sm30", True) for r in rows]
-                n = sum(ps); w = 100.0 * sum(1 for x in ps if x > 0) / len(ps)
-                self.set_runtime_statistic(f"C {tp}+{dn}+sm30+tested", f"${n:,.0f} / WR {w:.0f}%")
+            cands.sort(key=lambda x: x[0])
+            return (cr - cands[0][1]) * self.mult
+        combos = {
+            "C SPX-reiner tp40+dte5+ls300": ["tp40", "dte5", "ls300"],   # $300 stop (config exata)
+            "C SPX tp40+dte5+ls750":        ["tp40", "dte5", "ls750"],
+            "C SPX tp40+dte5+ls1500":       ["tp40", "dte5", "ls1500"],
+            "C RUT-reiner tp50+dte5":       ["tp50", "dte5"],
+            "C SPY-reiner tp50+dte2":       ["tp50", "dte2"],
+            "C tp40+dte5 (no stop)":        ["tp40", "dte5"],
+        }
+        for lbl, fields in combos.items():
+            ps = [combo_pnl(r, fields) for r in rows]
+            n = sum(ps); w = 100.0 * sum(1 for x in ps if x > 0) / len(ps)
+            worst = min(ps)
+            self.set_runtime_statistic(lbl, f"${n:,.0f} / WR {w:.0f}% / pior ${worst:,.0f}")
 
     def on_end_of_algorithm(self):
         self._emit_runtime_stats()
@@ -406,6 +442,7 @@ class IronDuck(QCAlgorithm):
                 "settle_pnl_pts", "settle_net", "settle_result"]
         cols += [f"tp{int(l*100)}" for l in self.profit_levels]
         cols += [f"sm{int(m*10)}" for m in self.stop_mults]
+        cols += [f"ls{L}" for L in self.loss_stops]
         cols += [f"dte{n}" for n in self.dte_exits]
         self.log("DUCKHDR|" + ",".join(cols) + f"|tag={self.run_tag}")
         for r in self.rows:

@@ -94,6 +94,12 @@ type BacktestTrade = {
   iv_long?: number | string | null;
   dte_close?: number | string | null;
   spot_close?: number | string | null;
+  // Hedge Hog (LPV 30DTE + far short put 90DTE) per-event fields
+  lpv_debit?: number | string | null;
+  far_short?: number | string | null;
+  far_exp?: string | null;
+  far_credit?: number | string | null;
+  delta_far?: number | string | null;
 };
 
 type BacktestDailyRow = {
@@ -137,6 +143,10 @@ type PayoffSeries = {
   references: PayoffReference[];
   domain: [number, number];
   marker: { label: string; spot: number; pnl: number } | null;
+  // legenda da linha T+0 (varia por família: Layer B "~35 DTE", Duck/HH = data do fechamento)
+  closeLabel?: string;
+  // 2º marcador: P&L NA EXPIRAÇÃO no spot de settle, quando a regra fechou ANTES (Duck).
+  marker2?: { label: string; spot: number; pnl: number } | null;
 };
 
 const DASH = "\u2014";
@@ -758,7 +768,10 @@ function TradesTable({
   const isPl5 = detail.meta.kind === "pl5";
   const isIbfly = detail.meta.kind === "ibfly";
   const isLayerB = detail.meta.kind === "layerb";
-  const headers = isLayerB
+  const isHedgehog = detail.meta.kind === "hedgehog";
+  const headers = isHedgehog
+    ? ["Date", "LPV Exp", "Spot", "VIX", "Event", "LPV S/L", "Far (exp)", "Net credit", "P&L", "Result"]
+    : isLayerB
     ? ["Date", "Exp", "Spot", "VIX", "Roll type", "Short / Long×2", "Δ s / l", "Net roll", "P&L wk", "Result"]
     : isSs42
     ? ["Trade", "Exp", "Spot in", "IV%", "Put / Call", "Credit", "Spot out", "P&L", "Result"]
@@ -804,11 +817,25 @@ function TradesTable({
                   <td className="px-4 py-2.5 text-muted-foreground tabular">{fmtDate(t.exp_date as string)}</td>
                   <td className="px-4 py-2.5 tabular text-muted-foreground">{fmtNum(Number(t.spot_entry))}</td>
                   <td className="px-4 py-2.5 tabular text-muted-foreground">
-                    {isLayerB
+                    {isLayerB || isHedgehog
                       ? (t.vix_entry != null ? Number(t.vix_entry).toFixed(1) : "—")
                       : (t.iv_atm_pct != null ? `${Number(t.iv_atm_pct).toFixed(1)}%` : "—")}
                   </td>
-                  {isLayerB ? (
+                  {isHedgehog ? (
+                    <>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">{hedgehogEventLabel(String(t.roll_dir ?? ""))}</td>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
+                        {t.short_put != null ? Number(t.short_put).toFixed(0) : "—"} / {t.long_put != null ? Number(t.long_put).toFixed(0) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
+                        {t.far_short != null ? Number(t.far_short).toFixed(0) : "—"}
+                        {t.far_exp ? ` (${fmtDate(t.far_exp as string)})` : ""}
+                      </td>
+                      <td className="px-4 py-2.5 tabular text-muted-foreground">
+                        {t.total_credit != null ? `${Number(t.total_credit).toFixed(2)} pts` : "—"}
+                      </td>
+                    </>
+                  ) : isLayerB ? (
                     <>
                       <td className="px-4 py-2.5 tabular text-muted-foreground">
                         {(() => {
@@ -904,7 +931,10 @@ function TradeInspector({
 
   const trade = detail.trades[index] as BacktestTrade;
   const dailyRows = getTradeDailyRows(trade, detail.daily as BacktestDailyRow[]);
-  const dteEntry = asNum(trade.dte_entry) ?? inferEntryDte(dailyRows) ?? (detail.meta.kind === "ss42" ? 42 : 7);
+  const isHedgehog = detail.meta.kind === "hedgehog";
+  const dteEntry = asNum(trade.dte_entry)
+    ?? (isHedgehog ? daysBetween(trade.trade_date, trade.exp_date) : null)
+    ?? inferEntryDte(dailyRows) ?? (detail.meta.kind === "ss42" ? 42 : 7);
   const journey = buildJourneySeries(trade, dailyRows, dteEntry);
   const open = isOpenTrade(trade);
   const markerSpot = getPayoffMarkerSpot(trade, journey, open);
@@ -945,6 +975,13 @@ function TradeInspector({
                 {open
                   ? "Still open — rolls weekly, not held to expiration"
                   : `Rolled / closed on ${fmtDate((trade.effective_close_date as string) ?? "")} (before expiration)`}
+              </p>
+            )}
+            {isHedgehog && (
+              <p className="mt-0.5 text-[11px] text-[var(--warning)]">
+                {open
+                  ? "Still open — managed by triggers, not held to expiration"
+                  : `Rolled / closed on ${fmtDate((trade.effective_close_date as string) ?? "")} — ${hedgehogEventLabel(String(trade.roll_dir ?? ""))}`}
               </p>
             )}
             <p className="mt-1 text-xs text-muted-foreground">
@@ -992,6 +1029,33 @@ function TradeInspector({
             value={fmtMoney(pnl)}
             tone={pnl}
             sub={spotExit != null ? `spot ${fmtNum(spotExit)}` : undefined}
+          />
+        </div>
+      ) : isHedgehog ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <KpiBlock label="VIX Entry" value={fmtNum(vixEntry)} />
+          <KpiBlock
+            label="LPV (debit)"
+            value={asNum(trade.lpv_debit) != null ? `${fmtNum(asNum(trade.lpv_debit))} pts` : DASH}
+            sub={`${fmtNum(asNum(trade.long_put))} / ${fmtNum(asNum(trade.short_put))} · ${fmtNum(dteEntry)}d`}
+          />
+          <KpiBlock
+            label="Far short put"
+            value={asNum(trade.far_credit) != null ? `${fmtNum(asNum(trade.far_credit))} pts cr` : DASH}
+            sub={`${fmtNum(asNum(trade.far_short))} · Δ ${fmtNum(asNum(trade.delta_far))}`}
+          />
+          <KpiBlock
+            label="Net credit"
+            value={credit != null ? `${fmtNum(credit)} pts` : DASH}
+            sub={credit != null ? fmtMoney(credit * detail.meta.multiplier) : undefined}
+          />
+          <KpiBlock label="Event" value={hedgehogEventLabel(String(trade.roll_dir ?? ""))} small />
+          <KpiBlock
+            label="P&L (USD)"
+            value={open ? "In Progress" : fmtMoney(pnl)}
+            tone={open ? null : pnl}
+            sub={!open && asNum(trade.spot_close) != null ? `closed @ ${fmtNum(asNum(trade.spot_close))}` : undefined}
+            small={open}
           />
         </div>
       ) : (detail.meta.kind === "ic0dte" || detail.meta.kind === "ironfly") ? (
@@ -1120,7 +1184,7 @@ function PayoffDiagram({
               <Area type="linear" dataKey="loss" stroke="none" fill="url(#payoff-loss-fill)" isAnimationActive={false} />
               <Line type="linear" dataKey="pnl" stroke="var(--primary)" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} name="At expiration" />
               {hasClose && (
-                <Line type="monotone" dataKey="pnlClose" stroke="var(--warning)" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} isAnimationActive={false} name="At close (~35 DTE)" />
+                <Line type="monotone" dataKey="pnlClose" stroke="var(--warning)" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 4 }} isAnimationActive={false} name={payoff.closeLabel ?? "At close (~35 DTE)"} />
               )}
               {payoff.marker && (
                 <ReferenceDot
@@ -1130,6 +1194,16 @@ function PayoffDiagram({
                   fill={payoff.marker.pnl >= 0 ? "var(--gain)" : "var(--loss)"}
                   stroke="var(--foreground)"
                   strokeWidth={1.5}
+                />
+              )}
+              {payoff.marker2 && (
+                <ReferenceDot
+                  x={payoff.marker2.spot}
+                  y={payoff.marker2.pnl}
+                  r={4}
+                  fill="var(--primary)"
+                  stroke="var(--foreground)"
+                  strokeWidth={1}
                 />
               )}
             </AreaChart>
@@ -1143,7 +1217,7 @@ function PayoffDiagram({
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--warning)" }} />
-                  At close (~35 DTE)
+                  {payoff.closeLabel ?? "At close (~35 DTE)"}
                 </span>
               </>
             )}
@@ -1156,7 +1230,13 @@ function PayoffDiagram({
             {payoff.marker && (
               <span className="inline-flex items-center gap-1.5">
                 <span className={`h-2 w-2 rounded-full ${payoff.marker.pnl >= 0 ? "bg-[var(--gain)]" : "bg-[var(--loss)]"}`} />
-                {payoff.marker.label} <span className="tabular text-foreground">{fmtNum(payoff.marker.spot)}</span>
+                {payoff.marker.label} <span className="tabular text-foreground">{fmtNum(payoff.marker.spot)} · {fmtMoney(payoff.marker.pnl)}</span>
+              </span>
+            )}
+            {payoff.marker2 && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "var(--primary)" }} />
+                {payoff.marker2.label} <span className="tabular text-foreground">{fmtNum(payoff.marker2.spot)} · {fmtMoney(payoff.marker2.pnl)}</span>
               </span>
             )}
           </div>
@@ -1255,6 +1335,8 @@ function BacktestStrikeStructure({
     ? buildIC0DTELegRows(trade)
     : kind === "ironfly"
     ? buildIronFlyLegRows(trade)
+    : kind === "hedgehog"
+    ? buildHedgehogLegRows(trade)
     : buildIc7LegRows(trade);
 
   return (
@@ -1262,7 +1344,7 @@ function BacktestStrikeStructure({
       rows={rows}
       netCredit={credit}
       multiplier={multiplier}
-      rightLabel={kind === "ss42" ? "Delta" : "Width"}
+      rightLabel={kind === "ss42" || kind === "hedgehog" ? "Delta" : "Width"}
     />
   );
 }
@@ -1291,6 +1373,17 @@ function buildIronFlyLegRows(trade: BacktestTrade): LegRow[] {
     { leg: "Short Put (ATM)",  side: "Sell", strike: sp, detail: "body",   mid: null },
     { leg: "Short Call (ATM)", side: "Sell", strike: sc, detail: "body",   mid: null },
     { leg: "Long Call (high)", side: "Buy",  strike: lc, detail: wing,     mid: null },
+  ];
+}
+
+function buildHedgehogLegRows(trade: BacktestTrade): LegRow[] {
+  // 3 pernas, 2 expirações: LPV (buy 30Δ / sell 20Δ, ~30 DTE) + far short put (~7Δ, 75-115 DTE).
+  const exp = trade.exp_date ? fmtDate(trade.exp_date) : DASH;
+  const fexp = trade.far_exp ? fmtDate(trade.far_exp) : DASH;
+  return [
+    { leg: `LPV Long Put (${exp})`, side: "Buy", strike: asNum(trade.long_put), detail: fmtDelta(asNum(trade.delta_long)), mid: null },
+    { leg: `LPV Short Put (${exp})`, side: "Sell", strike: asNum(trade.short_put), detail: fmtDelta(asNum(trade.delta_short)), mid: null },
+    { leg: `Far Short Put (${fexp})`, side: "Sell", strike: asNum(trade.far_short), detail: fmtDelta(asNum(trade.delta_far)), mid: asNum(trade.far_credit) },
   ];
 }
 
@@ -1500,18 +1593,33 @@ function buildPayoffSeries(
     const lowerBep = sp - creditPts;
     const upperBep = sc + creditPts;
     const anchor = (sp + sc) / 2;                            // meio da zona de lucro (= ATM no IronFly)
+    // Iron Duck: a regra pode ter fechado ANTES da expiração — o export grava onde (spot_close) e
+    // quando (effective_close_date). Marcador = P&L REALIZADO no fechamento + linha T+0 ancorada;
+    // 2º marcador = P&L da expiração no settle. 0DTE antigos não têm as colunas → comportamento velho.
+    const spotClose = asNum(trade.spot_close);
+    const realized = asNum(trade.pnl_usd);
+    const closedEarly = trade.exit_method === "rule_triggered" && spotClose != null && realized != null;
     const refs = [lp, sp, sc, lc, lowerBep, upperBep];
     if (settle != null) refs.push(settle);
     if (entrySpot != null) refs.push(entrySpot);
+    if (closedEarly && spotClose != null) refs.push(spotClose);
     let xMin = Math.min(...refs), xMax = Math.max(...refs);
     const pad = Math.max((xMax - xMin) * 0.08, anchor * 0.005);
     xMin = Math.max(0, xMin - pad);
     xMax += pad;
+    const theoAtClose = closedEarly && spotClose != null ? ic0dteCloseValue(spotClose, trade) : null;
+    const closeOffset = realized != null && theoAtClose != null ? realized - theoAtClose : 0;
     const steps = 240;
     const points = Array.from({ length: steps + 1 }, (_, idx) => {
       const spot = xMin + ((xMax - xMin) * idx) / steps;
       const pnl = payoffAtSpot(spot, trade, kind, multiplier);
-      return { spot, pnl, profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0, pctFromEntry: ((spot - anchor) / anchor) * 100 };
+      const closeRaw = closedEarly && theoAtClose != null ? ic0dteCloseValue(spot, trade) : null;
+      return {
+        spot, pnl,
+        profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0,
+        pctFromEntry: ((spot - anchor) / anchor) * 100,
+        ...(closeRaw != null ? { pnlClose: closeRaw + closeOffset } : {}),
+      };
     });
     const references: PayoffReference[] = [
       { key: "short-put", label: "Short Put", value: sp, color: "var(--loss)", dash: "3 3" },
@@ -1523,6 +1631,18 @@ function buildPayoffSeries(
     ];
     if (entrySpot != null) {
       references.unshift({ key: "entry", label: "SPOT IN", value: entrySpot, color: "var(--primary)", dash: "4 4" });
+    }
+    if (closedEarly && spotClose != null && realized != null) {
+      return {
+        points,
+        references,
+        domain: [xMin, xMax],
+        marker: { label: "Closed here", spot: spotClose, pnl: realized },
+        marker2: settle == null
+          ? null
+          : { label: "At expiration", spot: settle, pnl: payoffAtSpot(settle, trade, kind, multiplier) },
+        closeLabel: trade.effective_close_date ? `At close (${fmtDate(trade.effective_close_date)})` : "At close",
+      };
     }
     return {
       points,
@@ -1687,6 +1807,48 @@ function buildPayoffSeries(
         : { label: "Closed here", spot: spotClose, pnl: realized },
     };
   }
+  if (kind === "hedgehog") {
+    // HH: 3 pernas em 2 expirações. Curva principal = vencimento do LPV (LPV intrínseco + residual
+    // BS do far). Linha T+0 = valor na data do roll, ancorada no P&L realizado (padrão Layer B).
+    const klg = asNum(trade.long_put), ksh = asNum(trade.short_put), kfar = asNum(trade.far_short);
+    const entrySpot = asNum(trade.spot_entry);
+    if (klg == null || ksh == null || kfar == null || entrySpot == null) return null;
+    const spotClose = asNum(trade.spot_close);
+    const realized = asNum(trade.pnl_usd);
+    // range: da cauda abaixo do far strike (o risco real) até acima do spot de entrada
+    let xMin = Math.max(0, Math.min(kfar * 0.96, entrySpot * 0.82));
+    let xMax = entrySpot * 1.05;
+    if (spotClose != null) { xMin = Math.min(xMin, spotClose * 0.995); xMax = Math.max(xMax, spotClose * 1.005); }
+    const theoAtClose = spotClose != null ? hedgehogCloseValue(spotClose, trade, multiplier) : null;
+    const closeOffset = realized != null && theoAtClose != null ? realized - theoAtClose : 0;
+    const steps = 240;
+    const points = Array.from({ length: steps + 1 }, (_, idx) => {
+      const spot = xMin + ((xMax - xMin) * idx) / steps;
+      const pnl = payoffAtSpot(spot, trade, kind, multiplier);
+      const closeRaw = theoAtClose != null ? hedgehogCloseValue(spot, trade, multiplier) : null;
+      return {
+        spot, pnl,
+        profit: pnl >= 0 ? pnl : 0, loss: pnl <= 0 ? pnl : 0,
+        pctFromEntry: ((spot - entrySpot) / entrySpot) * 100,
+        ...(closeRaw != null ? { pnlClose: closeRaw + closeOffset } : {}),
+      };
+    });
+    const references: PayoffReference[] = [
+      { key: "entry", label: "SPOT at open", value: entrySpot, color: "var(--primary)", dash: "4 4" },
+      { key: "lpv-long", label: "LPV Long Put (Δ30)", value: klg, color: "var(--gain)", dash: "4 4" },
+      { key: "lpv-short", label: "LPV Short Put (Δ20)", value: ksh, color: "var(--warning)", dash: "3 3" },
+      { key: "far-short", label: "Far Short Put (Δ7)", value: kfar, color: "var(--loss)", dash: "3 3" },
+    ];
+    return {
+      points,
+      references,
+      domain: [xMin, xMax],
+      marker: spotClose == null || realized == null || spotClose < xMin || spotClose > xMax
+        ? null
+        : { label: "Closed here", spot: spotClose, pnl: realized },
+      closeLabel: trade.effective_close_date ? `At close (${fmtDate(trade.effective_close_date)})` : "At close",
+    };
+  }
   const spotEntry = asNum(trade.spot_entry);
   const credit = asNum(trade.total_credit);
   const shortPut = asNum(trade.short_put);
@@ -1769,6 +1931,56 @@ function bsPut(spot: number, strike: number, T: number, sigma: number): number {
   return strike * normCdf(-d2) - spot * normCdf(-d1);
 }
 
+// Black-Scholes de uma CALL via paridade put-call (r=0): C = P + S − K.
+function bsCall(spot: number, strike: number, T: number, sigma: number): number {
+  if (T <= 0 || sigma <= 0) return Math.max(0, spot - strike);
+  return bsPut(spot, strike, T, sigma) + spot - strike;
+}
+
+// Inversa da normal padrão (Acklam) — precisa p/ implicar IV a partir do delta gravado no motor.
+function invNormCdf(p: number): number {
+  if (p <= 0 || p >= 1) return NaN;
+  const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2, -3.066479806614716e1, 2.506628277459239];
+  const b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+  const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
+  const pl = 0.02425;
+  if (p < pl) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p > 1 - pl) return -invNormCdf(1 - p);
+  const q = p - 0.5, r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q /
+    (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+
+// IV implícita a partir do DELTA gravado na entrada (r=0). Resolve o quadrático em σ de
+// d1 = [ln(S/K) + σ²T/2]/(σ√T): σ = (d1 ± √(d1² − 2·ln(S/K)))/√T. Pernas OTM (ln>0) → raiz
+// menor (a maior é o ramo absurdo); guarda de sanidade 1%–300%.
+function ivFromDelta(S: number, K: number, T: number, delta: number, isPut: boolean): number | null {
+  if (S <= 0 || K <= 0 || T <= 0) return null;
+  const p = isPut ? 1 + delta : delta;      // N(d1)
+  if (!(p > 0 && p < 1)) return null;
+  const d1 = invNormCdf(p);
+  const L = Math.log(S / K);
+  const disc = d1 * d1 - 2 * L;
+  if (!Number.isFinite(d1) || disc < 0) return null;
+  const s = Math.sqrt(disc), rt = Math.sqrt(T);
+  const lo = (d1 - s) / rt, hi = (d1 + s) / rt;
+  const sigma = L > 0 ? lo : hi;
+  return sigma > 0.01 && sigma < 3 ? sigma : (hi > 0.01 && hi < 3 ? hi : null);
+}
+
+// Dias corridos entre duas datas "YYYY-MM-DD" (UTC, evita o gotcha de fuso do JS).
+function daysBetween(a?: string | null, b?: string | null): number | null {
+  if (!a || !b) return null;
+  const ta = Date.parse(`${String(a).slice(0, 10)}T00:00:00Z`);
+  const tb = Date.parse(`${String(b).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return null;
+  return Math.round((tb - ta) / 86400000);
+}
+
 // Valor da estrutura Layer B (2 long puts + 1 short put) a `dteClose` dias, em USD.
 // = 2·put(K_long) − 1·put(K_short) − custo de abrir (−cash_open). cash_open é crédito líquido em pts.
 function layerbCloseValue(spot: number, trade: BacktestTrade, multiplier: number): number | null {
@@ -1781,6 +1993,75 @@ function layerbCloseValue(spot: number, trade: BacktestTrade, multiplier: number
   const structVal = 2 * bsPut(spot, kl, T, ivl) - bsPut(spot, ks, T, ivs);   // pts
   // P&L no fechamento = valor atual da estrutura + o caixa líquido recebido na abertura
   return (structVal + cashOpen) * multiplier;
+}
+
+// ── HEDGE HOG (LPV 30DTE + far short put ~90DTE) ─────────────────────────────
+// IVs por perna implicadas dos DELTAS gravados na entrada do evento (não temos IV no export).
+function hedgehogIvs(trade: BacktestTrade): { lg: number; sh: number; far: number } | null {
+  const S = asNum(trade.spot_entry);
+  const klg = asNum(trade.long_put), ksh = asNum(trade.short_put), kfar = asNum(trade.far_short);
+  const dlg = asNum(trade.delta_long), dsh = asNum(trade.delta_short), dfar = asNum(trade.delta_far);
+  const tLpv = daysBetween(trade.trade_date, trade.exp_date);
+  const tFar = daysBetween(trade.trade_date, trade.far_exp);
+  if (S == null || klg == null || ksh == null || kfar == null) return null;
+  if (dlg == null || dsh == null || dfar == null || tLpv == null || tFar == null) return null;
+  const lg = ivFromDelta(S, klg, tLpv / 365, dlg, true);
+  const sh = ivFromDelta(S, ksh, tLpv / 365, dsh, true);
+  const far = ivFromDelta(S, kfar, tFar / 365, dfar, true);
+  if (lg == null || sh == null || far == null) return null;
+  return { lg, sh, far };
+}
+
+// P&L do evento HH no FECHAMENTO (T+0 na data em que rolou): LPV + far reprecificados por BS no
+// DTE residual. Nível ancorado no realizado (mesmo truque do Layer B); a FORMA é o que vale.
+function hedgehogCloseValue(spot: number, trade: BacktestTrade, multiplier: number): number | null {
+  const ivs = hedgehogIvs(trade);
+  const klg = asNum(trade.long_put), ksh = asNum(trade.short_put), kfar = asNum(trade.far_short);
+  const cash = (asNum(trade.far_credit) ?? 0) - (asNum(trade.lpv_debit) ?? 0);
+  const close = trade.effective_close_date;
+  const tLpv = daysBetween(close, trade.exp_date), tFar = daysBetween(close, trade.far_exp);
+  if (ivs == null || klg == null || ksh == null || kfar == null || tLpv == null || tFar == null) return null;
+  const lpv = bsPut(spot, klg, Math.max(0, tLpv) / 365, ivs.lg) - bsPut(spot, ksh, Math.max(0, tLpv) / 365, ivs.sh);
+  const farRes = bsPut(spot, kfar, Math.max(0, tFar) / 365, ivs.far);
+  return (lpv - farRes + cash) * multiplier;
+}
+
+// ── IRON DUCK: valor de fechar o IC na data do first-touch da regra (T+0) ────
+// IV das pontas implicada dos deltas dos SHORTS na entrada; longs usam a mesma vol (skew plano —
+// aproximação; o nível é ancorado no P&L realizado, então só a forma importa).
+function ic0dteCloseValue(spot: number, trade: BacktestTrade): number | null {
+  const lp = asNum(trade.long_put), sp = asNum(trade.short_put);
+  const sc = asNum(trade.short_call), lc = asNum(trade.long_call);
+  const creditUsd = asNum(trade.total_credit);
+  const S = asNum(trade.spot_entry), dte = asNum(trade.dte_entry);
+  const dp = asNum(trade.delta_put), dc = asNum(trade.delta_call);
+  const tClose = daysBetween(trade.effective_close_date, trade.exp_date);
+  if (lp == null || sp == null || sc == null || lc == null || creditUsd == null) return null;
+  if (S == null || dte == null || dp == null || dc == null || tClose == null) return null;
+  const ivP = ivFromDelta(S, sp, dte / 365, dp, true);
+  const ivC = ivFromDelta(S, sc, dte / 365, dc, false);
+  if (ivP == null || ivC == null) return null;
+  const T = Math.max(0, tClose) / 365;
+  const buyback = (bsPut(spot, sp, T, ivP) + bsCall(spot, sc, T, ivC))
+    - (bsPut(spot, lp, T, ivP) + bsCall(spot, lc, T, ivC));
+  return creditUsd - buyback * SPX_PT;
+}
+
+function hedgehogEventLabel(dir: string): string {
+  const map: Record<string, string> = {
+    entry: "Entry",
+    T1_far_tp: "T1 · far put >50% TP",
+    T1_far_roll: "T1 · far roll up (LPV ≥14d)",
+    T1_reopen: "T1 · far >50%, reopen all",
+    T2_lpv_tp: "T2 · LPV >80% TP",
+    T3_lpv_roll: "T3 · LPV <7 DTE roll",
+    T3_reopen: "T3 · LPV <7 DTE, reopen all",
+    T4_reopen: "T4 · breach, reopen all",
+    far_exp: "Far put expiry roll",
+  };
+  if (map[dir]) return map[dir];
+  if (dir.endsWith("_flat")) return `${map[dir.replace(/_flat$/, "")] ?? dir} (flat)`;
+  return dir || DASH;
 }
 
 function payoffAtSpot(
@@ -1834,6 +2115,17 @@ function payoffAtSpot(
     const cashOpen = asNum(trade.cash_open) ?? 0;
     const intrinsic = 2 * Math.max(0, kl - spot) - Math.max(0, ks - spot);
     return (intrinsic + cashOpen) * multiplier;
+  }
+  if (kind === "hedgehog") {
+    // "Expiração" = vencimento do LPV (a perna curta): LPV vira intrínseco; o far short put ainda
+    // tem DTE e entra pelo valor residual BS (IV implicada do delta de entrada). + caixa líquido.
+    const klg = asNum(trade.long_put) ?? 0, ksh = asNum(trade.short_put) ?? 0, kfar = asNum(trade.far_short) ?? 0;
+    const cash = (asNum(trade.far_credit) ?? 0) - (asNum(trade.lpv_debit) ?? 0);
+    const lpvIntr = Math.max(0, klg - spot) - Math.max(0, ksh - spot);
+    const tRes = Math.max(0, daysBetween(trade.exp_date, trade.far_exp) ?? 0) / 365;
+    const ivs = hedgehogIvs(trade);
+    const farRes = ivs != null && tRes > 0 ? bsPut(spot, kfar, tRes, ivs.far) : Math.max(0, kfar - spot);
+    return (lpvIntr - farRes + cash) * multiplier;
   }
   const credit = asNum(trade.total_credit) ?? 0;
   const shortPut = asNum(trade.short_put) ?? 0;

@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 import csv, sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -21,14 +22,16 @@ HOME = Path.home()
 OUT = REPO / "reports" / "iron_duck"
 QC = HOME / "qc_batman"
 
-# (tag, arquivo DUCK, underlying, combo default do Reiner: (tp, dte))
+# (tag, arquivo DUCK, underlying, campos do combo EXATO do Reiner — SEM tested)
+# SPX = TP40 ou 5DTE ou stop $300 · RUT = TP50 ou 5DTE.
 RUNS = [
-    ("SPX", QC / "duck_spx_5y.csv", "SPX", ("tp40", "dte5")),
-    ("RUT", QC / "duck_rut_5y.csv", "RUT", ("tp50", "dte2")),
+    ("SPX", QC / "duck_spx_5y.csv", "SPX", ["tp40", "dte5", "ls300"]),
+    ("RUT", QC / "duck_rut_5y.csv", "RUT", ["tp50", "dte5"]),
 ]
 MULT = 100.0
 # regras expostas no seletor do app (label -> coluna pnl_*)
-RULES_ORDER = ["reiner", "hold", "tp25", "tp40", "tp50", "tp75", "dte5", "dte2", "sm30", "tested"]
+RULES_ORDER = ["reiner", "hold", "tp25", "tp40", "tp50", "tp75", "dte5", "dte2",
+               "sm15", "sm20", "sm25", "sm30", "ls300", "ls750", "ls1500", "ls3000", "tested"]
 
 
 def parse_duck(path: Path):
@@ -59,44 +62,44 @@ def fnum(r, k, d=0.0):
 
 
 def bb_hoff(field_val):
-    """'hoff:buyback' -> (hoff:int, buyback:float) ou None."""
+    """'hoff:buyback[:dS]' -> (hoff:int, buyback:float, dS:float|None) ou None.
+    dS = offset do spot vs entrada no momento do toque (formato novo; velho = 2 campos)."""
     if field_val in ("", None):
         return None
     try:
-        h, b = str(field_val).split(":")
-        return int(h), float(b)
+        parts = str(field_val).split(":")
+        h, b = int(parts[0]), float(parts[1])
+        dS = float(parts[2]) if len(parts) > 2 else None
+        return h, b, dS
     except Exception:
         return None
 
 
 def derive(r, rule, combo):
-    """P&L (USD) de uma regra. buyback -> (credit - buyback)*MULT; se nao cruzou -> settle."""
+    """Uma regra -> (pnl_usd, hoff|None, dS|None). buyback -> (credit - buyback)*MULT;
+    sem toque -> settle (hoff/dS None = fechou na expiracao)."""
     cr = fnum(r, "credit")
     settle = fnum(r, "settle_net")
 
     def one(field):
         x = bb_hoff(r.get(field, ""))
-        return (cr - x[1]) * MULT if x else settle
+        return ((cr - x[1]) * MULT, x[0], x[2]) if x else (settle, None, None)
 
     if rule == "hold":
-        return settle
-    if rule in ("tp25", "tp40", "tp50", "tp75", "sm30", "dte5", "dte2"):
-        return one(rule)
+        return settle, None, None
     if rule == "tested":
         return one("cross_tested")
     if rule == "reiner":
-        # first-touch entre {tp, dte, sm30, tested} pelo hoff
-        tp, dte = combo
-        cands = []
-        for f in (tp, dte, "sm30", "cross_tested"):
-            x = bb_hoff(r.get(f, ""))
-            if x:
-                cands.append(x)
+        # combo EXATO do Reiner (lista de campos, SEM tested): first-touch pelo hoff
+        cands = [x for x in (bb_hoff(r.get(f, "")) for f in combo) if x]
         if not cands:
-            return settle
+            return settle, None, None
         cands.sort(key=lambda t: t[0])
-        return (cr - cands[0][1]) * MULT
-    return settle
+        h, b, dS = cands[0]
+        return (cr - b) * MULT, h, dS
+    if rule.startswith(("tp", "sm", "ls", "dte")):     # regra isolada -> lê o campo direto
+        return one(rule)
+    return settle, None, None
 
 
 def build(tag, path, underlying, combo):
@@ -105,10 +108,10 @@ def build(tag, path, underlying, combo):
         print(f"  {tag}: 0 trades, pulo"); return None
     trades = []
     for r in rows:
-        pnls = {rule: round(derive(r, rule, combo), 2) for rule in RULES_ORDER}
-        # DEFAULT = HOLD (settle analitico, sem spread) — limpo e reconcilia com o Reiner por-trade.
-        # As regras de saida antecipada usam buyback cruzando o bid-ask (realista, mas na iliquidez do
-        # RUT distorce muito -> ficam como opcoes/diagnostico, nao como headline). Ver ACHADOS.
+        drv = {rule: derive(r, rule, combo) for rule in RULES_ORDER}
+        pnls = {rule: round(v[0], 2) for rule, v in drv.items()}
+        # DEFAULT = HOLD (settle analitico) — REGRA DA MESA: tudo no MID (entradas, saidas, hold);
+        # os buybacks das regras tambem sao no mid (motor 2026-07-21) -> comparaveis ao hold.
         default_pnl = pnls["hold"]
         t = {
             "trade_date": r.get("open_date"), "exp_date": r.get("expiry_date"),
@@ -132,14 +135,35 @@ def build(tag, path, underlying, combo):
         }
         for rule in RULES_ORDER:
             t[f"pnl_{rule}"] = pnls[rule]
+        # ONDE/QUANDO cada regra fechou (p/ o Trade Auditor marcar o ponto no payoff):
+        #   toque -> spot_close = S_entry + dS (gravado no motor), close_date = open + hoff horas;
+        #   sem toque -> fechou na expiracao (spot settle / data da expiracao).
+        try:
+            open_dt = datetime.strptime(f"{r.get('open_date')} {r.get('open_time','09:45')}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            open_dt = None
+        s_entry = fnum(r, "S_entry"); s_settle = fnum(r, "S_settle")
+        for rule in RULES_ORDER:
+            _, hoff, dS = drv[rule]
+            if hoff is not None and dS is not None and open_dt is not None:
+                t[f"spot_close_{rule}"] = round(s_entry + dS, 2)
+                t[f"close_date_{rule}"] = (open_dt + timedelta(hours=hoff)).strftime("%Y-%m-%d")
+            else:
+                t[f"spot_close_{rule}"] = round(s_settle, 2)
+                t[f"close_date_{rule}"] = r.get("expiry_date")
         trades.append(t)
 
-    # RECONCILIACAO: soma da regra default
+    # RECONCILIACAO: soma da regra default (hold)
     total = round(sum(t["pnl_usd"] for t in trades), 2)
     hold_total = round(sum(t["pnl_hold"] for t in trades), 2)
-    print(f"  {tag}: {len(trades)} trades | default(reiner) ${total:,.0f} | hold ${hold_total:,.0f} "
-          f"| WR {100.0*sum(1 for t in trades if t['pnl_usd']>0)/len(trades):.0f}% "
-          f"| period {trades[0]['trade_date']}..{trades[-1]['trade_date']}")
+    print(f"  {tag}: {len(trades)} trades | period {trades[0]['trade_date']}..{trades[-1]['trade_date']}")
+    # TABELA comparativa (total / WR / PIOR trade) — responde 'qual saida corta as perdas grandes?'
+    print(f"    {'regra':16} {'total':>12} {'WR':>5} {'pior trade':>12}")
+    for rule in ["hold", "reiner", "tp40", "tp50", "dte5", "dte2",
+                 "ls300", "ls750", "ls1500", "ls3000", "sm20", "sm30"]:
+        ps = [t[f"pnl_{rule}"] for t in trades]
+        n = sum(ps); wr = 100.0 * sum(1 for x in ps if x > 0) / len(ps); worst = min(ps)
+        print(f"    {rule:16} ${n:>10,.0f} {wr:>4.0f}% ${worst:>10,.0f}")
 
     # daily.csv = equity da regra default
     daily = []; cum = 0.0
