@@ -1898,20 +1898,20 @@ if (_HH_DIR / "SPX" / "trades.csv").exists():
         "id": "hedge-hog-spx",
         "name": "Hedge Hog · SPX",
         "underlying": "SPX",
-        "strategy": "Hedge Hog · SPX · LPV 30DTE (30Δ/20Δ debit) + far short put 90DTE (7Δ credit)",
+        "strategy": "Hedge Hog · SPX · Bear Put Spread 30DTE (30Δ/20Δ debit) + Short Put 90DTE (7Δ credit)",
         "family": "Hedge Hog",
         "horizon": "30/90DTE",
         "description": (
             "Hedge Hog high-probability income trade (Reiner / EdgeSeeker) on SPX, managed EXACTLY per "
-            "the source PDF. A short-duration long put vertical (BUY ~30Δ put, SELL ~20Δ put, ~30 DTE — "
-            "'Der Hedge', a debit) financed by a long-duration short put (SELL 5-10Δ put, 75-115 DTE — "
-            "'Das Schwein', a credit); net credit since the far premium exceeds the vertical debit. "
-            "Triggers per the PDF: T1 far >50% profit → roll the far up if the LPV still has ≥14 DTE, "
-            "otherwise close and re-establish the whole spread; T2 LPV >80% profit → roll the LPV down; "
-            "T3 LPV <7 DTE → close and re-establish the whole spread; T4 price breaks the LPV short "
-            "strike within 10 days of entry → close and re-establish. Each row is one event (entry/"
-            "roll); per-row P&L is the realized change, so the table sums to the headline. 5-year "
-            "QuantConnect backtest at MID, 1 unit."
+            "the source PDF. A short-duration bear put spread (BUY ~30Δ put, SELL ~20Δ put, ~30 DTE — "
+            "the PDF's 'Der Hedge', a debit) financed by a long-duration short put (SELL 5-10Δ put, "
+            "75-115 DTE — 'Das Schwein', a credit); net credit since the short-put premium exceeds the "
+            "bear-put-spread debit. Triggers per the PDF: T1 short put >50% profit → roll the short put "
+            "up if the bear put spread still has ≥14 DTE, otherwise close and re-establish everything; "
+            "T2 bear put spread >80% profit → roll it down; T3 bear put spread <7 DTE → close and "
+            "re-establish everything; T4 price breaks the bear put spread's short strike within 10 days "
+            "of entry → close and re-establish. Each row is one event (entry/roll); per-row P&L is the "
+            "realized change, so the table sums to the headline. 5-year QuantConnect backtest at MID, 1 unit."
         ),
         "trades_csv": "hedge_hog/SPX/trades.csv",
         "daily_csv": "hedge_hog/SPX/daily.csv",

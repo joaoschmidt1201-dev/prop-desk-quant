@@ -770,7 +770,7 @@ function TradesTable({
   const isLayerB = detail.meta.kind === "layerb";
   const isHedgehog = detail.meta.kind === "hedgehog";
   const headers = isHedgehog
-    ? ["Date", "LPV Exp", "Spot", "VIX", "Event", "LPV S/L", "Far (exp)", "Net credit", "P&L", "Result"]
+    ? ["Date", "Bear Put Exp", "Spot", "VIX", "Event", "Bear Put S/L", "Short Put (exp)", "Net credit", "P&L", "Result"]
     : isLayerB
     ? ["Date", "Exp", "Spot", "VIX", "Roll type", "Short / Long×2", "Δ s / l", "Net roll", "P&L wk", "Result"]
     : isSs42
@@ -1035,12 +1035,12 @@ function TradeInspector({
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <KpiBlock label="VIX Entry" value={fmtNum(vixEntry)} />
           <KpiBlock
-            label="LPV (debit)"
+            label="Bear Put Spread (debit)"
             value={asNum(trade.lpv_debit) != null ? `${fmtNum(asNum(trade.lpv_debit))} pts` : DASH}
             sub={`${fmtNum(asNum(trade.long_put))} / ${fmtNum(asNum(trade.short_put))} · ${fmtNum(dteEntry)}d`}
           />
           <KpiBlock
-            label="Far short put"
+            label="Short Put"
             value={asNum(trade.far_credit) != null ? `${fmtNum(asNum(trade.far_credit))} pts cr` : DASH}
             sub={`${fmtNum(asNum(trade.far_short))} · Δ ${fmtNum(asNum(trade.delta_far))}`}
           />
@@ -1381,9 +1381,9 @@ function buildHedgehogLegRows(trade: BacktestTrade): LegRow[] {
   const exp = trade.exp_date ? fmtDate(trade.exp_date) : DASH;
   const fexp = trade.far_exp ? fmtDate(trade.far_exp) : DASH;
   return [
-    { leg: `LPV Long Put (${exp})`, side: "Buy", strike: asNum(trade.long_put), detail: fmtDelta(asNum(trade.delta_long)), mid: null },
-    { leg: `LPV Short Put (${exp})`, side: "Sell", strike: asNum(trade.short_put), detail: fmtDelta(asNum(trade.delta_short)), mid: null },
-    { leg: `Far Short Put (${fexp})`, side: "Sell", strike: asNum(trade.far_short), detail: fmtDelta(asNum(trade.delta_far)), mid: asNum(trade.far_credit) },
+    { leg: `Bear Put Spread — Buy (${exp})`, side: "Buy", strike: asNum(trade.long_put), detail: fmtDelta(asNum(trade.delta_long)), mid: null },
+    { leg: `Bear Put Spread — Sell (${exp})`, side: "Sell", strike: asNum(trade.short_put), detail: fmtDelta(asNum(trade.delta_short)), mid: null },
+    { leg: `Short Put (${fexp})`, side: "Sell", strike: asNum(trade.far_short), detail: fmtDelta(asNum(trade.delta_far)), mid: asNum(trade.far_credit) },
   ];
 }
 
@@ -1835,9 +1835,9 @@ function buildPayoffSeries(
     });
     const references: PayoffReference[] = [
       { key: "entry", label: "SPOT at open", value: entrySpot, color: "var(--primary)", dash: "4 4" },
-      { key: "lpv-long", label: "LPV Long Put (Δ30)", value: klg, color: "var(--gain)", dash: "4 4" },
-      { key: "lpv-short", label: "LPV Short Put (Δ20)", value: ksh, color: "var(--warning)", dash: "3 3" },
-      { key: "far-short", label: "Far Short Put (Δ7)", value: kfar, color: "var(--loss)", dash: "3 3" },
+      { key: "lpv-long", label: "Bear Put Spread — Buy (Δ30)", value: klg, color: "var(--gain)", dash: "4 4" },
+      { key: "lpv-short", label: "Bear Put Spread — Sell (Δ20)", value: ksh, color: "var(--warning)", dash: "3 3" },
+      { key: "far-short", label: "Short Put (Δ7)", value: kfar, color: "var(--loss)", dash: "3 3" },
     ];
     return {
       points,
@@ -2050,14 +2050,14 @@ function ic0dteCloseValue(spot: number, trade: BacktestTrade): number | null {
 function hedgehogEventLabel(dir: string): string {
   const map: Record<string, string> = {
     entry: "Entry",
-    T1_far_tp: "T1 · far put >50% TP",
-    T1_far_roll: "T1 · far roll up (LPV ≥14d)",
-    T1_reopen: "T1 · far >50%, reopen all",
-    T2_lpv_tp: "T2 · LPV >80% TP",
-    T3_lpv_roll: "T3 · LPV <7 DTE roll",
-    T3_reopen: "T3 · LPV <7 DTE, reopen all",
+    T1_far_tp: "T1 · short put >50% TP",
+    T1_far_roll: "T1 · short put roll up (bear put ≥14d)",
+    T1_reopen: "T1 · short put >50%, reopen all",
+    T2_lpv_tp: "T2 · bear put >80% TP",
+    T3_lpv_roll: "T3 · bear put <7 DTE roll",
+    T3_reopen: "T3 · bear put <7 DTE, reopen all",
     T4_reopen: "T4 · breach, reopen all",
-    far_exp: "Far put expiry roll",
+    far_exp: "Short put expiry roll",
   };
   if (map[dir]) return map[dir];
   if (dir.endsWith("_flat")) return `${map[dir.replace(/_flat$/, "")] ?? dir} (flat)`;
