@@ -109,7 +109,7 @@ function compareTrades(sortMode: SortMode, sortDirection: SortDirection, a: Trad
 }
 
 export function TradesTable({ filter }: Props) {
-  const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [sortMode, setSortMode] = useState<SortMode>("open_date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const { data, isLoading } = useQuery({
     queryKey: ["trades", filter.months, filter.env, filter.live],

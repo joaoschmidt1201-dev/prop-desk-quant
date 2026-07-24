@@ -7,6 +7,7 @@ familia da estrategia e DTE direto do nome, entao qualquer nome novo precisa de 
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 import export_control_panel as export
@@ -34,6 +35,35 @@ def test_underlyings_tuple_stays_in_sync() -> None:
 def test_infer_underlying_from_name(name: str, expected: str) -> None:
     assert api._infer_underlying_from_name(name) == expected
     assert export._infer_underlying(name) == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        # Acao NOVA (fora da tupla fixa): resolve pelo 1o token do nome, sem manter a lista a mao.
+        ("260724-1 AMD SC7", "AMD"),
+        ("T90 COIN PS7", "COIN"),
+        ("JS NFLX SS8", "NFLX"),        # prefixo de env "JS " antes do ticker
+        ("260724-2 GOOGL IC7", "GOOGL"),  # 5 letras
+        ("260724-9 PLTR BPS8", "PLTR"),
+    ],
+)
+def test_infer_underlying_fallback_new_tickers(name: str, expected: str) -> None:
+    # os dois modulos precisam concordar (paridade) tambem no fallback.
+    assert api._infer_underlying_from_name(name) == expected
+    assert export._infer_underlying(name) == expected
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "260724-1 SC7 sem ticker",   # codigo de estrategia solto nao vira ticker
+        "260724-1 CALL FLY teste",   # descritor generico nao vira ticker
+    ],
+)
+def test_infer_underlying_fallback_ignores_non_tickers(name: str) -> None:
+    assert api._infer_underlying_from_name(name) is None
+    assert export._infer_underlying(name) == "?"
 
 
 @pytest.mark.parametrize(
@@ -176,3 +206,54 @@ def test_migration_preserves_a_real_net_credit() -> None:
     assert [t["net_credit"] for t in snap["trades"]] == [-40.0, None, None]
     assert [t["max_profit"] for t in snap["trades"]] == [59858.0, 1600.0, None]
     assert snap["trades"][0]["contracts"] == 2
+
+
+def _snapshot_one(dte_open: int, open_offset_days: int, closed_from_sheets: set[str] | None = None) -> dict:
+    """Monta um snapshot de 1 trade RUT p/ testar o is_active. Marca db_robots HOJE (ativo pela data) e abre
+    `open_offset_days` atrás com `dte_open` DTE → controla se venceu hoje, ontem ou no futuro. `closed_from_sheets`
+    simula o marcador manual 'Closed' que o CZ escreve na célula acima do nome/url no Control Panel."""
+    today = pd.Timestamp.today().normalize()
+    open_date = today - pd.Timedelta(days=open_offset_days)
+    robots = pd.DataFrame([{
+        "date": today, "strategy": "260724-1 RUT SS7", "environment": "CZ Trades",
+        "env_norm": "CZ_Live", "pnl": 100.0, "delta": 0.1, "was_closed_flag": False,
+    }])
+    cria = pd.DataFrame([{
+        "trade_name": "260724-1 RUT SS7", "max_profit": 500.0, "max_loss": -5000.0,
+        "dte_open": dte_open, "dte_open_raw": str(dte_open), "open_date": open_date,
+        "underlying_price": 2400.0, "ist_lw_be": 2350.0, "ist_up_be": 2450.0,
+        "soll_lw_be": None, "soll_up_be": None, "strikes": "2350P / 2450C", "sd": 0.1,
+    }])
+    snap = export.build_trade_snapshot(robots, cria, closed_from_sheets)
+    assert snap, "snapshot vazio"
+    return snap[0]
+
+
+def test_snapshot_expiry_day_is_still_active() -> None:
+    """Vence HOJE (raw_days == 0, '0 DTE') NÃO é fechado — segue aberto até o settlement. Era o bug
+    que jogava todo trade de expiry-day pra Closed (e, por tabela, sumia o BE dist)."""
+    t = _snapshot_one(dte_open=7, open_offset_days=7)
+    assert t["is_active"] is True
+    assert t["dte_remaining"] == 0
+
+
+def test_snapshot_after_expiry_is_closed() -> None:
+    """Venceu ONTEM (raw_days == -1) → Closed."""
+    t = _snapshot_one(dte_open=7, open_offset_days=8)
+    assert t["is_active"] is False
+
+
+def test_snapshot_future_expiry_is_active() -> None:
+    """Vence daqui a dias, SEM marcador manual → Open (dentro do prazo). Regra do João: enquanto não tiver
+    'Closed' e estiver antes da expiração, aparece open."""
+    t = _snapshot_one(dte_open=7, open_offset_days=2)
+    assert t["is_active"] is True
+    assert t["dte_remaining"] == 5
+
+
+def test_snapshot_manual_close_within_dte_is_closed() -> None:
+    """Regra do João: o CZ fecha o trade ANTES do vencimento e escreve 'Closed' na célula acima do nome/url.
+    O marcador manual vence o DTE → Closed no app JÁ, mesmo com DTE restante > 0."""
+    t = _snapshot_one(dte_open=7, open_offset_days=2, closed_from_sheets={"260724-1 RUT SS7"})
+    assert t["is_active"] is False
+    assert t["dte_remaining"] == 5   # o DTE segue calculado; só o STATUS mudou pelo marcador manual

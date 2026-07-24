@@ -372,12 +372,33 @@ def snapshot_age_seconds(snap: dict[str, Any]) -> float | None:
     return max(0.0, (now_dt - generated_dt).total_seconds())
 
 
+# Fallback de ticker: quando a lista fixa não casa (ação nova que o CZ passou a tradar), assume que o 1º
+# token só-letras do nome, DEPOIS do id do trade, é o ticker — padrão do CZ é "<id> <TICKER> <estratégia>".
+# Mantido IDÊNTICO ao export_control_panel._ticker_fallback_from_name (tests/test_trade_parsing trava a paridade).
+_TICKER_ID_PREFIX_RE = re.compile(r"^\s*(?:JS\s+)?(?:T\d+|\d{6}-\d+|PL\d+|FOR\d+)?\s*", re.IGNORECASE)
+_NON_TICKER_TOKENS = frozenset({
+    "SP", "SC", "SS", "IC", "PS", "CS", "JL", "BW", "TC", "DC", "BAT", "FLY", "PCS", "BPS",
+    "BCS", "CCS", "RJL", "BWB", "BWIC", "PFLY", "IF", "IB", "LP", "SD",
+    "CALL", "PUT", "BEAR", "BULL", "HALF", "FULL", "LONG", "SHORT", "EDGE", "DIAG", "ROLL",
+    "WIDE", "INCOME", "HEDGE", "FOR", "JS", "PL",
+})
+
+
+def _ticker_fallback_from_name(name: Any) -> str | None:
+    n = _TICKER_ID_PREFIX_RE.sub("", str(name or "").strip())
+    m = re.match(r"([A-Za-z]{1,5})\b", n)
+    if not m:
+        return None
+    tok = m.group(1).upper()
+    return None if tok in _NON_TICKER_TOKENS else tok
+
+
 def _infer_underlying_from_name(name: Any) -> str | None:
     n = str(name or "").upper()
     for sym in TRADE_UNDERLYINGS:
         if re.search(rf"(?<![A-Z0-9]){re.escape(sym)}(?![A-Z0-9])", n):
             return UNDERLYING_ALIASES.get(sym, sym)
-    return None
+    return _ticker_fallback_from_name(name)
 
 
 def _normalize_snapshot_underlyings(snap: dict[str, Any]) -> None:

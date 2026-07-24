@@ -1182,9 +1182,12 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
         if open_date and dte_open:
             try:
                 exp_date = open_date + pd.Timedelta(days=int(dte_open))
-                dte_remaining = max(0, (exp_date - today).days)
-                # Trade com DTE calculado = 0 já expirou — não é ativo
-                if dte_remaining == 0 and is_active:
+                raw_days = (exp_date - today).days
+                dte_remaining = max(0, raw_days)
+                # Só fecha se JÁ venceu (venc ANTES de hoje). Vencer HOJE (raw_days == 0, "0 DTE") ainda é
+                # ATIVO — o trade segue aberto até o settlement. Antes, dte_remaining==0 (que também vale p/
+                # já-vencido, por causa do max(0,…)) fechava indevidamente todo trade de expiry-day.
+                if raw_days < 0 and is_active:
                     is_active = False
             except Exception:
                 pass
@@ -1247,12 +1250,33 @@ def build_trade_snapshot(db_robots: pd.DataFrame, db_cria: pd.DataFrame,
     return sorted(trades, key=lambda t: (not t["is_active"], t["name"]))
 
 
+# Fallback de ticker: quando a lista fixa não casa (ação nova que o CZ passou a tradar), assume que o 1º
+# token só-letras do nome, DEPOIS do id do trade, é o ticker — padrão do CZ é "<id> <TICKER> <estratégia>".
+# Automatiza tickers novos sem manter a tupla à mão. Ignora códigos de estratégia / descritores soltos.
+_TICKER_ID_PREFIX_RE = re.compile(r"^\s*(?:JS\s+)?(?:T\d+|\d{6}-\d+|PL\d+|FOR\d+)?\s*", re.IGNORECASE)
+_NON_TICKER_TOKENS = frozenset({
+    "SP", "SC", "SS", "IC", "PS", "CS", "JL", "BW", "TC", "DC", "BAT", "FLY", "PCS", "BPS",
+    "BCS", "CCS", "RJL", "BWB", "BWIC", "PFLY", "IF", "IB", "LP", "SD",
+    "CALL", "PUT", "BEAR", "BULL", "HALF", "FULL", "LONG", "SHORT", "EDGE", "DIAG", "ROLL",
+    "WIDE", "INCOME", "HEDGE", "FOR", "JS", "PL",
+})
+
+
+def _ticker_fallback_from_name(name) -> str | None:
+    n = _TICKER_ID_PREFIX_RE.sub("", str(name or "").strip())
+    m = re.match(r"([A-Za-z]{1,5})\b", n)
+    if not m:
+        return None
+    tok = m.group(1).upper()
+    return None if tok in _NON_TICKER_TOKENS else tok
+
+
 def _infer_underlying(name: str) -> str:
     n = name.upper()
     for sym in TRADE_UNDERLYINGS:
         if re.search(rf"(?<![A-Z0-9]){re.escape(sym)}(?![A-Z0-9])", n):
             return UNDERLYING_ALIASES.get(sym, sym)
-    return "?"
+    return _ticker_fallback_from_name(name) or "?"
 
 
 def _infer_underlying_from_visual(name: str, open_price: float | None) -> str:
